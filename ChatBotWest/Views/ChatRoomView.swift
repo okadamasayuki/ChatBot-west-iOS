@@ -56,17 +56,17 @@ struct ChatRoomView: View {
     /// 相談の本人には自分の質問、財務にはBAの回答に対して表示する
     private func readStatus(for msg: Message) -> String? {
         guard let r = room else { return nil }
-        if store.isMyRoom(r) {
-            guard msg.role == .user else { return nil }
-            // 自分以外の誰か(財務など)が読んだか
-            let read = r.reads.contains { $0.key != store.myUid() && $0.value >= msg.ts }
-            return read ? "既読" : "未読"
-        } else if store.isExpert {
+        if store.isExpert {
+            // 財務は常にBAの回答に対して表示(相談の本人が読んだか)
             guard msg.role == .expert else { return nil }
-            // 相談の本人が読んだか
-            let read = r.ownerUid.isEmpty
+            let read = r.ownerUid.isEmpty || r.ownerUid == store.myUid()
                 ? r.reads.contains { $0.key != store.myUid() && $0.value >= msg.ts }
                 : (r.reads[r.ownerUid] ?? "") >= msg.ts
+            return read ? "既読" : "未読"
+        } else if store.isMyRoom(r) {
+            // 担当者は自分の質問に対して表示(自分以外の誰かが読んだか)
+            guard msg.role == .user else { return nil }
+            let read = r.reads.contains { $0.key != store.myUid() && $0.value >= msg.ts }
             return read ? "既読" : "未読"
         }
         return nil
