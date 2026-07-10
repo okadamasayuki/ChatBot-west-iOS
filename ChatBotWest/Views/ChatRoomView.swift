@@ -27,10 +27,10 @@ struct ChatRoomView: View {
         return store.isExpert || store.isMyRoom(r)
     }
 
-    /// BAタブの該当案件へジャンプ(財務のみ。案件があり完了していない場合)
-    private var canJumpToCase: Bool {
-        guard store.isExpert, let id = store.currentRoomId else { return false }
-        return store.cases.contains { $0.roomId == id } && !store.isDoneRoom(id)
+    /// この相談の未回答案件(財務のみ、チャット内にBAの案件カードを統合表示する)
+    private var roomCases: [CaseItem] {
+        guard store.isExpert, let id = store.currentRoomId, !store.isDoneRoom(id) else { return [] }
+        return store.cases.filter { $0.roomId == id && $0.status != .answered }
     }
 
     var body: some View {
@@ -55,6 +55,11 @@ struct ChatRoomView: View {
                         }
                         if store.pendingTyping {
                             TypingBubble().id("typing")
+                        }
+                        // BAタブの該当案件をチャット内に統合表示(財務のみ・未回答の案件)
+                        ForEach(roomCases) { c in
+                            CaseCardView(caseItem: c)
+                                .padding(.top, 4)
                         }
                     }
                     .padding(.horizontal, 10)
@@ -101,12 +106,6 @@ struct ChatRoomView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
-                if canJumpToCase {
-                    Button("回答する") {
-                        if let id = store.currentRoomId { store.jumpToCase(roomId: id) }
-                    }
-                    .font(.system(size: 13))
-                }
                 if canToggleDone {
                     Button {
                         if let id = store.currentRoomId { store.toggleRoomDone(id) }
