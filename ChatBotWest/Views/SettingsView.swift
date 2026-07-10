@@ -109,6 +109,7 @@ struct SettingsView: View {
                                 }
                             }
                         Button("回答の癖を保存") {
+                            styleFocused = false // 保存したらキーボードを閉じる
                             store.saveAnswerStyle(styleText)
                             styleSavedNote = true
                         }
@@ -138,6 +139,14 @@ struct SettingsView: View {
             }
             .navigationTitle("設定")
             .navigationBarTitleDisplayMode(.inline)
+            // 下にスクロールするとキーボードが閉じる + キーボード上部に「完了」ボタン
+            .scrollDismissesKeyboard(.interactively)
+            .toolbar {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("完了") { styleFocused = false }
+                }
+            }
             .onAppear { styleText = store.answerStyle }
             .onChange(of: store.answerStyle) { s in
                 // Web版などでの変更をリアルタイム反映(このアプリで編集中のときは上書きしない)
