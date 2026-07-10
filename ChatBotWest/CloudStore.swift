@@ -39,10 +39,12 @@ final class CloudStore: ObservableObject {
     @Published var sending = false
     var pendingRoom: Room? // 未送信の新規相談(最初のメッセージ送信まで保存しない)
 
-    /// 開発モード(動作は未定義。トグルの状態だけ端末に保存される)
+    /// 開発モード: APIが担当者役(会計の素人)になり、聞き返しへの返答や回答への更問を自動で行う
     @Published var devMode: Bool = UserDefaults.standard.bool(forKey: "devMode") {
         didSet { UserDefaults.standard.set(devMode, forKey: "devMode") }
     }
+    private var devFollowupCounts: [String: Int] = [:] // roomId → 更問の回数(ループ防止・各ルーム2回まで)
+    private var devClarifyCounts: [String: Int] = [:]  // roomId → 聞き返しへの返答回数(各ルーム3回まで)
 
     private let db = Firestore.firestore()
     private let wid: String
@@ -520,9 +522,11 @@ final class CloudStore: ObservableObject {
         return isMyRoom(r)
     }
 
-    func submitQuestion(_ text: String) async {
+    /// `simulated` = 開発モードの担当者役(API)による送信(財務の端末からでも送れる)
+    func submitQuestion(_ text: String, simulated: Bool = false) async {
         let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty, !sending, currentRoomId != nil, canSendInCurrentRoom else { return }
+        guard !text.isEmpty, !sending, currentRoomId != nil,
+              simulated || canSendInCurrentRoom else { return }
 
         sending = true
         pendingTyping = true
@@ -555,10 +559,12 @@ final class CloudStore: ObservableObject {
                 addMessage(Message(role: .ai, text: result.answer), roomId: roomId)
                 addQa(QaEntry(question: text, answeredBy: "AI", answer: result.answer,
                               askedAt: nowIso(), answeredAt: nowIso()))
+                scheduleDevQuestionerReply(roomId: roomId, isFollowup: true)
             } else if result.decision == "clarify", !result.clarify_question.isEmpty {
                 // 情報不足 → 短い質問+選択肢ボタンで聞き返す
                 addMessage(Message(role: .ai, text: result.clarify_question,
                                    clarifyOptions: result.clarify_options), roomId: roomId)
+                scheduleDevQuestionerReply(roomId: roomId, isFollowup: false)
             } else {
                 // エスカレーション
                 let caseObj = CaseItem(
@@ -633,5 +639,40 @@ final class CloudStore: ObservableObject {
         ))
         updateCase(c.id, ["answer": text, "status": CaseStatus.answered.rawValue,
                           "answeredAt": nowIso(), "handledBy": handler])
+        scheduleDevQuestionerReply(roomId: c.roomId, isFollowup: true)
+    }
+
+    // MARK: - 開発モード(APIによる担当者役)
+
+    /// APIが担当者役(会計の素人)として返信する。
+    /// 聞き返しには返答し、AI/BAの回答には更問(追加質問)をする。他の挙動は変えない。
+    private func scheduleDevQuestionerReply(roomId: String, isFollowup: Bool) {
+        guard devMode else { return }
+        if isFollowup {
+            guard devFollowupCounts[roomId, default: 0] < 2 else { return }
+            devFollowupCounts[roomId, default: 0] += 1
+        } else {
+            guard devClarifyCounts[roomId, default: 0] < 3 else { return }
+            devClarifyCounts[roomId, default: 0] += 1
+        }
+        Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
+            guard let self, self.currentRoomId == roomId, !self.sending else { return }
+            // 質問者の視点で会話履歴を組み立てる(自分の発言=assistant、AI/BA=user)
+            let history = self.roomMessages
+                .filter { $0.role != .system }
+                .suffix(20)
+                .map { ClaudeService.ChatMessage(role: $0.role == .user ? "assistant" : "user", content: $0.text) }
+            guard history.last?.role == "user" else { return }
+            do {
+                let reply = try await ClaudeService.call(system: Prompts.devQuestionerSystem,
+                                                         messages: Array(history))
+                let text = reply.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !text.isEmpty, self.currentRoomId == roomId else { return }
+                await self.submitQuestion(text, simulated: true)
+            } catch {
+                // 開発モードの自動返信は失敗しても通常フローに影響させない
+            }
+        }
     }
 }
