@@ -345,9 +345,13 @@ struct PdfKitView: UIViewRepresentable {
                 let chars = Array(pageText)
                 var s = map[startNorm]
                 var e = map[endNorm]
-                // 文の区切りまで拡張(引用が短い/部分一致でも中途半端にならない)
-                while s > 0, chars[s - 1] != "。", chars[s - 1] != "\n" { s -= 1 }
-                while e < chars.count - 1, chars[e] != "。", chars[e] != "\n" { e += 1 }
+                // 文の区切り「。」まで拡張(引用が短い/部分一致でも中途半端にならない)。
+                // PDF内部のテキストは行の折り返しで改行が入るため、改行はまたいで広げる。
+                // 見出しなど「。」が無い場所で広がりすぎないよう、拡張は前後120文字まで
+                var budget = 120
+                while s > 0, chars[s - 1] != "。", budget > 0 { s -= 1; budget -= 1 }
+                budget = 120
+                while e < chars.count - 1, chars[e] != "。", budget > 0 { e += 1; budget -= 1 }
                 let sIdx = pageText.index(pageText.startIndex, offsetBy: s)
                 let eIdx = pageText.index(pageText.startIndex, offsetBy: e + 1)
                 if let sel = page.selection(for: NSRange(sIdx..<eIdx, in: pageText)) {
