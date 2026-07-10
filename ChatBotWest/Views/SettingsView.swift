@@ -129,7 +129,7 @@ struct SettingsView: View {
                     Toggle("🛠 開発モード", isOn: $store.devMode)
                         .tint(Theme.accent)
                 } footer: {
-                    Text("オンにすると、ごく基本的な質問はAIが回答し、情報不足のときは聞き返し、それ以外は「AIアシスタントでは解決できずBA回答が必要」として積極的にエスカレーションされます(BAフローのテスト用)。")
+                    Text("実践練習用。ごく基本的な質問はAIが回答し、情報不足のときは聞き返します。聞き返しへの担当者の返答は自動で行われ、解決できない質問は「BA回答が必要」としてエスカレーションされます。")
                 }
 
                 Section("⬇ Q&A履歴のダウンロード") {
@@ -166,7 +166,13 @@ struct SettingsView: View {
             }
             .confirmationDialog("すべての相談・BAの案件・回答履歴を削除しますか?\n全員の画面から消え、元に戻せません。",
                                 isPresented: $confirmDeleteAll, titleVisibility: .visible) {
-                Button("削除する", role: .destructive) { confirmDeleteAllFinal = true }
+                Button("削除する", role: .destructive) {
+                    // 1つ目のダイアログが閉じ切ってから最終確認を出す(連続表示だと出ないことがある)
+                    Task { @MainActor in
+                        try? await Task.sleep(nanoseconds: 500_000_000)
+                        confirmDeleteAllFinal = true
+                    }
+                }
                 Button("キャンセル", role: .cancel) {}
             }
             .confirmationDialog("本当に削除しますか?(最終確認)",
