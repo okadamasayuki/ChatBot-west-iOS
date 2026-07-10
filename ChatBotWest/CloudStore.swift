@@ -541,13 +541,13 @@ final class CloudStore: ObservableObject {
 
             var system = Prompts.withNaiki(Prompts.triageSystem, naiki: naiki, manuals: manuals)
             if devMode {
-                // 開発モード: すぐ結果が返るよう聞き返しを省略し、BAへのエスカレーションを起きやすくする
+                // 開発モード: BAへのエスカレーションを起きやすくする(聞き返しは通常どおり行う)
                 system += """
 
 
                 【開発モード】この会話はBAフローのテスト中です。上記の判断基準より優先して、次のルールで判断してください:
-                - clarify(聞き返し)は使わない。decision は "answer" か "escalate" のどちらかにする
                 - ごく基本的な一般知識で確実に即答できる質問だけ "answer" にする
+                - 情報が不足している場合は通常どおり "clarify" で聞き返す
                 - それ以外は積極的に "escalate" とし、質問に応じた escalation_reason と options を生成する
                 """
             }
