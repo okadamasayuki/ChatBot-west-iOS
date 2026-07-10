@@ -102,7 +102,7 @@ struct ChatRoomView: View {
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
                 if canJumpToCase {
-                    Button("BAで見る") {
+                    Button("回答する") {
                         if let id = store.currentRoomId { store.jumpToCase(roomId: id) }
                     }
                     .font(.system(size: 13))
