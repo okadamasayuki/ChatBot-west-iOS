@@ -60,9 +60,6 @@ struct ManualView: View {
         NavigationStack {
             Form {
                 Section {
-                    Text("社内マニュアル — アップロードした内容も回答時にAIが参照します(PDF / テキスト / Markdown)。")
-                        .font(.footnote)
-                        .foregroundColor(.secondary)
                     Button("📄 ファイルを選択して追加") { showImporter = true }
                     if let addStatus {
                         Text(addStatus.message)
