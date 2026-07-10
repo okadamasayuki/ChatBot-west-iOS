@@ -345,13 +345,21 @@ struct PdfKitView: UIViewRepresentable {
                 let chars = Array(pageText)
                 var s = map[startNorm]
                 var e = map[endNorm]
-                // 文の区切り「。」まで拡張(引用が短い/部分一致でも中途半端にならない)。
-                // PDF内部のテキストは行の折り返しで改行が入るため、改行はまたいで広げる。
-                // 見出しなど「。」が無い場所で広がりすぎないよう、拡張は前後120文字まで
+                // 項目の区切りまで拡張(引用が短い/部分一致でも中途半端にならない)。
+                // 区切り = 「。」または「数字.」で始まる行頭(=箇条書き項目の先頭)。
+                // 行の折り返しの改行はまたいで広げる。広がりすぎ防止で前後120文字まで
                 var budget = 120
-                while s > 0, chars[s - 1] != "。", budget > 0 { s -= 1; budget -= 1 }
+                while s > 0, budget > 0 {
+                    let prev = chars[s - 1]
+                    if prev == "。" { break }
+                    if prev == "\n", Self.isItemStart(chars, at: s) { break } // 自分の項目の先頭
+                    s -= 1; budget -= 1
+                }
                 budget = 120
-                while e < chars.count - 1, chars[e] != "。", budget > 0 { e += 1; budget -= 1 }
+                while e < chars.count - 1, chars[e] != "。", budget > 0 {
+                    if chars[e] == "\n", Self.isItemStart(chars, at: e + 1) { e -= 1; break } // 次の項目の直前
+                    e += 1; budget -= 1
+                }
                 // 範囲の先頭・末尾の空白/改行を除く(改行が前の行末に描画され、
                 // 前の文の「。」までマーカーが付いて見えるのを防ぐ)
                 while s < e, chars[s].isWhitespace || chars[s].isNewline { s += 1 }
@@ -364,6 +372,15 @@ struct PdfKitView: UIViewRepresentable {
             }
         }
         return []
+    }
+
+    /// 指定位置から「数字.」(箇条書き項目の先頭)が始まるか
+    static func isItemStart(_ chars: [Character], at index: Int) -> Bool {
+        var j = index
+        while j < chars.count, chars[j] == " " || chars[j] == "　" { j += 1 }
+        var hasDigit = false
+        while j < chars.count, chars[j].isNumber { hasDigit = true; j += 1 }
+        return hasDigit && j < chars.count && (chars[j] == "." || chars[j] == "．" || chars[j] == "、" || chars[j] == ")" || chars[j] == ")")
     }
 
     /// 照合用の正規化: 空白・改行・句読点・記号を除去し、全角半角と大文字小文字の差も吸収する。
