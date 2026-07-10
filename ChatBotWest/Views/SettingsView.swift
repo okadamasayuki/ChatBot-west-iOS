@@ -150,7 +150,7 @@ struct SettingsView: View {
                     Toggle("🛠 開発モード", isOn: $store.devMode)
                         .tint(Theme.accent)
                 } footer: {
-                    Text("実践練習用。ごく基本的な質問はAIが回答し、情報不足のときは聞き返します。聞き返しへの担当者の返答は自動で行われ、解決できない質問は「BA回答が必要」としてエスカレーションされます。")
+                    Text("現在は何も動作しません(定義は調整中)。")
                 }
 
                 Section("⬇ Q&A履歴のダウンロード") {
