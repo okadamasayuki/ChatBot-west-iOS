@@ -141,6 +141,8 @@ struct SettingsView: View {
             .navigationBarTitleDisplayMode(.inline)
             // 下にスクロールするとキーボードが閉じる + キーボード上部に「完了」ボタン
             .scrollDismissesKeyboard(.interactively)
+            // 入力欄の外をタップするとキーボードを閉じる
+            .onTapGesture { styleFocused = false }
             .toolbar {
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer()
