@@ -78,6 +78,7 @@ struct CaseCardView: View {
     @State private var customSelected = false
     @State private var customDirection = ""
     @State private var previewManual: Manual? // マニュアル引用のタップで開くプレビュー
+    @State private var previewHighlight: String? // プレビューでハイライトする該当箇所
     @State private var draftText = ""
     @State private var isEditingDraft = false
     @State private var generating = false
@@ -114,7 +115,7 @@ struct CaseCardView: View {
                 .stroke(highlighted ? Theme.accent.opacity(0.6) : .clear, lineWidth: 3)
         )
         .sheet(item: $previewManual) { m in
-            ManualPreviewSheet(manual: m)
+            ManualPreviewSheet(manual: m, highlight: previewHighlight)
         }
         .onChange(of: speech.transcript) { t in
             if speech.isRecording { customDirection = t }
@@ -272,6 +273,7 @@ struct CaseCardView: View {
                         // タップで該当マニュアルのプレビューを開く
                         Button {
                             if let m = store.manuals.first(where: { $0.title == ref.manual }) {
+                                previewHighlight = ref.excerpt
                                 previewManual = m
                             }
                         } label: {

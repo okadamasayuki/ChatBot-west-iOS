@@ -168,11 +168,13 @@ struct ManualView: View {
     }
 }
 
-/// マニュアルのプレビュー(元PDFがあればPDFをそのまま描画、なければ抽出テキスト)
+/// マニュアルのプレビュー(元PDFがあればPDFをそのまま描画、なければ抽出テキスト)。
+/// `highlight` を渡すと該当箇所を黄色でハイライトする(PDFは自動スクロールも行う)
 struct ManualPreviewSheet: View {
     @EnvironmentObject var store: CloudStore
     @Environment(\.dismiss) private var dismiss
     let manual: Manual
+    var highlight: String? = nil
     @State private var showExtract = false
 
     var body: some View {
@@ -180,10 +182,10 @@ struct ManualPreviewSheet: View {
             Group {
                 if let b64 = manual.pdfData, let data = Data(base64Encoded: b64),
                    let doc = PDFDocument(data: data) {
-                    PdfKitView(document: doc)
+                    PdfKitView(document: doc, highlight: highlight)
                 } else {
                     ScrollView {
-                        Text(manual.content.isEmpty ? "(内容なし)" : manual.content)
+                        Text(highlightedContent)
                             .font(.system(size: 13))
                             .lineSpacing(5)
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -214,6 +216,20 @@ struct ManualPreviewSheet: View {
             }
         }
     }
+
+    /// テキストプレビュー用: 該当箇所に黄色の背景を付ける(見つからなければ先頭20字で再検索)
+    private var highlightedContent: AttributedString {
+        var attr = AttributedString(manual.content.isEmpty ? "(内容なし)" : manual.content)
+        guard let h = highlight?.trimmingCharacters(in: .whitespacesAndNewlines), !h.isEmpty else { return attr }
+        var range = attr.range(of: h)
+        if range == nil, h.count > 20 {
+            range = attr.range(of: String(h.prefix(20)))
+        }
+        if let range {
+            attr[range].backgroundColor = Color.yellow.opacity(0.55)
+        }
+        return attr
+    }
 }
 
 // MARK: - PDF ユーティリティ
@@ -235,16 +251,42 @@ enum PdfUtils {
 
 struct PdfKitView: UIViewRepresentable {
     let document: PDFDocument
+    var highlight: String? = nil
 
     func makeUIView(context: Context) -> PDFView {
         let view = PDFView()
         view.document = document
         view.autoScales = true
         view.displayDirection = .vertical
+        applyHighlight(view)
         return view
     }
 
     func updateUIView(_ view: PDFView, context: Context) {
-        if view.document !== document { view.document = document }
+        if view.document !== document {
+            view.document = document
+            applyHighlight(view)
+        }
+    }
+
+    /// 該当箇所に黄色のマーカー注釈を付け、最初のマッチへスクロールする
+    private func applyHighlight(_ view: PDFView) {
+        guard let h = highlight?.trimmingCharacters(in: .whitespacesAndNewlines), !h.isEmpty else { return }
+        var selections = document.findString(h, withOptions: [.caseInsensitive])
+        if selections.isEmpty, h.count > 20 {
+            // 抽出時の改行・空白の違いで一致しない場合は先頭20字で再検索
+            selections = document.findString(String(h.prefix(20)), withOptions: [.caseInsensitive])
+        }
+        for sel in selections {
+            for line in sel.selectionsByLine() {
+                guard let page = line.pages.first else { continue }
+                let annotation = PDFAnnotation(bounds: line.bounds(for: page), forType: .highlight, withProperties: nil)
+                annotation.color = UIColor.systemYellow.withAlphaComponent(0.6)
+                page.addAnnotation(annotation)
+            }
+        }
+        if let first = selections.first {
+            DispatchQueue.main.async { view.go(to: first) }
+        }
     }
 }
