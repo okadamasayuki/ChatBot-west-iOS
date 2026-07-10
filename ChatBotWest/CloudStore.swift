@@ -366,6 +366,23 @@ final class CloudStore: ObservableObject {
         }
     }
 
+    /// メッセージを削除する(最後のメッセージなら一覧のプレビューも更新)
+    func deleteMessage(_ msg: Message) {
+        guard let roomId = currentRoomId else { return }
+        let roomRef = wsRef().collection("rooms").document(roomId)
+        roomRef.collection("messages").document(msg.id).delete()
+        if roomMessages.last?.id == msg.id {
+            let remaining = roomMessages.filter { $0.id != msg.id }
+            if let last = remaining.last {
+                let lastText = last.role == .expert ? "【BA】" + last.text : last.text
+                roomRef.updateData(["lastText": lastText, "lastTs": last.ts])
+            } else {
+                // メッセージが無くなった相談は一覧に表示されなくなる(空の下書きと同じ扱い)
+                roomRef.updateData(["lastText": ""])
+            }
+        }
+    }
+
     func deleteRoom(_ id: String) async {
         guard let r = rooms.first(where: { $0.id == id }), canDeleteRoom(r) else { return }
         do {

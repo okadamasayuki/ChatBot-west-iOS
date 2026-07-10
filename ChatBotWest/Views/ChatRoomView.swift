@@ -6,6 +6,7 @@ struct ChatRoomView: View {
     @State private var input = ""
     @FocusState private var inputFocused: Bool
     @State private var editingMessage: Message?
+    @State private var deletingMessage: Message?
 
     private var lastMessageId: String? {
         store.pendingTyping ? "typing" : store.roomMessages.last?.id
@@ -106,13 +107,18 @@ struct ChatRoomView: View {
                                 }
                             )
                             .id(msg.id)
-                            // 長押しで編集(財務: AI・BAのメッセージ / 担当者: 自分の質問)
+                            // 長押しで編集・削除(財務: AI・BAのメッセージ / 担当者: 自分の質問)
                             if canEdit(msg) {
                                 bubble.contextMenu {
                                     Button {
                                         editingMessage = msg
                                     } label: {
                                         Label("編集", systemImage: "pencil")
+                                    }
+                                    Button(role: .destructive) {
+                                        deletingMessage = msg
+                                    } label: {
+                                        Label("削除", systemImage: "trash")
                                     }
                                 }
                             } else {
@@ -175,6 +181,16 @@ struct ChatRoomView: View {
             EditMessageSheet(message: msg) { newText in
                 store.updateMessageText(msg, newText: newText)
             }
+        }
+        .confirmationDialog("このメッセージを削除しますか?元に戻せません。",
+                            isPresented: Binding(get: { deletingMessage != nil },
+                                                 set: { if !$0 { deletingMessage = nil } }),
+                            titleVisibility: .visible) {
+            Button("削除", role: .destructive) {
+                if let msg = deletingMessage { store.deleteMessage(msg) }
+                deletingMessage = nil
+            }
+            Button("キャンセル", role: .cancel) { deletingMessage = nil }
         }
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
