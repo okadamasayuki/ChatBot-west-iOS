@@ -1,0 +1,45 @@
+name: ChatBotWest
+options:
+  bundleIdPrefix: com.okadamasayuki
+  deploymentTarget:
+    iOS: "16.0"
+  createIntermediateGroups: true
+packages:
+  Firebase:
+    url: https://github.com/firebase/firebase-ios-sdk
+    from: 11.0.0
+targets:
+  ChatBotWest:
+    type: application
+    platform: iOS
+    sources:
+      - ChatBotWest
+    dependencies:
+      - package: Firebase
+        product: FirebaseAuth
+      - package: Firebase
+        product: FirebaseFirestore
+      - package: Firebase
+        product: FirebaseFunctions
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.okadamasayuki.ChatBotWest
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        SWIFT_VERSION: "5.9"
+        TARGETED_DEVICE_FAMILY: "1"
+        GENERATE_INFOPLIST_FILE: NO
+        DEVELOPMENT_TEAM: ""
+        CODE_SIGN_STYLE: Automatic
+    info:
+      path: ChatBotWest/Info.plist
+      properties:
+        CFBundleDisplayName: 会計相談チャット
+        CFBundleShortVersionString: "1.0"
+        CFBundleVersion: "1"
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        NSMicrophoneUsageDescription: 回答方針の音声入力に使用します。
+        NSSpeechRecognitionUsageDescription: 音声を文字に変換して回答方針を入力するために使用します。
+        ITSAppUsesNonExemptEncryption: false

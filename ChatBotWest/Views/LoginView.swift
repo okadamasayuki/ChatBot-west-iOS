@@ -1,0 +1,130 @@
+import SwiftUI
+
+/// Web版と同じ2ステップのログイン画面:
+/// ステップ1でログイン/新規登録を選び、ステップ2で入力する。
+/// 新規登録時のみニックネームと役割を入力する。
+struct LoginView: View {
+    @EnvironmentObject var store: CloudStore
+
+    enum Mode { case chooser, login, signup }
+    @State private var mode: Mode = .chooser
+    @State private var email = ""
+    @State private var password = ""
+    @State private var nicknameInput = ""
+    @State private var role: MemberRole = .questioner
+    @State private var errorMessage: String?
+    @State private var busy = false
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                switch mode {
+                case .chooser:
+                    Section {
+                        Text("ご利用にはアカウントが必要です。初めての方は「新規登録」、登録済みの方は「ログイン」を選んでください。")
+                            .font(.footnote)
+                            .foregroundColor(.secondary)
+                    }
+                    Section {
+                        Button {
+                            switchMode(.login)
+                        } label: {
+                            HStack { Spacer(); Text("ログイン").bold(); Spacer() }
+                        }
+                        Button("新規登録") {
+                            switchMode(.signup)
+                        }
+                    }
+
+                case .login, .signup:
+                    Section {
+                        TextField("メールアドレス", text: $email)
+                            .keyboardType(.emailAddress)
+                            .textContentType(.username)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                        SecureField("パスワード", text: $password)
+                            .textContentType(.password)
+                        if mode == .signup {
+                            TextField("ニックネーム", text: $nicknameInput)
+                                .textContentType(.nickname)
+                        }
+                    }
+
+                    if mode == .signup {
+                        Section("役割") {
+                            Picker("役割", selection: $role) {
+                                Text("担当者(質問のみ)").tag(MemberRole.questioner)
+                                Text("財務(BA)").tag(MemberRole.expert)
+                            }
+                            .pickerStyle(.inline)
+                            .labelsHidden()
+                        }
+                    }
+
+                    if let errorMessage {
+                        Section {
+                            Text(errorMessage)
+                                .font(.footnote)
+                                .foregroundColor(.red)
+                        }
+                    }
+
+                    Section {
+                        Button {
+                            submit()
+                        } label: {
+                            HStack {
+                                Spacer()
+                                if busy { ProgressView().padding(.trailing, 6) }
+                                Text(mode == .signup ? "新規登録" : "ログイン").bold()
+                                Spacer()
+                            }
+                        }
+                        .disabled(busy)
+
+                        Button("戻る") {
+                            switchMode(.chooser)
+                        }
+                        .disabled(busy)
+                    }
+                }
+            }
+            .navigationTitle(mode == .signup ? "新規登録" : mode == .login ? "ログイン" : "💬 会計相談チャット")
+            .navigationBarTitleDisplayMode(.inline)
+        }
+        .tint(Theme.accentDark)
+    }
+
+    private func switchMode(_ m: Mode) {
+        mode = m
+        errorMessage = nil
+    }
+
+    private func submit() {
+        let email = email.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !email.isEmpty, !password.isEmpty else {
+            errorMessage = "メールアドレスとパスワードを入力してください。"
+            return
+        }
+        let nickname = nicknameInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        if mode == .signup, nickname.isEmpty {
+            errorMessage = "ニックネームを入力してください。"
+            return
+        }
+        errorMessage = nil
+        busy = true
+        Task {
+            do {
+                if mode == .signup {
+                    try await store.signup(email: email, password: password, role: role, nickname: nickname)
+                } else {
+                    try await store.login(email: email, password: password)
+                }
+            } catch {
+                errorMessage = CloudStore.authErrorMessage(error)
+            }
+            busy = false
+        }
+    }
+}
