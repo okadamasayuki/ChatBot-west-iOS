@@ -45,6 +45,7 @@ final class CloudStore: ObservableObject {
     }
     private var devFollowupCounts: [String: Int] = [:] // roomId → 更問の回数(ループ防止・各ルーム2回まで)
     private var devClarifyCounts: [String: Int] = [:]  // roomId → 聞き返しへの返答回数(各ルーム3回まで)
+    private var devRepliedMsgIds: Set<String> = []     // 返信済みメッセージID(二重返信防止)
 
     private let db = Firestore.firestore()
     private let wid: String
@@ -228,6 +229,7 @@ final class CloudStore: ObservableObject {
         listeners.append(wsRef().collection("cases").order(by: "askedAt").addSnapshotListener { [weak self] snap, _ in
             Task { @MainActor in
                 self?.cases = snap?.documents.compactMap { CaseItem(dict: $0.data()) } ?? []
+                self?.devMaybeReply() // 案件が回答済みになったタイミングでも担当者役の返信を判定
             }
         })
 
@@ -296,6 +298,7 @@ final class CloudStore: ObservableObject {
             .order(by: "ts").addSnapshotListener { [weak self] snap, _ in
                 Task { @MainActor in
                     self?.roomMessages = snap?.documents.compactMap { Message(dict: $0.data()) } ?? []
+                    self?.devMaybeReply() // 開発モード: 担当者役の返信が必要か判定(既存の相談を開いたときも動く)
                 }
             }
     }
@@ -559,12 +562,10 @@ final class CloudStore: ObservableObject {
                 addMessage(Message(role: .ai, text: result.answer), roomId: roomId)
                 addQa(QaEntry(question: text, answeredBy: "AI", answer: result.answer,
                               askedAt: nowIso(), answeredAt: nowIso()))
-                scheduleDevQuestionerReply(roomId: roomId, isFollowup: true)
             } else if result.decision == "clarify", !result.clarify_question.isEmpty {
                 // 情報不足 → 短い質問+選択肢ボタンで聞き返す
                 addMessage(Message(role: .ai, text: result.clarify_question,
                                    clarifyOptions: result.clarify_options), roomId: roomId)
-                scheduleDevQuestionerReply(roomId: roomId, isFollowup: false)
             } else {
                 // エスカレーション
                 let caseObj = CaseItem(
@@ -639,10 +640,22 @@ final class CloudStore: ObservableObject {
         ))
         updateCase(c.id, ["answer": text, "status": CaseStatus.answered.rawValue,
                           "answeredAt": nowIso(), "handledBy": handler])
-        scheduleDevQuestionerReply(roomId: c.roomId, isFollowup: true)
     }
 
     // MARK: - 開発モード(APIによる担当者役)
+
+    /// 開いている相談が「担当者の返答待ち」の状態なら、担当者役の返信をスケジュールする。
+    /// メッセージ・案件の更新のたびに呼ばれるため、既存の「担当者回答待ち」の相談を開いたときも動く。
+    private func devMaybeReply() {
+        guard devMode, let roomId = currentRoomId, let last = roomMessages.last else { return }
+        guard last.role == .ai || last.role == .expert else { return }
+        guard !devRepliedMsgIds.contains(last.id), !isDoneRoom(roomId) else { return }
+        // 未回答の案件がある(=BA回答待ち)ときはBAの回答を待つ
+        guard !cases.contains(where: { $0.roomId == roomId && $0.status != .answered }) else { return }
+        devRepliedMsgIds.insert(last.id)
+        let isClarify = last.role == .ai && !last.clarifyOptions.isEmpty
+        scheduleDevQuestionerReply(roomId: roomId, isFollowup: !isClarify)
+    }
 
     /// APIが担当者役(会計の素人)として返信する。
     /// 聞き返しには返答し、AI/BAの回答には更問(追加質問)をする。他の挙動は変えない。
