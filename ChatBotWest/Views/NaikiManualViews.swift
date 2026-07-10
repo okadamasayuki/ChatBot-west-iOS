@@ -25,7 +25,7 @@ struct NaikiView: View {
                     showCompact = true
                 }
                 .buttonStyle(.bordered)
-                .padding(.horizontal, 12)
+                .frame(maxWidth: .infinity)
                 .padding(.bottom, 12)
                 .disabled(store.naiki.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
