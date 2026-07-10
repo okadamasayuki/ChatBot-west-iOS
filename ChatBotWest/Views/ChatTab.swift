@@ -136,9 +136,26 @@ struct RoomListView: View {
         }
     }
 
-    /// 並び替えチップ + 財務のまとめて社内ルール更新ボタン
+    /// すべての相談が選択済みか
+    private var allSelected: Bool {
+        !visibleRooms.isEmpty && visibleRooms.allSatisfy { selectedRooms.contains($0.id) }
+    }
+
+    /// 並び替えチップ + 財務の全選択・まとめて社内ルール更新ボタン
     private var sortBar: some View {
         HStack(spacing: 6) {
+            if store.isExpert && !visibleRooms.isEmpty {
+                Button(allSelected ? "全解除" : "全選択") {
+                    if allSelected {
+                        selectedRooms.removeAll()
+                    } else {
+                        selectedRooms = Set(visibleRooms.map { $0.id })
+                    }
+                }
+                .font(.system(size: 12))
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            }
             if store.isExpert && !selectedRooms.isEmpty {
                 Button {
                     showBatchNaiki = true
