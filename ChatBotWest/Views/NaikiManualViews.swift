@@ -314,25 +314,43 @@ struct PdfKitView: UIViewRepresentable {
 
         let (normExcerpt, _) = Self.normalizedWithMap(text)
         guard normExcerpt.count >= 6 else { return [] }
+        let anchorLen = min(10, normExcerpt.count)
 
-        // 2) 正規化した引用(全体 → 先頭20字 → 先頭12字)でページごとに照合
-        var probes = [normExcerpt]
-        for len in [20, 12] where normExcerpt.count > len {
-            probes.append(String(normExcerpt.prefix(len)))
-        }
-        for probe in probes {
-            for i in 0..<document.pageCount {
-                guard let page = document.page(at: i), let pageText = page.string else { continue }
-                let (norm, map) = Self.normalizedWithMap(pageText)
-                guard let r = norm.range(of: probe) else { continue }
-                let startNorm = norm.distance(from: norm.startIndex, to: r.lowerBound)
-                let endNorm = norm.distance(from: norm.startIndex, to: r.upperBound) - 1
-                guard startNorm < map.count, endNorm < map.count else { continue }
-                let sIdx = pageText.index(pageText.startIndex, offsetBy: map[startNorm])
-                let eIdx = pageText.index(pageText.startIndex, offsetBy: map[endNorm] + 1)
-                if let sel = page.selection(for: NSRange(sIdx..<eIdx, in: pageText)) {
-                    return [sel]
+        // 2) ページごとに「一致する最長の先頭部分」を探し、
+        //    引用がAIの言い換えで途中から原文とずれていても、
+        //    一致箇所を含む文の区切り(「。」や改行)まで広げてハイライトする
+        for i in 0..<document.pageCount {
+            guard let page = document.page(at: i), let pageText = page.string else { continue }
+            let (norm, map) = Self.normalizedWithMap(pageText)
+            guard norm.range(of: String(normExcerpt.prefix(anchorLen))) != nil else { continue }
+
+            // 二分探索で一致する最長の先頭部分の長さを求める
+            var lo = anchorLen, hi = normExcerpt.count, best = anchorLen
+            while lo <= hi {
+                let mid = (lo + hi) / 2
+                if norm.range(of: String(normExcerpt.prefix(mid))) != nil {
+                    best = mid; lo = mid + 1
+                } else {
+                    hi = mid - 1
                 }
+            }
+            guard let r = norm.range(of: String(normExcerpt.prefix(best))) else { continue }
+            let startNorm = norm.distance(from: norm.startIndex, to: r.lowerBound)
+            let endNorm = norm.distance(from: norm.startIndex, to: r.upperBound) - 1
+            guard startNorm < map.count, endNorm < map.count else { continue }
+
+            let chars = Array(pageText)
+            var s = map[startNorm]
+            var e = map[endNorm]
+            if best < normExcerpt.count {
+                // 部分一致 → 文の区切りまで広げる(項目全体をハイライト)
+                while s > 0, chars[s - 1] != "。", chars[s - 1] != "\n" { s -= 1 }
+                while e < chars.count - 1, chars[e] != "。", chars[e] != "\n" { e += 1 }
+            }
+            let sIdx = pageText.index(pageText.startIndex, offsetBy: s)
+            let eIdx = pageText.index(pageText.startIndex, offsetBy: e + 1)
+            if let sel = page.selection(for: NSRange(sIdx..<eIdx, in: pageText)) {
+                return [sel]
             }
         }
         return []
