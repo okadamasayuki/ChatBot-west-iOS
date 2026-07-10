@@ -767,33 +767,46 @@ final class CloudStore: ObservableObject {
                 .joined(separator: "\n\n")
             guard !transcript.isEmpty else { retryLater(); return }
             self.devTypingRoomId = roomId // 「質問者が入力中…」を表示
-            do {
-                let raw = try await ClaudeService.call(
-                    system: Prompts.devQuestionerSystem,
-                    messages: [.init(role: "user", content: """
-                    以下は会計相談チャットのこれまでのやり取りです。あなたは「質問者」です。
-                    このやり取りの続きとして、質問者が次に送るメッセージを決めてください。
+            defer { if self.devTypingRoomId == roomId { self.devTypingRoomId = nil } }
 
-                    \(transcript)
-                    """)],
-                    schema: Prompts.devQuestionerSchema
-                )
-                self.devTypingRoomId = nil
-                let result = try JSONDecoder().decode(DevQuestionerResult.self, from: Data(raw.utf8))
-                let text = result.message.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !text.isEmpty, self.currentRoomId == roomId else { retryLater(); return }
-                if result.satisfied && isFollowup {
-                    // 納得した → お礼を送って完了にする
-                    self.devFinishRoom(roomId, thanks: text)
-                } else {
-                    if isFollowup { self.devFollowupCounts[roomId, default: 0] += 1 }
-                    else { self.devClarifyCounts[roomId, default: 0] += 1 }
-                    await self.submitQuestion(text, simulated: true)
+            // 一時的なAPIエラー(Functionsのタイムアウト等)に備えて最大2回試す
+            var raw: String?
+            for attempt in 1...2 {
+                do {
+                    raw = try await ClaudeService.call(
+                        system: Prompts.devQuestionerSystem,
+                        messages: [.init(role: "user", content: """
+                        以下は会計相談チャットのこれまでのやり取りです。あなたは「質問者」です。
+                        このやり取りの続きとして、質問者が次に送るメッセージを決めてください。
+
+                        \(transcript)
+                        """)],
+                        schema: Prompts.devQuestionerSchema
+                    )
+                    break
+                } catch {
+                    if attempt == 2 {
+                        // 全滅 → マークを外す(相談を開き直すと再試行される)
+                        retryLater()
+                        return
+                    }
+                    try? await Task.sleep(nanoseconds: 1_000_000_000)
                 }
-            } catch {
-                // 失敗しても通常フローに影響させない。マークを外して再試行できるようにする
-                self.devTypingRoomId = nil
+            }
+            guard let raw,
+                  let result = try? JSONDecoder().decode(DevQuestionerResult.self, from: Data(raw.utf8)) else {
                 retryLater()
+                return
+            }
+            let text = result.message.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !text.isEmpty, self.currentRoomId == roomId else { retryLater(); return }
+            if result.satisfied && isFollowup {
+                // 納得した → お礼を送って完了にする
+                self.devFinishRoom(roomId, thanks: text)
+            } else {
+                if isFollowup { self.devFollowupCounts[roomId, default: 0] += 1 }
+                else { self.devClarifyCounts[roomId, default: 0] += 1 }
+                await self.submitQuestion(text, simulated: true)
             }
         }
     }
