@@ -120,7 +120,8 @@ struct ChatRoomView: View {
                             }
                         }
                         if store.pendingTyping {
-                            TypingBubble().id("typing")
+                            // 財務視点ではAIは自分側(右)に表示
+                            TypingBubble(alignRight: store.isExpert).id("typing")
                         }
                         // BAタブの該当案件をチャット内に統合表示(財務のみ・未回答の案件)
                         ForEach(roomCases) { c in
@@ -346,9 +347,12 @@ struct SystemBubble: View {
 }
 
 struct TypingBubble: View {
+    var alignRight = false
+
     var body: some View {
         HStack {
-            VStack(alignment: .leading, spacing: 3) {
+            if alignRight { Spacer(minLength: 60) }
+            VStack(alignment: alignRight ? .trailing : .leading, spacing: 3) {
                 Text("🤖 AIアシスタント")
                     .font(.system(size: 11))
                     .foregroundColor(Theme.header.opacity(0.8))
@@ -368,7 +372,7 @@ struct TypingBubble: View {
                 .background(Color(.systemBackground))
                 .cornerRadius(14)
             }
-            Spacer(minLength: 60)
+            if !alignRight { Spacer(minLength: 60) }
         }
     }
 }
