@@ -77,6 +77,7 @@ struct CaseCardView: View {
 
     @State private var customSelected = false
     @State private var customDirection = ""
+    @State private var previewManual: Manual? // マニュアル引用のタップで開くプレビュー
     @State private var draftText = ""
     @State private var isEditingDraft = false
     @State private var generating = false
@@ -112,6 +113,9 @@ struct CaseCardView: View {
             RoundedRectangle(cornerRadius: 12)
                 .stroke(highlighted ? Theme.accent.opacity(0.6) : .clear, lineWidth: 3)
         )
+        .sheet(item: $previewManual) { m in
+            ManualPreviewSheet(manual: m)
+        }
         .onChange(of: speech.transcript) { t in
             if speech.isRecording { customDirection = t }
         }
@@ -265,13 +269,22 @@ struct CaseCardView: View {
                         .foregroundColor(.primary)
                         .multilineTextAlignment(.leading)
                     ForEach(Array(refs.enumerated()), id: \.offset) { _, ref in
-                        Text("📖 \(ref.manual): \(ref.excerpt)")
-                            .font(.system(size: 11))
-                            .foregroundColor(Theme.tagWaitingFg)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(6)
-                            .background(Color(red: 0xee / 255, green: 0xf4 / 255, blue: 1.0))
-                            .cornerRadius(6)
+                        // タップで該当マニュアルのプレビューを開く
+                        Button {
+                            if let m = store.manuals.first(where: { $0.title == ref.manual }) {
+                                previewManual = m
+                            }
+                        } label: {
+                            Text("📖 \(ref.manual): \(ref.excerpt)")
+                                .font(.system(size: 11))
+                                .foregroundColor(Theme.tagWaitingFg)
+                                .multilineTextAlignment(.leading)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(6)
+                                .background(Color(red: 0xee / 255, green: 0xf4 / 255, blue: 1.0))
+                                .cornerRadius(6)
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
                 Spacer(minLength: 0)
