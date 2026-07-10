@@ -8,7 +8,8 @@ struct ChatRoomView: View {
     @State private var editingMessage: Message?
 
     private var lastMessageId: String? {
-        store.pendingTyping ? "typing" : store.roomMessages.last?.id
+        if store.devTypingRoomId != nil, store.devTypingRoomId == store.currentRoomId { return "devTyping" }
+        return store.pendingTyping ? "typing" : store.roomMessages.last?.id
     }
 
     private var room: Room? { store.currentRoom() }
@@ -135,6 +136,11 @@ struct ChatRoomView: View {
                         if store.pendingTyping {
                             // 財務視点ではAIは自分側(右)に表示
                             TypingBubble(alignRight: store.isExpert).id("typing")
+                        }
+                        if store.devTypingRoomId == store.currentRoomId, store.devTypingRoomId != nil {
+                            // 開発モード: 担当者役が返信を生成中(質問者側に表示)
+                            TypingBubble(label: "🙋 質問者が入力中…", alignRight: !store.isExpert)
+                                .id("devTyping")
                         }
                         // BAタブの該当案件をチャット内に統合表示(財務のみ・未回答の案件)
                         ForEach(roomCases) { c in
@@ -362,13 +368,14 @@ struct SystemBubble: View {
 }
 
 struct TypingBubble: View {
+    var label = "🤖 AIアシスタント"
     var alignRight = false
 
     var body: some View {
         HStack {
             if alignRight { Spacer(minLength: 60) }
             VStack(alignment: alignRight ? .trailing : .leading, spacing: 3) {
-                Text("🤖 AIアシスタント")
+                Text(label)
                     .font(.system(size: 11))
                     .foregroundColor(Theme.header.opacity(0.8))
                 TimelineView(.periodic(from: .now, by: 0.4)) { context in

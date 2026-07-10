@@ -56,6 +56,7 @@ final class CloudStore: ObservableObject {
     private var devFollowupCounts: [String: Int] = [:] // roomId → 更問の回数(ループ防止)
     private var devClarifyCounts: [String: Int] = [:]  // roomId → 聞き返しへの返答回数
     private var devRepliedMsgIds: Set<String> = []     // 返信済みメッセージID(二重返信防止)
+    @Published var devTypingRoomId: String?            // 担当者役が返信を生成中の相談(「入力中…」表示用)
 
     private let db = Firestore.firestore()
     private let wid: String
@@ -765,6 +766,7 @@ final class CloudStore: ObservableObject {
                 }
                 .joined(separator: "\n\n")
             guard !transcript.isEmpty else { retryLater(); return }
+            self.devTypingRoomId = roomId // 「質問者が入力中…」を表示
             do {
                 let raw = try await ClaudeService.call(
                     system: Prompts.devQuestionerSystem,
@@ -776,6 +778,7 @@ final class CloudStore: ObservableObject {
                     """)],
                     schema: Prompts.devQuestionerSchema
                 )
+                self.devTypingRoomId = nil
                 let result = try JSONDecoder().decode(DevQuestionerResult.self, from: Data(raw.utf8))
                 let text = result.message.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !text.isEmpty, self.currentRoomId == roomId else { retryLater(); return }
@@ -789,6 +792,7 @@ final class CloudStore: ObservableObject {
                 }
             } catch {
                 // 失敗しても通常フローに影響させない。マークを外して再試行できるようにする
+                self.devTypingRoomId = nil
                 retryLater()
             }
         }
