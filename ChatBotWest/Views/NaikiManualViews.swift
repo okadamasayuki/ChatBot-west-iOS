@@ -217,16 +217,24 @@ struct ManualPreviewSheet: View {
         }
     }
 
-    /// テキストプレビュー用: 該当箇所に黄色の背景を付ける(見つからなければ先頭20字で再検索)
+    /// テキストプレビュー用: 該当箇所に黄色の背景を付ける。
+    /// 完全一致しない場合は空白除去 → 先頭24/16/10/6文字と段階的に短くして再検索
     private var highlightedContent: AttributedString {
         var attr = AttributedString(manual.content.isEmpty ? "(内容なし)" : manual.content)
         guard let h = highlight?.trimmingCharacters(in: .whitespacesAndNewlines), !h.isEmpty else { return attr }
-        var range = attr.range(of: h)
-        if range == nil, h.count > 20 {
-            range = attr.range(of: String(h.prefix(20)))
+        let clean = h
+            .replacingOccurrences(of: "\\s+", with: "", options: .regularExpression)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "「」『』()()。、・…※"))
+        var candidates: [String] = [h]
+        if clean != h { candidates.append(clean) }
+        for len in [24, 16, 10, 6] where clean.count > len {
+            candidates.append(String(clean.prefix(len)))
         }
-        if let range {
-            attr[range].backgroundColor = Color.yellow.opacity(0.55)
+        for probe in candidates where probe.count >= 4 {
+            if let range = attr.range(of: probe) {
+                attr[range].backgroundColor = Color.yellow.opacity(0.55)
+                return attr
+            }
         }
         return attr
     }
@@ -269,24 +277,36 @@ struct PdfKitView: UIViewRepresentable {
         }
     }
 
-    /// 該当箇所に黄色のマーカー注釈を付け、最初のマッチへスクロールする
+    /// 該当箇所を黄色でハイライトし、最初のマッチへスクロールする
     private func applyHighlight(_ view: PDFView) {
         guard let h = highlight?.trimmingCharacters(in: .whitespacesAndNewlines), !h.isEmpty else { return }
-        var selections = document.findString(h, withOptions: [.caseInsensitive])
-        if selections.isEmpty, h.count > 20 {
-            // 抽出時の改行・空白の違いで一致しない場合は先頭20字で再検索
-            selections = document.findString(String(h.prefix(20)), withOptions: [.caseInsensitive])
-        }
+        let selections = findSelections(h)
+        guard !selections.isEmpty else { return }
         for sel in selections {
-            for line in sel.selectionsByLine() {
-                guard let page = line.pages.first else { continue }
-                let annotation = PDFAnnotation(bounds: line.bounds(for: page), forType: .highlight, withProperties: nil)
-                annotation.color = UIColor.systemYellow.withAlphaComponent(0.6)
-                page.addAnnotation(annotation)
-            }
+            sel.color = UIColor.systemYellow.withAlphaComponent(0.6)
         }
+        // 注釈ではなく PDFView 標準のハイライト表示を使う(注釈は環境によって描画されないため)
+        view.highlightedSelections = selections
         if let first = selections.first {
             DispatchQueue.main.async { view.go(to: first) }
         }
+    }
+
+    /// 引用がPDF内部のテキストと完全一致しない場合に備え、
+    /// 空白除去 → 先頭24/16/10/6文字 と段階的に短くして検索する
+    private func findSelections(_ text: String) -> [PDFSelection] {
+        let clean = text
+            .replacingOccurrences(of: "\\s+", with: "", options: .regularExpression)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "「」『』()()。、・…※"))
+        var candidates: [String] = [text]
+        if clean != text { candidates.append(clean) }
+        for len in [24, 16, 10, 6] where clean.count > len {
+            candidates.append(String(clean.prefix(len)))
+        }
+        for probe in candidates where probe.count >= 4 {
+            let sels = document.findString(probe, withOptions: [.caseInsensitive])
+            if !sels.isEmpty { return sels }
+        }
+        return []
     }
 }
