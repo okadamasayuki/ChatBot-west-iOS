@@ -292,20 +292,47 @@ struct PdfKitView: UIViewRepresentable {
         }
     }
 
-    /// 引用がPDF内部のテキストと完全一致しない場合に備え、
-    /// 空白除去 → 先頭24/16/10/6文字 と段階的に短くして検索する
+    /// 引用に対応する範囲をPDFから探す。
+    /// PDF内部のテキストは改行・空白の入り方が引用と異なるため、
+    /// 空白を除去した正規化テキスト同士で照合し、見つかった範囲を元のテキスト位置に
+    /// 逆マッピングして選択範囲を作る(引用の全体がハイライトされる)。
     private func findSelections(_ text: String) -> [PDFSelection] {
-        let clean = text
-            .replacingOccurrences(of: "\\s+", with: "", options: .regularExpression)
-            .trimmingCharacters(in: CharacterSet(charactersIn: "「」『』()()。、・…※"))
-        var candidates: [String] = [text]
-        if clean != text { candidates.append(clean) }
-        for len in [24, 16, 10, 6] where clean.count > len {
-            candidates.append(String(clean.prefix(len)))
+        // 1) まずは素直に全文検索(そのまま一致すればこれが最速・最正確)
+        let direct = document.findString(text, withOptions: [.caseInsensitive])
+        if !direct.isEmpty { return direct }
+
+        func normalize(_ s: String) -> String {
+            s.filter { !$0.isWhitespace && !$0.isNewline }
         }
-        for probe in candidates where probe.count >= 4 {
-            let sels = document.findString(probe, withOptions: [.caseInsensitive])
-            if !sels.isEmpty { return sels }
+        let normExcerpt = normalize(text)
+        guard normExcerpt.count >= 6 else { return [] }
+
+        // 2) 正規化した引用(全体 → 先頭20字 → 先頭12字)でページごとに照合
+        var probes = [normExcerpt]
+        for len in [20, 12] where normExcerpt.count > len {
+            probes.append(String(normExcerpt.prefix(len)))
+        }
+        for probe in probes {
+            for i in 0..<document.pageCount {
+                guard let page = document.page(at: i), let pageText = page.string else { continue }
+                // 正規化テキストと「正規化後の位置 → 元の位置」の対応表を作る
+                var norm = ""
+                var map: [Int] = []
+                for (idx, ch) in pageText.enumerated() {
+                    if ch.isWhitespace || ch.isNewline { continue }
+                    norm.append(ch)
+                    map.append(idx)
+                }
+                guard let r = norm.range(of: probe) else { continue }
+                let startNorm = norm.distance(from: norm.startIndex, to: r.lowerBound)
+                let endNorm = norm.distance(from: norm.startIndex, to: r.upperBound) - 1
+                guard startNorm < map.count, endNorm < map.count else { continue }
+                let sIdx = pageText.index(pageText.startIndex, offsetBy: map[startNorm])
+                let eIdx = pageText.index(pageText.startIndex, offsetBy: map[endNorm] + 1)
+                if let sel = page.selection(for: NSRange(sIdx..<eIdx, in: pageText)) {
+                    return [sel]
+                }
+            }
         }
         return []
     }
