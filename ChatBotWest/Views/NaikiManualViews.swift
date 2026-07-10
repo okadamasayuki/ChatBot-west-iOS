@@ -200,8 +200,10 @@ struct ManualPreviewSheet: View {
             .onAppear {
                 guard !pdfLoaded else { return }
                 pdfLoaded = true
+                print("[preview] manual=\(manual.title) pdfData=\(manual.pdfData?.count ?? 0)B highlight=\(String((highlight ?? "nil").prefix(40)))")
                 if let b64 = manual.pdfData, let data = Data(base64Encoded: b64) {
                     pdfDoc = PDFDocument(data: data)
+                    print("[preview] doc pages=\(pdfDoc?.pageCount ?? -1)")
                 }
             }
             .toolbar {
@@ -298,8 +300,12 @@ struct PdfKitView: UIViewRepresentable {
 
     /// 該当箇所を黄色でハイライトし、最初のマッチへスクロールする(再適用は冪等・スクロールは初回のみ)
     private func applyHighlight(_ view: PDFView) {
-        guard let h = highlight?.trimmingCharacters(in: .whitespacesAndNewlines), !h.isEmpty else { return }
+        guard let h = highlight?.trimmingCharacters(in: .whitespacesAndNewlines), !h.isEmpty else {
+            print("[pdfkit] apply: highlightなし")
+            return
+        }
         let selections = findSelections(h)
+        print("[pdfkit] apply: sel=\(selections.count) viewDoc=\(view.document === document) h=\(String(h.prefix(30)))")
         guard !selections.isEmpty else { return }
         let firstTime = (view.highlightedSelections ?? []).isEmpty
         for sel in selections {
@@ -319,6 +325,7 @@ struct PdfKitView: UIViewRepresentable {
     private func findSelections(_ text: String) -> [PDFSelection] {
         let normExcerptChars = Array(Self.normalizedWithMap(text).0)
         let n = normExcerptChars.count
+        print("[pdfkit] find: normLen=\(n) pages=\(document.pageCount) page0Text=\(document.page(at: 0)?.string?.count ?? -1)")
         guard n >= 6 else { return [] }
         let anchorLen = min(10, n)
 

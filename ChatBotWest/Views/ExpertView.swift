@@ -77,8 +77,14 @@ struct CaseCardView: View {
 
     @State private var customSelected = false
     @State private var customDirection = ""
-    @State private var previewManual: Manual? // マニュアル引用のタップで開くプレビュー
-    @State private var previewHighlight: String? // プレビューでハイライトする該当箇所
+    /// マニュアル引用のタップで開くプレビュー(マニュアルとハイライト対象を1つの値で渡す。
+    /// 別々の@Stateにすると初回表示でハイライトが未設定のままシートが描画される)
+    struct ManualPreviewTarget: Identifiable {
+        let id = UUID()
+        let manual: Manual
+        let excerpt: String
+    }
+    @State private var previewTarget: ManualPreviewTarget?
     @State private var draftText = ""
     @State private var isEditingDraft = false
     @State private var generating = false
@@ -114,8 +120,8 @@ struct CaseCardView: View {
             RoundedRectangle(cornerRadius: 12)
                 .stroke(highlighted ? Theme.accent.opacity(0.6) : .clear, lineWidth: 3)
         )
-        .sheet(item: $previewManual) { m in
-            ManualPreviewSheet(manual: m, highlight: previewHighlight)
+        .sheet(item: $previewTarget) { target in
+            ManualPreviewSheet(manual: target.manual, highlight: target.excerpt)
         }
         .onChange(of: speech.transcript) { t in
             if speech.isRecording { customDirection = t }
@@ -273,8 +279,7 @@ struct CaseCardView: View {
                         // タップで該当マニュアルのプレビューを開く
                         Button {
                             if let m = store.manuals.first(where: { $0.title == ref.manual }) {
-                                previewHighlight = ref.excerpt
-                                previewManual = m
+                                previewTarget = ManualPreviewTarget(manual: m, excerpt: ref.excerpt)
                             }
                         } label: {
                             Text("📖 \(ref.manual): \(ref.excerpt)")
