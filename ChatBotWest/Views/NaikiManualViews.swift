@@ -312,10 +312,7 @@ struct PdfKitView: UIViewRepresentable {
         let direct = document.findString(text, withOptions: [.caseInsensitive])
         if !direct.isEmpty { return direct }
 
-        func normalize(_ s: String) -> String {
-            s.filter { !$0.isWhitespace && !$0.isNewline }
-        }
-        let normExcerpt = normalize(text)
+        let (normExcerpt, _) = Self.normalizedWithMap(text)
         guard normExcerpt.count >= 6 else { return [] }
 
         // 2) 正規化した引用(全体 → 先頭20字 → 先頭12字)でページごとに照合
@@ -326,14 +323,7 @@ struct PdfKitView: UIViewRepresentable {
         for probe in probes {
             for i in 0..<document.pageCount {
                 guard let page = document.page(at: i), let pageText = page.string else { continue }
-                // 正規化テキストと「正規化後の位置 → 元の位置」の対応表を作る
-                var norm = ""
-                var map: [Int] = []
-                for (idx, ch) in pageText.enumerated() {
-                    if ch.isWhitespace || ch.isNewline { continue }
-                    norm.append(ch)
-                    map.append(idx)
-                }
+                let (norm, map) = Self.normalizedWithMap(pageText)
                 guard let r = norm.range(of: probe) else { continue }
                 let startNorm = norm.distance(from: norm.startIndex, to: r.lowerBound)
                 let endNorm = norm.distance(from: norm.startIndex, to: r.upperBound) - 1
@@ -346,5 +336,24 @@ struct PdfKitView: UIViewRepresentable {
             }
         }
         return []
+    }
+
+    /// 照合用の正規化: 空白・改行・句読点・記号を除去し、全角半角と大文字小文字の差も吸収する。
+    /// 「正規化後の位置 → 元のテキスト位置」の対応表も返す(ハイライト範囲の逆マッピング用)
+    static func normalizedWithMap(_ s: String) -> (String, [Int]) {
+        let skip = CharacterSet(charactersIn: "、。・,.;:()()[]「」『』【】〈〉《》\"'‘’“”‐-–—〜~…※　 !?！?")
+        var norm = ""
+        var map: [Int] = []
+        for (idx, ch) in s.enumerated() {
+            if ch.isWhitespace || ch.isNewline { continue }
+            let str = String(ch)
+            if str.rangeOfCharacter(from: skip) != nil { continue }
+            let converted = (str.applyingTransform(.fullwidthToHalfwidth, reverse: false) ?? str).lowercased()
+            for c in converted {
+                norm.append(c)
+                map.append(idx)
+            }
+        }
+        return (norm, map)
     }
 }
