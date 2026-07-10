@@ -683,12 +683,12 @@ final class CloudStore: ObservableObject {
     /// 納得した場合(または更問の上限に達した場合)はお礼を送って相談を完了にする。
     private func scheduleDevQuestionerReply(roomId: String, isFollowup: Bool) {
         guard devMode else { return }
-        // 更問の上限(各ルーム2回)に達したら、納得したことにしてお礼+完了
-        let followupLimitReached = isFollowup && devFollowupCounts[roomId, default: 0] >= 2
+        // 更問の上限に達したら、納得したことにしてお礼+完了
+        let followupLimitReached = isFollowup && devFollowupCounts[roomId, default: 0] >= devReplyLimit
         if isFollowup && !followupLimitReached {
             devFollowupCounts[roomId, default: 0] += 1
         } else if !isFollowup {
-            guard devClarifyCounts[roomId, default: 0] < 3 else { return }
+            guard devClarifyCounts[roomId, default: 0] < devReplyLimit else { return }
             devClarifyCounts[roomId, default: 0] += 1
         }
         Task { [weak self] in
