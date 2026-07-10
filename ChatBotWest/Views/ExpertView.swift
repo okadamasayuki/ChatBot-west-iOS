@@ -93,17 +93,10 @@ struct CaseCardView: View {
         VStack(alignment: .leading, spacing: 10) {
             statusLabel
 
-            // 質問タイトルをタップすると元の相談(トークルーム)を開く
-            Button {
-                store.openRoomFromCase(caseItem)
-            } label: {
-                Text(caseItem.question)
-                    .font(.system(size: 15, weight: .semibold))
-                    .lineSpacing(3)
-                    .foregroundColor(Color(red: 0x0a / 255, green: 0x6e / 255, blue: 0xbd / 255))
-                    .multilineTextAlignment(.leading)
-            }
-            .buttonStyle(.plain)
+            Text(caseItem.question)
+                .font(.system(size: 15, weight: .semibold))
+                .lineSpacing(3)
+                .multilineTextAlignment(.leading)
 
             if caseItem.status == .answered {
                 noteBox("📨 送信済み回答:\n\(caseItem.answer ?? "")", bg: Theme.tagDoneBg)
@@ -139,9 +132,9 @@ struct CaseCardView: View {
                 store.toggleHandler(caseItem)
             } label: {
                 if caseItem.handledBy.isEmpty {
-                    labelChip("要対応", bg: Theme.header)
+                    labelChip("要対応", bg: Color(red: 0xd6 / 255.0, green: 0x3a / 255.0, blue: 0x2f / 255.0))       // 赤
                 } else {
-                    labelChip("対応中：\(caseItem.handledBy)", bg: mineHandling ? Theme.accentDark : Theme.header)
+                    labelChip("対応中：\(caseItem.handledBy)", bg: Color(red: 0xe8 / 255.0, green: 0x8a / 255.0, blue: 0x1a / 255.0)) // オレンジ
                 }
             }
             .buttonStyle(.plain)
