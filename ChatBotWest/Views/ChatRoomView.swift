@@ -27,6 +27,31 @@ struct ChatRoomView: View {
         return store.isExpert || store.isMyRoom(r)
     }
 
+    /// メッセージの表示スタイル(LINEと同じく「自分側=右・緑」の視点で描く)。
+    /// 財務: AI/BAが右側(BAは緑)、質問者が左側。担当者: 自分の質問が右・緑、AI/BAが左側
+    private func bubbleStyle(for msg: Message) -> (label: String?, right: Bool, color: Color, border: Color?) {
+        let questionerName = ownerName.isEmpty ? "質問者" : ownerName
+        if store.isExpert {
+            switch msg.role {
+            case .user:
+                return ("🙋 \(questionerName)", false, Color(.systemBackground), nil)
+            case .ai:
+                return ("🤖 AIアシスタント", true, Color(.systemBackground), nil)
+            default:
+                return ("👤 BA", true, Theme.myBubble, nil)
+            }
+        } else {
+            switch msg.role {
+            case .user:
+                return (ownerName.isEmpty ? nil : "🙋 \(ownerName)", true, Theme.myBubble, nil)
+            case .ai:
+                return ("🤖 AIアシスタント", false, Color(.systemBackground), nil)
+            default:
+                return ("👤 BA", false, Theme.expertBubble, Theme.expertBorder)
+            }
+        }
+    }
+
     /// 自分側のメッセージの既読/未読(相手が読んだかどうか)。
     /// 相談の本人には自分の質問、財務にはBAの回答に対して表示する
     private func readStatus(for msg: Message) -> String? {
@@ -63,9 +88,13 @@ struct ChatRoomView: View {
                         }
                         let lastIdx = store.roomMessages.count - 1
                         ForEach(Array(store.roomMessages.enumerated()), id: \.element.id) { idx, msg in
+                            let style = bubbleStyle(for: msg)
                             MessageBubble(
                                 message: msg,
-                                ownerName: ownerName,
+                                senderLabel: style.label,
+                                alignRight: style.right,
+                                bubbleColor: style.color,
+                                borderColor: style.border,
                                 readStatus: readStatus(for: msg),
                                 showClarify: idx == lastIdx && msg.role == .ai && !msg.clarifyOptions.isEmpty && !viewOnly,
                                 onChoice: { choice in
@@ -149,42 +178,31 @@ struct ChatRoomView: View {
 
 struct MessageBubble: View {
     let message: Message
-    var ownerName: String = ""
+    var senderLabel: String? = nil
+    var alignRight = false
+    var bubbleColor: Color = Color(.systemBackground)
+    var borderColor: Color? = nil
     var readStatus: String? = nil
     let showClarify: Bool
     var onChoice: (String) -> Void = { _ in }
 
     var body: some View {
-        switch message.role {
-        case .user:
+        if message.role == .system {
+            SystemBubble(text: message.text)
+        } else {
             HStack {
-                Spacer(minLength: 60)
-                VStack(alignment: .trailing, spacing: 3) {
-                    if !ownerName.isEmpty {
-                        Text("🙋 \(ownerName)")
+                if alignRight { Spacer(minLength: 60) }
+                VStack(alignment: alignRight ? .trailing : .leading, spacing: 3) {
+                    if let senderLabel {
+                        Text(senderLabel)
                             .font(.system(size: 11))
                             .foregroundColor(Theme.header.opacity(0.8))
                     }
                     bubbleText
-                        .background(Theme.myBubble)
-                        .cornerRadius(14)
-                    HStack(spacing: 4) {
-                        readStatusText
-                        timeText
-                    }
-                }
-            }
-        case .ai, .expert:
-            HStack {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(message.role == .ai ? "🤖 AIアシスタント" : "👤 BA")
-                        .font(.system(size: 11))
-                        .foregroundColor(Theme.header.opacity(0.8))
-                    bubbleText
-                        .background(message.role == .ai ? Color(.systemBackground) : Theme.expertBubble)
+                        .background(bubbleColor)
                         .overlay(
                             RoundedRectangle(cornerRadius: 14)
-                                .stroke(message.role == .expert ? Theme.expertBorder : .clear, lineWidth: 1)
+                                .stroke(borderColor ?? .clear, lineWidth: 1)
                         )
                         .cornerRadius(14)
                     if showClarify {
@@ -192,14 +210,14 @@ struct MessageBubble: View {
                         FlowChoices(options: message.clarifyOptions, onChoice: onChoice)
                     }
                     HStack(spacing: 4) {
+                        // LINEと同じく、自分側は「既読 → 時刻」の順
+                        if alignRight { readStatusText }
                         timeText
-                        readStatusText
+                        if !alignRight { readStatusText }
                     }
                 }
-                Spacer(minLength: 60)
+                if !alignRight { Spacer(minLength: 60) }
             }
-        case .system:
-            SystemBubble(text: message.text)
         }
     }
 
