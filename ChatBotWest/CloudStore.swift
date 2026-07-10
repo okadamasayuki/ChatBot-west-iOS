@@ -715,35 +715,36 @@ final class CloudStore: ObservableObject {
     /// 開いている相談が「担当者の返答待ち」の状態なら、担当者役の返信をスケジュールする。
     /// メッセージ・案件の更新のたびに呼ばれるため、既存の「担当者回答待ち」の相談を開いたときも動く。
     private func devMaybeReply() {
-        guard devMode, let roomId = currentRoomId, let last = roomMessages.last else { return }
+        guard devMode, let roomId = currentRoomId else { return }
+        // 削除済み・システムメッセージは無視して、最後の実質的なメッセージを見る
+        guard let last = roomMessages.last(where: { !$0.deleted && $0.role != .system }) else { return }
         guard last.role == .ai || last.role == .expert else { return }
         guard !devRepliedMsgIds.contains(last.id), !isDoneRoom(roomId) else { return }
         // 未回答の案件がある(=BA回答待ち)ときはBAの回答を待つ
         guard !cases.contains(where: { $0.roomId == roomId && $0.status != .answered }) else { return }
-        devRepliedMsgIds.insert(last.id)
         let isClarify = last.role == .ai && !last.clarifyOptions.isEmpty
-        scheduleDevQuestionerReply(roomId: roomId, isFollowup: !isClarify)
+        scheduleDevQuestionerReply(roomId: roomId, isFollowup: !isClarify, msgId: last.id)
     }
 
     /// APIが担当者役(会計の素人)として返信する。
     /// 聞き返しには返答し、AI/BAの回答には納得するまで更問をする。
     /// 納得した場合(または更問の上限に達した場合)はお礼を送って相談を完了にする。
-    private func scheduleDevQuestionerReply(roomId: String, isFollowup: Bool) {
+    /// 途中で中断・失敗した場合は返信済みマークを外し、次のスナップショット更新で再試行できるようにする。
+    private func scheduleDevQuestionerReply(roomId: String, isFollowup: Bool, msgId: String) {
         guard devMode else { return }
-        // 更問の上限に達したら、納得したことにしてお礼+完了
         let followupLimitReached = isFollowup && devFollowupCounts[roomId, default: 0] >= devReplyLimit
-        if isFollowup && !followupLimitReached {
-            devFollowupCounts[roomId, default: 0] += 1
-        } else if !isFollowup {
-            guard devClarifyCounts[roomId, default: 0] < devReplyLimit else { return }
-            devClarifyCounts[roomId, default: 0] += 1
-        }
+        if !isFollowup, devClarifyCounts[roomId, default: 0] >= devReplyLimit { return }
+        devRepliedMsgIds.insert(msgId) // 二重予約を防ぐ(失敗時は外して再試行可能にする)
+
         Task { [weak self] in
             try? await Task.sleep(nanoseconds: 1_500_000_000)
-            // 待機中にオフにされたら送らない
-            guard let self, self.devMode, self.currentRoomId == roomId, !self.sending else { return }
+            guard let self else { return }
+            let retryLater = { self.devRepliedMsgIds.remove(msgId) }
+            // オフにされた/相談を閉じた/送信中 → いったん取り下げ(条件が揃えば再試行される)
+            guard self.devMode, self.currentRoomId == roomId, !self.sending else { retryLater(); return }
 
             if followupLimitReached {
+                // 更問の上限に達したら、納得したことにしてお礼+完了
                 self.devFinishRoom(roomId, thanks: "ありがとうございます、よく分かりました!")
                 return
             }
@@ -751,7 +752,7 @@ final class CloudStore: ObservableObject {
             // 会話履歴を台本テキストとして1つのメッセージにまとめて渡す
             // (roleを反転して渡すと構造が不正になり、モデルがアーティファクトを出すため)
             let transcript = self.roomMessages
-                .filter { $0.role != .system }
+                .filter { $0.role != .system && !$0.deleted }
                 .suffix(20)
                 .map { m -> String in
                     switch m.role {
@@ -762,7 +763,7 @@ final class CloudStore: ObservableObject {
                     }
                 }
                 .joined(separator: "\n\n")
-            guard !transcript.isEmpty else { return }
+            guard !transcript.isEmpty else { retryLater(); return }
             do {
                 let raw = try await ClaudeService.call(
                     system: Prompts.devQuestionerSystem,
@@ -776,15 +777,18 @@ final class CloudStore: ObservableObject {
                 )
                 let result = try JSONDecoder().decode(DevQuestionerResult.self, from: Data(raw.utf8))
                 let text = result.message.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !text.isEmpty, self.currentRoomId == roomId else { return }
+                guard !text.isEmpty, self.currentRoomId == roomId else { retryLater(); return }
                 if result.satisfied && isFollowup {
                     // 納得した → お礼を送って完了にする
                     self.devFinishRoom(roomId, thanks: text)
                 } else {
+                    if isFollowup { self.devFollowupCounts[roomId, default: 0] += 1 }
+                    else { self.devClarifyCounts[roomId, default: 0] += 1 }
                     await self.submitQuestion(text, simulated: true)
                 }
             } catch {
-                // 開発モードの自動返信は失敗しても通常フローに影響させない
+                // 失敗しても通常フローに影響させない。マークを外して再試行できるようにする
+                retryLater()
             }
         }
     }
