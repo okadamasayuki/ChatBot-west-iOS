@@ -737,7 +737,8 @@ final class CloudStore: ObservableObject {
         devRepliedMsgIds.insert(msgId) // 二重予約を防ぐ(失敗時は外して再試行可能にする)
 
         Task { [weak self] in
-            try? await Task.sleep(nanoseconds: 1_500_000_000)
+            // 即答: 待機はスナップショットの反映を待つ最小限だけ
+            try? await Task.sleep(nanoseconds: 200_000_000)
             guard let self else { return }
             let retryLater = { self.devRepliedMsgIds.remove(msgId) }
             // オフにされた/相談を閉じた/送信中 → いったん取り下げ(条件が揃えば再試行される)
