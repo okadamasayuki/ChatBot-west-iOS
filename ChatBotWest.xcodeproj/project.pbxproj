@@ -16,6 +16,7 @@
 		381212752211D3590D715AE9 /* ChatRoomView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CE0A7C4EE659D2CF860E02C /* ChatRoomView.swift */; };
 		7919DA4320C51D8910872E88 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 731995A5B533ECD9B63D73DD /* Models.swift */; };
 		805EAA02A243F800C32DB940 /* CloudStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8984E9ACA16B6576A53CF46F /* CloudStore.swift */; };
+		98D65C96AB55E6E13F63FF6A /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = BE2324FAD56E94C8A9507113 /* Assets.xcassets */; };
 		9A2F44F0FAFD9D96B5F4A382 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD3304DA16A875C2415C4F1F /* LoginView.swift */; };
 		A7842A848D7E42B7122AFF80 /* SpeechRecognizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B878A783285F5A6B7F48B2A2 /* SpeechRecognizer.swift */; };
 		B1E407B10E90A9F56F8E42FC /* FirebaseFunctions in Frameworks */ = {isa = PBXBuildFile; productRef = 9BD3C6220F061BE9AB7A0F0B /* FirebaseFunctions */; };
@@ -41,6 +42,7 @@
 		AED3154295D9CCCC87F60B1C /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		B72B9642D45337FC24F45555 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		B878A783285F5A6B7F48B2A2 /* SpeechRecognizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechRecognizer.swift; sourceTree = "<group>"; };
+		BE2324FAD56E94C8A9507113 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		C0EF6EEED0F76C4A4FF4A316 /* ClaudeService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeService.swift; sourceTree = "<group>"; };
 		CFC9A7686B652F1C4AC14F06 /* NaikiManualViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NaikiManualViews.swift; sourceTree = "<group>"; };
 		DB9B5924DCCE96BCD4FD0E5E /* App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App.swift; sourceTree = "<group>"; };
@@ -100,6 +102,7 @@
 			isa = PBXGroup;
 			children = (
 				DB9B5924DCCE96BCD4FD0E5E /* App.swift */,
+				BE2324FAD56E94C8A9507113 /* Assets.xcassets */,
 				C0EF6EEED0F76C4A4FF4A316 /* ClaudeService.swift */,
 				8984E9ACA16B6576A53CF46F /* CloudStore.swift */,
 				597C8E0105D2CA71FFBA2ED4 /* Info.plist */,
@@ -119,6 +122,7 @@
 			buildConfigurationList = B02597218882F1ADC586BB73 /* Build configuration list for PBXNativeTarget "ChatBotWest" */;
 			buildPhases = (
 				95AC3749FB0BDFCF9FBF85F9 /* Sources */,
+				E4A0658D30C45DE4A25BF021 /* Resources */,
 				A979DB1887570C15A4C3F025 /* Frameworks */,
 			);
 			buildRules = (
@@ -171,6 +175,17 @@
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		E4A0658D30C45DE4A25BF021 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				98D65C96AB55E6E13F63FF6A /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		95AC3749FB0BDFCF9FBF85F9 /* Sources */ = {

@@ -38,6 +38,8 @@ struct ChatBotWestApp: App {
         WindowGroup {
             RootView()
                 .environmentObject(store)
+                // Web版と同じライト配色のデザインのため、ダークモードでも常にライト表示にする
+                .preferredColorScheme(.light)
         }
     }
 }

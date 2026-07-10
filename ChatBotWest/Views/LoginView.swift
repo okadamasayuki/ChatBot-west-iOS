@@ -29,12 +29,28 @@ struct LoginView: View {
                         Button {
                             switchMode(.login)
                         } label: {
-                            HStack { Spacer(); Text("ログイン").bold(); Spacer() }
+                            Text("ログイン")
+                                .bold()
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 6)
                         }
-                        Button("新規登録") {
+                        .buttonStyle(.borderedProminent)
+                        .tint(Theme.accent)
+                        .listRowBackground(Color.clear)
+                        .listRowInsets(EdgeInsets())
+
+                        Button {
                             switchMode(.signup)
+                        } label: {
+                            Text("新規登録")
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 6)
                         }
+                        .buttonStyle(.bordered)
+                        .listRowBackground(Color.clear)
+                        .listRowInsets(EdgeInsets())
                     }
+                    .listRowSeparator(.hidden)
 
                 case .login, .signup:
                     Section {
