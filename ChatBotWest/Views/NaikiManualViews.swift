@@ -41,7 +41,8 @@ struct NaikiView: View {
                     savedMessage: "✓ 社内ルールを更新しました。全員の回答に反映されます。",
                     applyLabel: "社内ルールを更新",
                     confirmBeforeApply: "現在の社内ルールをこの内容で置き換えます。よろしいですか?",
-                    diffBase: store.naiki // コンパクト前後の差分を表示
+                    diffBase: store.naiki, // コンパクト前後の差分を表示
+                    dismissOnApply: true   // 更新したらシートを閉じる
                 )
             }
         }

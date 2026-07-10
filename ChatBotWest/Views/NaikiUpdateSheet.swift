@@ -14,6 +14,8 @@ struct NaikiUpdateSheet: View {
     var confirmBeforeApply: String? = nil
     /// 変更前のテキスト。指定すると「差分/編集」の切り替え表示になる(コンパクト用)
     var diffBase: String? = nil
+    /// 反映したらシートを閉じる
+    var dismissOnApply = false
 
     @State private var text = ""
     @State private var busy = false
@@ -113,7 +115,11 @@ struct NaikiUpdateSheet: View {
     private func doApply() {
         guard canApply else { return }
         apply(text.trimmingCharacters(in: .whitespacesAndNewlines))
-        savedNote = savedMessage
+        if dismissOnApply {
+            dismiss()
+        } else {
+            savedNote = savedMessage
+        }
     }
 }
 
