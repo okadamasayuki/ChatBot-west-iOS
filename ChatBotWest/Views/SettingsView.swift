@@ -85,11 +85,32 @@ struct SettingsView: View {
                             }
                         }
                         .disabled(deleteAllBusy)
+                        // 確認ダイアログはボタンごとに付ける(同じビューに複数まとめると動かないため)
+                        .confirmationDialog("すべての相談・BAの案件・回答履歴を削除しますか?\n全員の画面から消え、元に戻せません。",
+                                            isPresented: $confirmDeleteAll, titleVisibility: .visible) {
+                            Button("削除する", role: .destructive) {
+                                // 1つ目のダイアログが閉じ切ってから最終確認を出す
+                                Task { @MainActor in
+                                    try? await Task.sleep(nanoseconds: 500_000_000)
+                                    confirmDeleteAllFinal = true
+                                }
+                            }
+                            Button("キャンセル", role: .cancel) {}
+                        }
+                        .alert("本当に削除しますか?(最終確認)", isPresented: $confirmDeleteAllFinal) {
+                            Button("すべて削除", role: .destructive) { deleteAllRooms() }
+                            Button("キャンセル", role: .cancel) {}
+                        }
                     }
 
                     Section("📘 社内ルール") {
                         Button("🗑 社内ルールを空にする", role: .destructive) {
                             confirmClearNaiki = true
+                        }
+                        .confirmationDialog("社内ルールをすべて削除して空にしますか?\n(全員の回答に反映されます。元に戻せません)",
+                                            isPresented: $confirmClearNaiki, titleVisibility: .visible) {
+                            Button("空にする", role: .destructive) { store.saveNaiki("") }
+                            Button("キャンセル", role: .cancel) {}
                         }
                     }
 
@@ -163,27 +184,6 @@ struct SettingsView: View {
             }
             .sheet(item: $shareURL) { url in
                 ActivityView(items: [url])
-            }
-            .confirmationDialog("すべての相談・BAの案件・回答履歴を削除しますか?\n全員の画面から消え、元に戻せません。",
-                                isPresented: $confirmDeleteAll, titleVisibility: .visible) {
-                Button("削除する", role: .destructive) {
-                    // 1つ目のダイアログが閉じ切ってから最終確認を出す(連続表示だと出ないことがある)
-                    Task { @MainActor in
-                        try? await Task.sleep(nanoseconds: 500_000_000)
-                        confirmDeleteAllFinal = true
-                    }
-                }
-                Button("キャンセル", role: .cancel) {}
-            }
-            .confirmationDialog("本当に削除しますか?(最終確認)",
-                                isPresented: $confirmDeleteAllFinal, titleVisibility: .visible) {
-                Button("すべて削除", role: .destructive) { deleteAllRooms() }
-                Button("キャンセル", role: .cancel) {}
-            }
-            .confirmationDialog("社内ルールをすべて削除して空にしますか?\n(全員の回答に反映されます。元に戻せません)",
-                                isPresented: $confirmClearNaiki, titleVisibility: .visible) {
-                Button("空にする", role: .destructive) { store.saveNaiki("") }
-                Button("キャンセル", role: .cancel) {}
             }
         }
     }
