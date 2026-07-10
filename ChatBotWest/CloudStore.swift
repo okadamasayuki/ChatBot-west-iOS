@@ -41,10 +41,20 @@ final class CloudStore: ObservableObject {
 
     /// 開発モード: APIが担当者役(会計の素人)になり、聞き返しへの返答や回答への更問を自動で行う
     @Published var devMode: Bool = UserDefaults.standard.bool(forKey: "devMode") {
-        didSet { UserDefaults.standard.set(devMode, forKey: "devMode") }
+        didSet {
+            UserDefaults.standard.set(devMode, forKey: "devMode")
+            if devMode {
+                // オンにし直したら状態をリセットして、開いている相談を即再判定する
+                devFollowupCounts = [:]
+                devClarifyCounts = [:]
+                devRepliedMsgIds = []
+                devMaybeReply()
+            }
+        }
     }
-    private var devFollowupCounts: [String: Int] = [:] // roomId → 更問の回数(ループ防止・各ルーム2回まで)
-    private var devClarifyCounts: [String: Int] = [:]  // roomId → 聞き返しへの返答回数(各ルーム3回まで)
+    private let devReplyLimit = 5 // 開発モードの返信上限(更問・聞き返しへの返答とも各ルームこの回数まで)
+    private var devFollowupCounts: [String: Int] = [:] // roomId → 更問の回数(ループ防止)
+    private var devClarifyCounts: [String: Int] = [:]  // roomId → 聞き返しへの返答回数
     private var devRepliedMsgIds: Set<String> = []     // 返信済みメッセージID(二重返信防止)
 
     private let db = Firestore.firestore()
@@ -683,7 +693,8 @@ final class CloudStore: ObservableObject {
         }
         Task { [weak self] in
             try? await Task.sleep(nanoseconds: 1_500_000_000)
-            guard let self, self.currentRoomId == roomId, !self.sending else { return }
+            // 待機中にオフにされたら送らない
+            guard let self, self.devMode, self.currentRoomId == roomId, !self.sending else { return }
 
             if followupLimitReached {
                 self.devFinishRoom(roomId, thanks: "ありがとうございます、よく分かりました!")
