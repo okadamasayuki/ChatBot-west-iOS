@@ -5,6 +5,8 @@ struct ChatRoomView: View {
     @EnvironmentObject var store: CloudStore
     @State private var input = ""
     @FocusState private var inputFocused: Bool
+    @State private var dragOffset: CGFloat = 0   // 左スワイプ中の画面のずれ(指に追従)
+    @State private var draggingHoriz = false
 
     private var lastMessageId: String? {
         store.pendingTyping ? "typing" : store.roomMessages.last?.id
@@ -98,17 +100,41 @@ struct ChatRoomView: View {
             }
         }
         // 左スワイプでBAタブの該当質問へ(財務のみ。案件がなければBAタブへ)。
+        // 指に追従して画面が横に動き、しきい値を超えて離すとスライドアウトして遷移する。
         // 右方向(戻る)は NavigationStack の標準スワイプに任せる
+        .offset(x: dragOffset)
         .simultaneousGesture(
-            DragGesture(minimumDistance: 30)
-                .onEnded { value in
+            DragGesture(minimumDistance: 20)
+                .onChanged { value in
+                    guard store.isExpert else { return }
                     let dx = value.translation.width
                     let dy = value.translation.height
-                    guard store.isExpert, dx < -80, abs(dx) > abs(dy) * 1.5 else { return }
-                    if canJumpToCase, let id = store.currentRoomId {
-                        store.jumpToCase(roomId: id)
+                    if !draggingHoriz {
+                        // 横方向の意図がはっきりしてから追従を始める(縦スクロールを邪魔しない)
+                        guard dx < -12, abs(dx) > abs(dy) * 1.5 else { return }
+                        draggingHoriz = true
+                    }
+                    dragOffset = min(0, dx)
+                }
+                .onEnded { value in
+                    guard draggingHoriz else { return }
+                    draggingHoriz = false
+                    let width = UIScreen.main.bounds.width
+                    let commit = value.translation.width < -max(80, width * 0.25)
+                    if commit {
+                        // 画面ごと左へスライドアウトしてから遷移
+                        withAnimation(.easeOut(duration: 0.22)) { dragOffset = -width * 1.2 }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.24) {
+                            if canJumpToCase, let id = store.currentRoomId {
+                                store.jumpToCase(roomId: id)
+                            } else {
+                                store.activeTab = .expert
+                            }
+                            dragOffset = 0 // 遷移後は無アニメーションで元の位置に戻す
+                        }
                     } else {
-                        store.activeTab = .expert
+                        // しきい値未満: スナップバック
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { dragOffset = 0 }
                     }
                 }
         )
