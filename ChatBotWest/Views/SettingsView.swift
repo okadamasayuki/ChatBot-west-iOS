@@ -169,8 +169,12 @@ struct SettingsView: View {
             .navigationBarTitleDisplayMode(.inline)
             // 下にスクロールするとキーボードが閉じる + キーボード上部に「完了」ボタン
             .scrollDismissesKeyboard(.interactively)
-            // 入力欄の外をタップするとキーボードを閉じる(ボタンのタップは妨げない)
-            .simultaneousGesture(TapGesture().onEnded { styleFocused = false })
+            // 入力欄の外をタップするとキーボードを閉じる。
+            // キーボード表示中だけジェスチャーを有効にする(通常時はボタンのタップを一切妨げない)
+            .simultaneousGesture(
+                TapGesture().onEnded { styleFocused = false },
+                including: styleFocused ? .all : .subviews
+            )
             .toolbar {
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer()
