@@ -266,14 +266,25 @@ struct PdfKitView: UIViewRepresentable {
         view.document = document
         view.autoScales = true
         view.displayDirection = .vertical
-        applyHighlight(view)
+        scheduleHighlight(view)
         return view
     }
 
     func updateUIView(_ view: PDFView, context: Context) {
         if view.document !== document {
             view.document = document
-            applyHighlight(view)
+            scheduleHighlight(view)
+        }
+    }
+
+    /// PDFViewの描画準備が終わる前に設定すると反映されないことがあるため、
+    /// 少し遅らせて2回適用する(適用は冪等)
+    private func scheduleHighlight(_ view: PDFView) {
+        DispatchQueue.main.async { applyHighlight(view) }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            if (view.highlightedSelections ?? []).isEmpty {
+                applyHighlight(view)
+            }
         }
     }
 
