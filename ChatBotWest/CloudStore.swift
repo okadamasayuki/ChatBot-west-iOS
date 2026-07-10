@@ -671,15 +671,31 @@ final class CloudStore: ObservableObject {
         Task { [weak self] in
             try? await Task.sleep(nanoseconds: 1_500_000_000)
             guard let self, self.currentRoomId == roomId, !self.sending else { return }
-            // 質問者の視点で会話履歴を組み立てる(自分の発言=assistant、AI/BA=user)
-            let history = self.roomMessages
+            // 会話履歴を台本テキストとして1つのメッセージにまとめて渡す
+            // (roleを反転して渡すと構造が不正になり、モデルがアーティファクトを出すため)
+            let transcript = self.roomMessages
                 .filter { $0.role != .system }
                 .suffix(20)
-                .map { ClaudeService.ChatMessage(role: $0.role == .user ? "assistant" : "user", content: $0.text) }
-            guard history.last?.role == "user" else { return }
+                .map { m -> String in
+                    switch m.role {
+                    case .user: return "質問者: \(m.text)"
+                    case .ai: return "AIアシスタント: \(m.text)"
+                    case .expert: return "会計専門家(BA): \(m.text)"
+                    case .system: return ""
+                    }
+                }
+                .joined(separator: "\n\n")
+            guard !transcript.isEmpty else { return }
             do {
-                let reply = try await ClaudeService.call(system: Prompts.devQuestionerSystem,
-                                                         messages: Array(history))
+                let reply = try await ClaudeService.call(
+                    system: Prompts.devQuestionerSystem,
+                    messages: [.init(role: "user", content: """
+                    以下は会計相談チャットのこれまでのやり取りです。あなたは「質問者」です。
+                    このやり取りの続きとして、質問者が次に送るメッセージの本文だけを返してください。
+
+                    \(transcript)
+                    """)]
+                )
                 let text = reply.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !text.isEmpty, self.currentRoomId == roomId else { return }
                 await self.submitQuestion(text, simulated: true)
