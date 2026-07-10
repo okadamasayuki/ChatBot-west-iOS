@@ -317,44 +317,42 @@ struct PdfKitView: UIViewRepresentable {
     /// 空白を除去した正規化テキスト同士で照合し、見つかった範囲を元のテキスト位置に
     /// 逆マッピングして選択範囲を作る(引用の全体がハイライトされる)。
     private func findSelections(_ text: String) -> [PDFSelection] {
-        let (normExcerpt, _) = Self.normalizedWithMap(text)
-        guard normExcerpt.count >= 6 else { return [] }
-        let anchorLen = min(10, normExcerpt.count)
+        let normExcerptChars = Array(Self.normalizedWithMap(text).0)
+        let n = normExcerptChars.count
+        guard n >= 6 else { return [] }
+        let anchorLen = min(10, n)
 
-        // 2) ページごとに「一致する最長の先頭部分」を探し、
-        //    引用がAIの言い換えで途中から原文とずれていても、
-        //    一致箇所を含む文の区切り(「。」や改行)まで広げてハイライトする
-        for i in 0..<document.pageCount {
-            guard let page = document.page(at: i), let pageText = page.string else { continue }
-            let (norm, map) = Self.normalizedWithMap(pageText)
-            guard norm.range(of: String(normExcerpt.prefix(anchorLen))) != nil else { continue }
+        // 引用の冒頭がAIの言い換えで原文と違う場合に備え、
+        // アンカー(照合の足がかり)は引用の先頭・1/4・中央・3/4 の複数位置から取る
+        var anchors: [String] = []
+        for offset in [0, n / 4, n / 2, (3 * n) / 4] {
+            guard offset + anchorLen <= n else { continue }
+            let probe = String(normExcerptChars[offset..<(offset + anchorLen)])
+            if !anchors.contains(probe) { anchors.append(probe) }
+        }
 
-            // 二分探索で一致する最長の先頭部分の長さを求める
-            var lo = anchorLen, hi = normExcerpt.count, best = anchorLen
-            while lo <= hi {
-                let mid = (lo + hi) / 2
-                if norm.range(of: String(normExcerpt.prefix(mid))) != nil {
-                    best = mid; lo = mid + 1
-                } else {
-                    hi = mid - 1
+        // ページごとにアンカーを探し、一致箇所を含む文の区切り(「。」や改行)まで
+        // 広げてハイライトする(項目全体が引かれる)
+        for anchor in anchors {
+            for i in 0..<document.pageCount {
+                guard let page = document.page(at: i), let pageText = page.string else { continue }
+                let (norm, map) = Self.normalizedWithMap(pageText)
+                guard let r = norm.range(of: anchor) else { continue }
+                let startNorm = norm.distance(from: norm.startIndex, to: r.lowerBound)
+                let endNorm = norm.distance(from: norm.startIndex, to: r.upperBound) - 1
+                guard startNorm < map.count, endNorm < map.count else { continue }
+
+                let chars = Array(pageText)
+                var s = map[startNorm]
+                var e = map[endNorm]
+                // 文の区切りまで拡張(引用が短い/部分一致でも中途半端にならない)
+                while s > 0, chars[s - 1] != "。", chars[s - 1] != "\n" { s -= 1 }
+                while e < chars.count - 1, chars[e] != "。", chars[e] != "\n" { e += 1 }
+                let sIdx = pageText.index(pageText.startIndex, offsetBy: s)
+                let eIdx = pageText.index(pageText.startIndex, offsetBy: e + 1)
+                if let sel = page.selection(for: NSRange(sIdx..<eIdx, in: pageText)) {
+                    return [sel]
                 }
-            }
-            guard let r = norm.range(of: String(normExcerpt.prefix(best))) else { continue }
-            let startNorm = norm.distance(from: norm.startIndex, to: r.lowerBound)
-            let endNorm = norm.distance(from: norm.startIndex, to: r.upperBound) - 1
-            guard startNorm < map.count, endNorm < map.count else { continue }
-
-            let chars = Array(pageText)
-            var s = map[startNorm]
-            var e = map[endNorm]
-            // 常に文の区切り(「。」・改行)まで広げ、項目全体をハイライトする
-            // (引用が短い場合や途中までしか一致しない場合でも中途半端にならない)
-            while s > 0, chars[s - 1] != "。", chars[s - 1] != "\n" { s -= 1 }
-            while e < chars.count - 1, chars[e] != "。", chars[e] != "\n" { e += 1 }
-            let sIdx = pageText.index(pageText.startIndex, offsetBy: s)
-            let eIdx = pageText.index(pageText.startIndex, offsetBy: e + 1)
-            if let sel = page.selection(for: NSRange(sIdx..<eIdx, in: pageText)) {
-                return [sel]
             }
         }
         return []
