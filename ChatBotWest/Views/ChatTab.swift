@@ -30,16 +30,31 @@ struct RoomListView: View {
 
     enum RoomFilter { case mine, all }
 
+    /// 相談ごとの未回答案件の対応者(nil=案件なし / ""=対応者未決定 / 名前=対応中)。
+    /// 複数の案件がある場合は「対応者未決定」を優先して表示する
+    private var openCaseHandlers: [String: String] {
+        var map: [String: String] = [:]
+        for c in store.cases where c.status != .answered {
+            if let current = map[c.roomId], current.isEmpty { continue }
+            map[c.roomId] = c.handledBy
+        }
+        return map
+    }
+
     private var visibleRooms: [Room] {
         // メッセージのない相談(空の下書きの残骸)は一覧に出さない
         let base = store.rooms.filter { !$0.lastText.trimmingCharacters(in: .whitespaces).isEmpty }
         let effective: RoomFilter = store.isExpert ? .all : filter
         let list = effective == .mine ? base.filter { store.isMyRoom($0) } : base
-        let openSet = Set(store.cases.filter { $0.status != .answered }.map { $0.roomId })
+        let handlers = openCaseHandlers
         let byNew: (Room, Room) -> Bool = { $0.lastTs > $1.lastTs }
         if sort == "status" {
-            // BA回答待ち → 担当者回答待ち → 完了(同じステータス内は新しい順)
-            func rank(_ r: Room) -> Int { r.isDone ? 2 : (openSet.contains(r.id) ? 0 : 1) }
+            // 対応者未決定 → 対応中 → 担当者回答待ち → 完了(同じステータス内は新しい順)
+            func rank(_ r: Room) -> Int {
+                if r.isDone { return 3 }
+                guard let h = handlers[r.id] else { return 2 }
+                return h.isEmpty ? 0 : 1
+            }
             return list.sorted { rank($0) != rank($1) ? rank($0) < rank($1) : byNew($0, $1) }
         }
         return list.sorted(by: byNew)
@@ -66,7 +81,7 @@ struct RoomListView: View {
 
                 ForEach(visibleRooms) { room in
                     RoomRowView(room: room,
-                                openCase: store.cases.contains { $0.roomId == room.id && $0.status != .answered },
+                                openCaseHandler: openCaseHandlers[room.id],
                                 selectable: store.isExpert,
                                 selected: selectedRooms.contains(room.id),
                                 onToggleSelect: {
@@ -188,7 +203,8 @@ struct RoomListView: View {
 
 struct RoomRowView: View {
     let room: Room
-    let openCase: Bool
+    /// nil=案件なし / ""=対応者未決定 / 名前=対応中
+    let openCaseHandler: String?
     var selectable = false
     var selected = false
     var onToggleSelect: () -> Void = {}
@@ -220,13 +236,17 @@ struct RoomRowView: View {
         .padding(.vertical, 2)
     }
 
-    // ステータスは3種類: 完了 / BA回答待ち(エスカレーション中) / 担当者回答待ち
+    // ステータス: 完了 / 対応者未決定 / 〇〇さん対応中 / 担当者回答待ち
     @ViewBuilder
     private var statusTag: some View {
         if room.isDone {
             TagView(text: "✓ 完了", bg: Theme.tagDoneBg, fg: Theme.tagDoneFg)
-        } else if openCase {
-            TagView(text: "BA回答待ち", bg: Theme.tagPendingBg, fg: Theme.tagPendingFg)
+        } else if let handler = openCaseHandler {
+            if handler.isEmpty {
+                TagView(text: "対応者未決定", bg: Theme.tagPendingBg, fg: Theme.tagPendingFg)
+            } else {
+                TagView(text: "\(handler)さん対応中", bg: Color(.systemGray5), fg: Color(.secondaryLabel))
+            }
         } else {
             TagView(text: "担当者回答待ち", bg: Theme.tagWaitingBg, fg: Theme.tagWaitingFg)
         }
