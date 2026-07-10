@@ -40,7 +40,8 @@ struct NaikiView: View {
                     apply: { text in store.saveNaiki(text) },
                     savedMessage: "✓ 社内ルールを更新しました。全員の回答に反映されます。",
                     applyLabel: "社内ルールを更新",
-                    confirmBeforeApply: "現在の社内ルールをこの内容で置き換えます。よろしいですか?"
+                    confirmBeforeApply: "現在の社内ルールをこの内容で置き換えます。よろしいですか?",
+                    diffBase: store.naiki // コンパクト前後の差分を表示
                 )
             }
         }
