@@ -243,9 +243,13 @@ struct RoomRowView: View {
             TagView(text: "✓ 完了", bg: Theme.tagDoneBg, fg: Theme.tagDoneFg)
         } else if let handler = openCaseHandler {
             if handler.isEmpty {
-                TagView(text: "対応者未決定", bg: Theme.tagPendingBg, fg: Theme.tagPendingFg)
+                TagView(text: "対応者未決定",
+                        bg: Color(red: 1.0, green: 0xe9 / 255.0, blue: 0xe7 / 255.0),   // 赤系
+                        fg: Color(red: 0xc0 / 255.0, green: 0x39 / 255.0, blue: 0x2b / 255.0))
             } else {
-                TagView(text: "\(handler)さん対応中", bg: Color(.systemGray5), fg: Color(.secondaryLabel))
+                TagView(text: "\(handler)さん対応中",
+                        bg: Color(red: 1.0, green: 0xf0 / 255.0, blue: 0xdd / 255.0),   // オレンジ系
+                        fg: Color(red: 0xc2 / 255.0, green: 0x6a / 255.0, blue: 0x00 / 255.0))
             }
         } else {
             TagView(text: "担当者回答待ち", bg: Theme.tagWaitingBg, fg: Theme.tagWaitingFg)
