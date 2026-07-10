@@ -353,6 +353,19 @@ final class CloudStore: ObservableObject {
         roomRef.collection("messages").document(msg.id).setData(msg.dict)
     }
 
+    /// メッセージ本文を編集する(最後のメッセージなら一覧のプレビューも更新)
+    func updateMessageText(_ msg: Message, newText: String) {
+        guard let roomId = currentRoomId else { return }
+        let text = newText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty, text != msg.text else { return }
+        let roomRef = wsRef().collection("rooms").document(roomId)
+        roomRef.collection("messages").document(msg.id).updateData(["text": text])
+        if roomMessages.last?.id == msg.id {
+            let lastText = msg.role == .expert ? "【BA】" + text : text
+            roomRef.updateData(["lastText": lastText])
+        }
+    }
+
     func deleteRoom(_ id: String) async {
         guard let r = rooms.first(where: { $0.id == id }), canDeleteRoom(r) else { return }
         do {

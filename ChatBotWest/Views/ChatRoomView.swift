@@ -5,6 +5,7 @@ struct ChatRoomView: View {
     @EnvironmentObject var store: CloudStore
     @State private var input = ""
     @FocusState private var inputFocused: Bool
+    @State private var editingMessage: Message?
 
     private var lastMessageId: String? {
         store.pendingTyping ? "typing" : store.roomMessages.last?.id
@@ -25,6 +26,15 @@ struct ChatRoomView: View {
     private var canToggleDone: Bool {
         guard let r = room, store.pendingRoom?.id != r.id else { return false }
         return store.isExpert || store.isMyRoom(r)
+    }
+
+    /// メッセージを編集できるか(財務: AI・BAのメッセージ / 担当者: 自分の相談の自分の質問)
+    private func canEdit(_ msg: Message) -> Bool {
+        if store.isExpert {
+            return msg.role == .ai || msg.role == .expert
+        }
+        guard let r = room, store.isMyRoom(r) else { return false }
+        return msg.role == .user
     }
 
     /// メッセージの表示スタイル(LINEと同じく「自分側=右・緑」の視点で描く)。
@@ -93,7 +103,7 @@ struct ChatRoomView: View {
                         let lastIdx = store.roomMessages.count - 1
                         ForEach(Array(store.roomMessages.enumerated()), id: \.element.id) { idx, msg in
                             let style = bubbleStyle(for: msg)
-                            MessageBubble(
+                            let bubble = MessageBubble(
                                 message: msg,
                                 senderLabel: style.label,
                                 alignRight: style.right,
@@ -106,6 +116,18 @@ struct ChatRoomView: View {
                                 }
                             )
                             .id(msg.id)
+                            // 長押しで編集(財務: AI・BAのメッセージ / 担当者: 自分の質問)
+                            if canEdit(msg) {
+                                bubble.contextMenu {
+                                    Button {
+                                        editingMessage = msg
+                                    } label: {
+                                        Label("編集", systemImage: "pencil")
+                                    }
+                                }
+                            } else {
+                                bubble
+                            }
                         }
                         if store.pendingTyping {
                             TypingBubble().id("typing")
@@ -158,6 +180,11 @@ struct ChatRoomView: View {
         }
         .navigationTitle(room?.title ?? "相談")
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(item: $editingMessage) { msg in
+            EditMessageSheet(message: msg) { newText in
+                store.updateMessageText(msg, newText: newText)
+            }
+        }
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
                 if canToggleDone {
@@ -174,6 +201,43 @@ struct ChatRoomView: View {
                     }
                 }
             }
+        }
+    }
+}
+
+// MARK: - メッセージ編集シート
+
+struct EditMessageSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let message: Message
+    let onSave: (String) -> Void
+    @State private var text = ""
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 10) {
+                TextEditor(text: $text)
+                    .font(.system(size: 14))
+                    .padding(4)
+                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color(.separator), lineWidth: 1))
+            }
+            .padding(14)
+            .navigationTitle("メッセージを編集")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("キャンセル") { dismiss() }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("保存") {
+                        onSave(text)
+                        dismiss()
+                    }
+                    .bold()
+                    .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+            .onAppear { text = message.text }
         }
     }
 }
@@ -230,7 +294,7 @@ struct MessageBubble: View {
         if let readStatus {
             Text(readStatus)
                 .font(.system(size: 10))
-                .foregroundColor(readStatus == "既読" ? Theme.accentDark : Theme.header.opacity(0.6))
+                .foregroundColor(Theme.header.opacity(0.6)) // 時刻と同じ色
         }
     }
 
