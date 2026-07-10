@@ -366,20 +366,32 @@ final class CloudStore: ObservableObject {
         }
     }
 
-    /// メッセージを削除する(最後のメッセージなら一覧のプレビューも更新)
+    /// メッセージを削除する(ソフトデリート)。本文を退避して「削除されました」表示にし、後から復元できる
     func deleteMessage(_ msg: Message) {
-        guard let roomId = currentRoomId else { return }
+        guard let roomId = currentRoomId, !msg.deleted else { return }
         let roomRef = wsRef().collection("rooms").document(roomId)
-        roomRef.collection("messages").document(msg.id).delete()
+        roomRef.collection("messages").document(msg.id).updateData([
+            "text": "削除されました",
+            "deleted": true,
+            "deletedText": msg.text,
+        ])
         if roomMessages.last?.id == msg.id {
-            let remaining = roomMessages.filter { $0.id != msg.id }
-            if let last = remaining.last {
-                let lastText = last.role == .expert ? "【BA】" + last.text : last.text
-                roomRef.updateData(["lastText": lastText, "lastTs": last.ts])
-            } else {
-                // メッセージが無くなった相談は一覧に表示されなくなる(空の下書きと同じ扱い)
-                roomRef.updateData(["lastText": ""])
-            }
+            roomRef.updateData(["lastText": "削除されました"])
+        }
+    }
+
+    /// 削除したメッセージを元に戻す
+    func restoreMessage(_ msg: Message) {
+        guard let roomId = currentRoomId, msg.deleted, let original = msg.deletedText else { return }
+        let roomRef = wsRef().collection("rooms").document(roomId)
+        roomRef.collection("messages").document(msg.id).updateData([
+            "text": original,
+            "deleted": FieldValue.delete(),
+            "deletedText": FieldValue.delete(),
+        ])
+        if roomMessages.last?.id == msg.id {
+            let lastText = msg.role == .expert ? "【BA】" + original : original
+            roomRef.updateData(["lastText": lastText])
         }
     }
 

@@ -6,7 +6,6 @@ struct ChatRoomView: View {
     @State private var input = ""
     @FocusState private var inputFocused: Bool
     @State private var editingMessage: Message?
-    @State private var deletingMessage: Message?
 
     private var lastMessageId: String? {
         store.pendingTyping ? "typing" : store.roomMessages.last?.id
@@ -100,25 +99,33 @@ struct ChatRoomView: View {
                                 alignRight: style.right,
                                 bubbleColor: style.color,
                                 borderColor: style.border,
-                                readStatus: readStatus(for: msg),
-                                showClarify: idx == lastIdx && msg.role == .ai && !msg.clarifyOptions.isEmpty && !viewOnly,
+                                readStatus: msg.deleted ? nil : readStatus(for: msg),
+                                showClarify: idx == lastIdx && msg.role == .ai && !msg.clarifyOptions.isEmpty && !viewOnly && !msg.deleted,
                                 onChoice: { choice in
                                     Task { await store.submitQuestion(choice) }
                                 }
                             )
                             .id(msg.id)
-                            // 長押しで編集・削除(財務: AI・BAのメッセージ / 担当者: 自分の質問)
+                            // 長押しで編集・削除・復元(財務: AI・BAのメッセージ / 担当者: 自分の質問)
                             if canEdit(msg) {
                                 bubble.contextMenu {
-                                    Button {
-                                        editingMessage = msg
-                                    } label: {
-                                        Label("編集", systemImage: "pencil")
-                                    }
-                                    Button(role: .destructive) {
-                                        deletingMessage = msg
-                                    } label: {
-                                        Label("削除", systemImage: "trash")
+                                    if msg.deleted {
+                                        Button {
+                                            store.restoreMessage(msg)
+                                        } label: {
+                                            Label("元に戻す", systemImage: "arrow.uturn.backward")
+                                        }
+                                    } else {
+                                        Button {
+                                            editingMessage = msg
+                                        } label: {
+                                            Label("編集", systemImage: "pencil")
+                                        }
+                                        Button(role: .destructive) {
+                                            store.deleteMessage(msg)
+                                        } label: {
+                                            Label("削除", systemImage: "trash")
+                                        }
                                     }
                                 }
                             } else {
@@ -181,16 +188,6 @@ struct ChatRoomView: View {
             EditMessageSheet(message: msg) { newText in
                 store.updateMessageText(msg, newText: newText)
             }
-        }
-        .confirmationDialog("このメッセージを削除しますか?元に戻せません。",
-                            isPresented: Binding(get: { deletingMessage != nil },
-                                                 set: { if !$0 { deletingMessage = nil } }),
-                            titleVisibility: .visible) {
-            Button("削除", role: .destructive) {
-                if let msg = deletingMessage { store.deleteMessage(msg) }
-                deletingMessage = nil
-            }
-            Button("キャンセル", role: .cancel) { deletingMessage = nil }
         }
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
@@ -308,6 +305,8 @@ struct MessageBubble: View {
     private var bubbleText: some View {
         Text(message.text)
             .font(.system(size: 14))
+            .italic(message.deleted)
+            .foregroundColor(message.deleted ? .secondary : .primary)
             .lineSpacing(4)
             .padding(.horizontal, 12)
             .padding(.vertical, 9)

@@ -116,9 +116,13 @@ struct Message: Identifiable, Equatable {
     var text: String
     var ts: String
     var clarifyOptions: [String]
+    /// 削除済みフラグ(本文は deletedText に退避され「削除されました」表示になる。復元可能)
+    var deleted: Bool
+    var deletedText: String?
 
     init(id: String = newUid(), role: MessageRole, text: String, ts: String = nowIso(), clarifyOptions: [String] = []) {
         self.id = id; self.role = role; self.text = text; self.ts = ts; self.clarifyOptions = clarifyOptions
+        self.deleted = false; self.deletedText = nil
     }
 
     init?(dict: [String: Any]) {
@@ -129,6 +133,8 @@ struct Message: Identifiable, Equatable {
         text = dict["text"] as? String ?? ""
         ts = dict["ts"] as? String ?? ""
         clarifyOptions = dict["clarifyOptions"] as? [String] ?? []
+        deleted = dict["deleted"] as? Bool ?? false
+        deletedText = dict["deletedText"] as? String
     }
 
     var dict: [String: Any] {
