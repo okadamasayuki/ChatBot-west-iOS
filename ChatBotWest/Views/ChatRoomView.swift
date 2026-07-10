@@ -97,6 +97,21 @@ struct ChatRoomView: View {
                 .background(Color(.secondarySystemBackground))
             }
         }
+        // 左スワイプでBAタブの該当質問へ(財務のみ。案件がなければBAタブへ)。
+        // 右方向(戻る)は NavigationStack の標準スワイプに任せる
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 30)
+                .onEnded { value in
+                    let dx = value.translation.width
+                    let dy = value.translation.height
+                    guard store.isExpert, dx < -80, abs(dx) > abs(dy) * 1.5 else { return }
+                    if canJumpToCase, let id = store.currentRoomId {
+                        store.jumpToCase(roomId: id)
+                    } else {
+                        store.activeTab = .expert
+                    }
+                }
+        )
         .navigationTitle(room?.title ?? "相談")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
