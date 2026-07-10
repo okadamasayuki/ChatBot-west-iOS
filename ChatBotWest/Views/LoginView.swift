@@ -90,20 +90,32 @@ struct LoginView: View {
                         Button {
                             submit()
                         } label: {
-                            HStack {
-                                Spacer()
-                                if busy { ProgressView().padding(.trailing, 6) }
+                            HStack(spacing: 8) {
+                                if busy { ProgressView().tint(.white) }
                                 Text(mode == .signup ? "新規登録" : "ログイン").bold()
-                                Spacer()
                             }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 6)
                         }
+                        .buttonStyle(.borderedProminent)
+                        .tint(Theme.accent)
                         .disabled(busy)
+                        .listRowBackground(Color.clear)
+                        .listRowInsets(EdgeInsets())
 
-                        Button("戻る") {
+                        Button {
                             switchMode(.chooser)
+                        } label: {
+                            Text("戻る")
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 6)
                         }
+                        .buttonStyle(.bordered)
                         .disabled(busy)
+                        .listRowBackground(Color.clear)
+                        .listRowInsets(EdgeInsets())
                     }
+                    .listRowSeparator(.hidden)
                 }
             }
             .navigationTitle(mode == .signup ? "新規登録" : mode == .login ? "ログイン" : "💬 会計相談チャット")
