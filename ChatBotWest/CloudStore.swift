@@ -619,11 +619,16 @@ final class CloudStore: ObservableObject {
                                    clarifyOptions: result.clarify_options), roomId: roomId)
             } else {
                 // エスカレーション
+                // この相談で最初に対応した人がいれば、デフォルトの対応者として引き継ぐ
+                let defaultHandler = cases
+                    .filter { $0.roomId == roomId && !$0.handledBy.isEmpty }
+                    .first?.handledBy ?? ""
                 let caseObj = CaseItem(
                     roomId: roomId,
                     question: text,
                     reason: result.escalation_reason.isEmpty ? "専門家の確認が必要な質問です。" : result.escalation_reason,
-                    options: result.options.isEmpty ? ["質問内容を確認のうえ個別に回答する"] : result.options
+                    options: result.options.isEmpty ? ["質問内容を確認のうえ個別に回答する"] : result.options,
+                    handledBy: defaultHandler
                 )
                 addCase(caseObj)
                 addMessage(Message(role: .ai, text: "ご質問ありがとうございます。この内容はBAによる確認が必要なため、BAにおつなぎしました。回答までしばらくお待ちください。"), roomId: roomId)
