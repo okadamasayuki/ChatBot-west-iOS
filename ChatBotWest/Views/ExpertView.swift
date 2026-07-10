@@ -47,18 +47,24 @@ struct ExpertView: View {
                     .padding(12)
                 }
                 .background(Theme.panelBg)
-                .onChange(of: store.highlightCaseId) { id in
-                    guard let id else { return }
-                    withAnimation { proxy.scrollTo(id, anchor: .top) }
-                    // ハイライトは2秒で解除(Web版 jump-hl と同様)
-                    Task {
-                        try? await Task.sleep(nanoseconds: 2_000_000_000)
-                        if store.highlightCaseId == id { store.highlightCaseId = nil }
-                    }
-                }
+                // タブの初回表示時は onChange が発火しないため、onAppear でもスクロールする
+                .onAppear { scrollToHighlight(proxy) }
+                .onChange(of: store.highlightCaseId) { _ in scrollToHighlight(proxy) }
             }
             .navigationTitle("BA")
             .navigationBarTitleDisplayMode(.inline)
+        }
+    }
+
+    /// 該当案件が一番上にくるようにスクロール(レイアウト確定を待ってから)
+    private func scrollToHighlight(_ proxy: ScrollViewProxy) {
+        guard let id = store.highlightCaseId else { return }
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 150_000_000)
+            withAnimation { proxy.scrollTo(id, anchor: .top) }
+            // ハイライトは2秒で解除(Web版 jump-hl と同様)
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            if store.highlightCaseId == id { store.highlightCaseId = nil }
         }
     }
 }
