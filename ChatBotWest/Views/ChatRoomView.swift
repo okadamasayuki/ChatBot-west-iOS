@@ -64,26 +64,16 @@ struct ChatRoomView: View {
 
     /// 自分側のメッセージの既読/未読(相手が読んだかどうか)。
     /// 相談の本人には自分の質問、財務にはBAの回答に対して表示する
+    /// 既読/未読は財務アカウントのみ表示。AIアシスタントとBAのメッセージが対象で、
+    /// 相談の本人が開いた(reads)か、後から質問者の返信があれば既読
     private func readStatus(for msg: Message) -> String? {
-        guard let r = room else { return nil }
-        if store.isExpert {
-            // 財務は常にBAの回答に対して表示。
-            // 相談の本人が開いた(reads)か、後から質問者の返信があれば既読
-            guard msg.role == .expert else { return nil }
-            let humanRead = r.ownerUid.isEmpty || r.ownerUid == store.myUid()
-                ? r.reads.contains { $0.key != store.myUid() && $0.value >= msg.ts }
-                : (r.reads[r.ownerUid] ?? "") >= msg.ts
-            let replied = store.roomMessages.contains { $0.role == .user && $0.ts > msg.ts }
-            return (humanRead || replied) ? "既読" : "未読"
-        } else if store.isMyRoom(r) {
-            // 担当者は自分の質問に対して表示。
-            // 誰かが開いた(reads)か、AI/BAからの返信があれば既読(AIは即座に読む)
-            guard msg.role == .user else { return nil }
-            let humanRead = r.reads.contains { $0.key != store.myUid() && $0.value >= msg.ts }
-            let replied = store.roomMessages.contains { ($0.role == .ai || $0.role == .expert) && $0.ts > msg.ts }
-            return (humanRead || replied) ? "既読" : "未読"
-        }
-        return nil
+        guard store.isExpert, let r = room else { return nil }
+        guard msg.role == .ai || msg.role == .expert else { return nil }
+        let humanRead = r.ownerUid.isEmpty || r.ownerUid == store.myUid()
+            ? r.reads.contains { $0.key != store.myUid() && $0.value >= msg.ts }
+            : (r.reads[r.ownerUid] ?? "") >= msg.ts
+        let replied = store.roomMessages.contains { $0.role == .user && $0.ts > msg.ts }
+        return (humanRead || replied) ? "既読" : "未読"
     }
 
     /// この相談の未回答案件(財務のみ、チャット内にBAの案件カードを統合表示する)
