@@ -62,14 +62,18 @@ struct Room: Identifiable, Equatable {
     var ownerName: String
     /// "done" = 完了 / それ以外(空)は進行中
     var status: String
+    /// 既読管理: uid → そのユーザーが読んだ最後のメッセージの ts
+    var reads: [String: String]
 
     init(id: String = newUid(), title: String = "新しい相談", createdAt: String = nowIso(),
          lastText: String = "", lastTs: String = nowIso(),
-         ownerUid: String = "", ownerEmail: String = "", ownerName: String = "", status: String = "") {
+         ownerUid: String = "", ownerEmail: String = "", ownerName: String = "", status: String = "",
+         reads: [String: String] = [:]) {
         self.id = id; self.title = title; self.createdAt = createdAt
         self.lastText = lastText; self.lastTs = lastTs
         self.ownerUid = ownerUid; self.ownerEmail = ownerEmail; self.ownerName = ownerName
         self.status = status
+        self.reads = reads
     }
 
     init?(dict: [String: Any]) {
@@ -83,15 +87,20 @@ struct Room: Identifiable, Equatable {
         ownerEmail = dict["ownerEmail"] as? String ?? ""
         ownerName = dict["ownerName"] as? String ?? ""
         status = dict["status"] as? String ?? ""
+        reads = dict["reads"] as? [String: String] ?? [:]
     }
 
     var isDone: Bool { status == "done" }
 
     var dict: [String: Any] {
-        ["id": id, "title": title, "createdAt": createdAt,
-         "lastText": lastText, "lastTs": lastTs,
-         "ownerUid": ownerUid, "ownerEmail": ownerEmail, "ownerName": ownerName,
-         "status": status]
+        var d: [String: Any] = [
+            "id": id, "title": title, "createdAt": createdAt,
+            "lastText": lastText, "lastTs": lastTs,
+            "ownerUid": ownerUid, "ownerEmail": ownerEmail, "ownerName": ownerName,
+            "status": status,
+        ]
+        if !reads.isEmpty { d["reads"] = reads }
+        return d
     }
 }
 

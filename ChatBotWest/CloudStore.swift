@@ -298,6 +298,7 @@ final class CloudStore: ObservableObject {
             .order(by: "ts").addSnapshotListener { [weak self] snap, _ in
                 Task { @MainActor in
                     self?.roomMessages = snap?.documents.compactMap { Message(dict: $0.data()) } ?? []
+                    self?.markRoomRead() // 表示中のメッセージを既読にする
                     self?.devMaybeReply() // 開発モード: 担当者役の返信が必要か判定(既存の相談を開いたときも動く)
                 }
             }
@@ -306,6 +307,16 @@ final class CloudStore: ObservableObject {
     private func stopRoomMessages() {
         roomMsgListener?.remove()
         roomMsgListener = nil
+    }
+
+    /// 開いている相談のメッセージを既読にする(rooms/{id}.reads.{uid} に最後に読んだ ts を記録)
+    private func markRoomRead() {
+        guard let uid = user?.uid, let roomId = currentRoomId,
+              let room = rooms.first(where: { $0.id == roomId }),
+              let lastTs = roomMessages.last?.ts, !lastTs.isEmpty else { return }
+        let current = room.reads[uid] ?? ""
+        guard lastTs > current else { return }
+        wsRef().collection("rooms").document(roomId).updateData(["reads.\(uid)": lastTs])
     }
 
     /// メッセージ追加。未送信の新規相談(pendingRoom)は最初のメッセージで保存する(Web版 addMessage と同じ)
@@ -658,19 +669,27 @@ final class CloudStore: ObservableObject {
     }
 
     /// APIが担当者役(会計の素人)として返信する。
-    /// 聞き返しには返答し、AI/BAの回答には更問(追加質問)をする。他の挙動は変えない。
+    /// 聞き返しには返答し、AI/BAの回答には納得するまで更問をする。
+    /// 納得した場合(または更問の上限に達した場合)はお礼を送って相談を完了にする。
     private func scheduleDevQuestionerReply(roomId: String, isFollowup: Bool) {
         guard devMode else { return }
-        if isFollowup {
-            guard devFollowupCounts[roomId, default: 0] < 2 else { return }
+        // 更問の上限(各ルーム2回)に達したら、納得したことにしてお礼+完了
+        let followupLimitReached = isFollowup && devFollowupCounts[roomId, default: 0] >= 2
+        if isFollowup && !followupLimitReached {
             devFollowupCounts[roomId, default: 0] += 1
-        } else {
+        } else if !isFollowup {
             guard devClarifyCounts[roomId, default: 0] < 3 else { return }
             devClarifyCounts[roomId, default: 0] += 1
         }
         Task { [weak self] in
             try? await Task.sleep(nanoseconds: 1_500_000_000)
             guard let self, self.currentRoomId == roomId, !self.sending else { return }
+
+            if followupLimitReached {
+                self.devFinishRoom(roomId, thanks: "ありがとうございます、よく分かりました!")
+                return
+            }
+
             // 会話履歴を台本テキストとして1つのメッセージにまとめて渡す
             // (roleを反転して渡すと構造が不正になり、モデルがアーティファクトを出すため)
             let transcript = self.roomMessages
@@ -687,21 +706,36 @@ final class CloudStore: ObservableObject {
                 .joined(separator: "\n\n")
             guard !transcript.isEmpty else { return }
             do {
-                let reply = try await ClaudeService.call(
+                let raw = try await ClaudeService.call(
                     system: Prompts.devQuestionerSystem,
                     messages: [.init(role: "user", content: """
                     以下は会計相談チャットのこれまでのやり取りです。あなたは「質問者」です。
-                    このやり取りの続きとして、質問者が次に送るメッセージの本文だけを返してください。
+                    このやり取りの続きとして、質問者が次に送るメッセージを決めてください。
 
                     \(transcript)
-                    """)]
+                    """)],
+                    schema: Prompts.devQuestionerSchema
                 )
-                let text = reply.trimmingCharacters(in: .whitespacesAndNewlines)
+                let result = try JSONDecoder().decode(DevQuestionerResult.self, from: Data(raw.utf8))
+                let text = result.message.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !text.isEmpty, self.currentRoomId == roomId else { return }
-                await self.submitQuestion(text, simulated: true)
+                if result.satisfied && isFollowup {
+                    // 納得した → お礼を送って完了にする
+                    self.devFinishRoom(roomId, thanks: text)
+                } else {
+                    await self.submitQuestion(text, simulated: true)
+                }
             } catch {
                 // 開発モードの自動返信は失敗しても通常フローに影響させない
             }
+        }
+    }
+
+    /// 担当者役がお礼を送って相談を完了にする
+    private func devFinishRoom(_ roomId: String, thanks: String) {
+        addMessage(Message(role: .user, text: thanks), roomId: roomId)
+        if let r = rooms.first(where: { $0.id == roomId }), !r.isDone {
+            toggleRoomDone(roomId)
         }
     }
 }

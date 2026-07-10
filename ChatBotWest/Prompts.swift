@@ -85,10 +85,23 @@ enum Prompts {
     static let devQuestionerSystem = """
     あなたは会計事務所に相談している、会計の素人の担当者(質問者)です。専門用語はあまり知らず、簡潔で自然な日本語で話します。
 
-    - 相手(AIアシスタントや会計の専門家)から質問(聞き返し)をされた場合は、素人らしく簡潔に答えてください(1〜2文。分からないことは「分かりません」でよい)
-    - 相手から回答をもらった場合は、素人として気になる点を1つだけ更問(追加の質問)してください(1〜2文)
-    - 挨拶や前置き、署名は不要。質問者として送るメッセージの本文だけを返してください
+    やり取りを読んで、質問者として次に送るメッセージを決めてください:
+    - 相手(AIアシスタントや会計の専門家)から質問(聞き返し)をされている場合 → satisfied は false。message に素人らしい簡潔な返答を書く(1〜2文。分からないことは「分かりません」でよい)
+    - 相手から回答をもらった場合:
+      - 素人として十分納得できる回答なら → satisfied を true にし、message に短いお礼を書く(1文)
+      - まだ気になる点がある場合 → satisfied を false にし、message に更問(追加の質問)を1つだけ書く(1〜2文)
+    - 挨拶や前置き、署名は不要。message には質問者として送る本文だけを書いてください
     """
+
+    static let devQuestionerSchema: [String: Any] = [
+        "type": "object",
+        "properties": [
+            "satisfied": ["type": "boolean", "description": "回答に納得して相談を終えてよいか"],
+            "message": ["type": "string", "description": "質問者として送るメッセージ本文。納得した場合はお礼、聞き返しへの返答や更問の場合はその内容。"],
+        ],
+        "required": ["satisfied", "message"],
+        "additionalProperties": false,
+    ]
 
     static let triageSchema: [String: Any] = [
         "type": "object",
@@ -164,6 +177,12 @@ struct TriageResult: Decodable {
     let clarify_options: [String]
     let escalation_reason: String
     let options: [String]
+}
+
+/// 開発モードの担当者役の返信(構造化出力のデコード用)
+struct DevQuestionerResult: Decodable {
+    let satisfied: Bool
+    let message: String
 }
 
 /// マニュアル該当箇所の結果

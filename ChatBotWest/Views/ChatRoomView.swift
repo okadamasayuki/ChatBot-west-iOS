@@ -27,6 +27,26 @@ struct ChatRoomView: View {
         return store.isExpert || store.isMyRoom(r)
     }
 
+    /// 自分側のメッセージの既読/未読(相手が読んだかどうか)。
+    /// 相談の本人には自分の質問、財務にはBAの回答に対して表示する
+    private func readStatus(for msg: Message) -> String? {
+        guard let r = room else { return nil }
+        if store.isMyRoom(r) {
+            guard msg.role == .user else { return nil }
+            // 自分以外の誰か(財務など)が読んだか
+            let read = r.reads.contains { $0.key != store.myUid() && $0.value >= msg.ts }
+            return read ? "既読" : "未読"
+        } else if store.isExpert {
+            guard msg.role == .expert else { return nil }
+            // 相談の本人が読んだか
+            let read = r.ownerUid.isEmpty
+                ? r.reads.contains { $0.key != store.myUid() && $0.value >= msg.ts }
+                : (r.reads[r.ownerUid] ?? "") >= msg.ts
+            return read ? "既読" : "未読"
+        }
+        return nil
+    }
+
     /// この相談の未回答案件(財務のみ、チャット内にBAの案件カードを統合表示する)
     private var roomCases: [CaseItem] {
         guard store.isExpert, let id = store.currentRoomId, !store.isDoneRoom(id) else { return [] }
@@ -46,6 +66,7 @@ struct ChatRoomView: View {
                             MessageBubble(
                                 message: msg,
                                 ownerName: ownerName,
+                                readStatus: readStatus(for: msg),
                                 showClarify: idx == lastIdx && msg.role == .ai && !msg.clarifyOptions.isEmpty && !viewOnly,
                                 onChoice: { choice in
                                     Task { await store.submitQuestion(choice) }
@@ -129,6 +150,7 @@ struct ChatRoomView: View {
 struct MessageBubble: View {
     let message: Message
     var ownerName: String = ""
+    var readStatus: String? = nil
     let showClarify: Bool
     var onChoice: (String) -> Void = { _ in }
 
@@ -146,7 +168,10 @@ struct MessageBubble: View {
                     bubbleText
                         .background(Theme.myBubble)
                         .cornerRadius(14)
-                    timeText
+                    HStack(spacing: 4) {
+                        readStatusText
+                        timeText
+                    }
                 }
             }
         case .ai, .expert:
@@ -166,12 +191,24 @@ struct MessageBubble: View {
                         // 聞き返しの選択肢ボタン
                         FlowChoices(options: message.clarifyOptions, onChoice: onChoice)
                     }
-                    timeText
+                    HStack(spacing: 4) {
+                        timeText
+                        readStatusText
+                    }
                 }
                 Spacer(minLength: 60)
             }
         case .system:
             SystemBubble(text: message.text)
+        }
+    }
+
+    @ViewBuilder
+    private var readStatusText: some View {
+        if let readStatus {
+            Text(readStatus)
+                .font(.system(size: 10))
+                .foregroundColor(readStatus == "既読" ? Theme.accentDark : Theme.header.opacity(0.6))
         }
     }
 
