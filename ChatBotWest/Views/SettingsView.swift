@@ -4,8 +4,6 @@ import UIKit
 /// 設定タブ: アカウント / サンプルデータ / 財務向け管理 / 回答の癖 / Q&A履歴ダウンロード
 struct SettingsView: View {
     @EnvironmentObject var store: CloudStore
-    @State private var apiKey = ClaudeService.storedApiKey
-    @State private var apiKeySavedNote = false
     @State private var shareURL: URL?
     @State private var sampleBusy = false
     @State private var sampleNote: String?
@@ -13,6 +11,7 @@ struct SettingsView: View {
     @State private var manualNote: String?
     @State private var styleText = ""
     @State private var styleSavedNote = false
+    @FocusState private var styleFocused: Bool
     @State private var confirmDeleteAll = false
     @State private var confirmDeleteAllFinal = false
     @State private var confirmClearNaiki = false
@@ -97,6 +96,7 @@ struct SettingsView: View {
                     Section {
                         TextEditor(text: $styleText)
                             .font(.system(size: 13))
+                            .focused($styleFocused)
                             .frame(minHeight: 100)
                             .overlay(alignment: .topLeading) {
                                 if styleText.isEmpty {
@@ -130,35 +130,6 @@ struct SettingsView: View {
                     Button("CSV をエクスポート(Excel対応)") { export(asCsv: true) }
                 }
 
-                Section {
-                    SecureField("sk-ant-api03-...(通常は空欄でOK)", text: $apiKey)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                    HStack {
-                        Button("APIキーを削除") {
-                            apiKey = ""
-                            UserDefaults.standard.removeObject(forKey: ClaudeService.apiKeyDefaultsKey)
-                            apiKeySavedNote = true
-                        }
-                        .foregroundColor(.red)
-                        Spacer()
-                        Button("保存") {
-                            UserDefaults.standard.set(apiKey.trimmingCharacters(in: .whitespacesAndNewlines),
-                                                      forKey: ClaudeService.apiKeyDefaultsKey)
-                            apiKeySavedNote = true
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .tint(Theme.accent)
-                    }
-                    if apiKeySavedNote {
-                        Text("保存しました。").font(.footnote).foregroundColor(Theme.accentDark)
-                    }
-                } header: {
-                    Text("APIキー(任意)")
-                } footer: {
-                    Text("Anthropic API キーはサーバー(Firebase Functions)側で管理されるため、通常は入力不要です。サーバー未設定時のフォールバックとしてのみ使われます(この端末にのみ保存)。")
-                }
-
                 if let errorNote {
                     Section {
                         Text("⚠ \(errorNote)").font(.footnote).foregroundColor(.red)
@@ -169,7 +140,8 @@ struct SettingsView: View {
             .navigationBarTitleDisplayMode(.inline)
             .onAppear { styleText = store.answerStyle }
             .onChange(of: store.answerStyle) { s in
-                if styleText.isEmpty { styleText = s }
+                // Web版などでの変更をリアルタイム反映(このアプリで編集中のときは上書きしない)
+                if !styleFocused { styleText = s }
             }
             .sheet(item: $shareURL) { url in
                 ActivityView(items: [url])

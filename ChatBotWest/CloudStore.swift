@@ -32,6 +32,7 @@ final class CloudStore: ObservableObject {
     // MARK: - 画面状態
     @Published var activeTab: AppTab = .chat
     @Published var highlightCaseId: String?   // BAタブでハイライトする案件(チャットからのジャンプ)
+    @Published var chatPath: [String] = []    // NavigationStack のパス(相談を開くとプッシュ遷移)
     @Published var currentRoomId: String?
     @Published var roomMessages: [Message] = []
     @Published var pendingTyping = false
@@ -109,6 +110,16 @@ final class CloudStore: ObservableObject {
                 nickname = pendingNickname
             }
             pendingNickname = ""
+            // メンバー情報(役割・ニックネーム・回答の癖)を常時同期する。
+            // Web版で「回答の癖」を編集した場合も、アプリを再起動せずに反映される。
+            listeners.append(mref.addSnapshotListener { [weak self] snap, _ in
+                Task { @MainActor in
+                    guard let self, let d = snap?.data() else { return }
+                    if let r = d["role"] as? String, let mr = MemberRole(rawValue: r) { self.role = mr }
+                    self.nickname = d["nickname"] as? String ?? ""
+                    self.answerStyle = d["answerStyle"] as? String ?? ""
+                }
+            })
         } else {
             role = nil
             nickname = ""
@@ -241,21 +252,29 @@ final class CloudStore: ObservableObject {
         pendingRoom = room
         currentRoomId = room.id
         roomMessages = []
+        chatPath = [room.id]
     }
 
     func openRoom(_ id: String) {
         pendingRoom = nil // 別ルームを開いたら未送信の下書きは破棄
         currentRoomId = id
         subscribeRoomMessages(id)
+        if chatPath != [id] { chatPath = [id] }
     }
 
     func backToRooms() { closeRoomView() }
+
+    /// ナビゲーションの「戻る」やスワイプで相談が閉じられたときの後始末
+    func handleChatPathChange() {
+        if chatPath.isEmpty, currentRoomId != nil { closeRoomView() }
+    }
 
     private func closeRoomView() {
         pendingRoom = nil
         currentRoomId = nil
         stopRoomMessages()
         roomMessages = []
+        if !chatPath.isEmpty { chatPath = [] }
     }
 
     private func subscribeRoomMessages(_ id: String) {

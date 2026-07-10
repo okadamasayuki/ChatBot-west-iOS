@@ -5,12 +5,15 @@ struct ChatTab: View {
     @EnvironmentObject var store: CloudStore
 
     var body: some View {
-        NavigationStack {
-            if store.currentRoomId == nil {
-                RoomListView()
-            } else {
-                ChatRoomView()
-            }
+        // 相談を開くとプッシュ遷移(右からスライド・スワイプで戻る)。LINEのトークと同じ動き
+        NavigationStack(path: $store.chatPath) {
+            RoomListView()
+                .navigationDestination(for: String.self) { _ in
+                    ChatRoomView()
+                }
+        }
+        .onChange(of: store.chatPath) { _ in
+            store.handleChatPathChange()
         }
     }
 }

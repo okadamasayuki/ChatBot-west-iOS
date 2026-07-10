@@ -102,7 +102,6 @@ struct CaseCardView: View {
             if caseItem.status == .answered {
                 noteBox("📨 送信済み回答:\n\(caseItem.answer ?? "")", bg: Theme.tagDoneBg)
             } else {
-                noteBox("💡 AIの判断: \(caseItem.reason)", bg: Color(.secondarySystemBackground))
                 pendingBody
             }
         }
@@ -155,10 +154,6 @@ struct CaseCardView: View {
 
     @ViewBuilder
     private var pendingBody: some View {
-        Text("回答の方針を選択してください:")
-            .font(.system(size: 12))
-            .foregroundColor(.secondary)
-
         // 各選択肢に対応するマニュアルの該当箇所(確認済みなら選択肢の下に表示)
         let refsByOpt = Dictionary(grouping: caseItem.manualRefs ?? [], by: { $0.option })
 

@@ -99,15 +99,7 @@ struct ChatRoomView: View {
         }
         .navigationTitle(room?.title ?? "相談")
         .navigationBarTitleDisplayMode(.inline)
-        .navigationBarBackButtonHidden(true)
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Button {
-                    store.backToRooms()
-                } label: {
-                    Image(systemName: "chevron.left")
-                }
-            }
             ToolbarItemGroup(placement: .topBarTrailing) {
                 if canJumpToCase {
                     Button("BAで見る") {
