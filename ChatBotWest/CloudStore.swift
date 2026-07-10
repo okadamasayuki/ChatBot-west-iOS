@@ -74,6 +74,11 @@ final class CloudStore: ObservableObject {
         visibleCases.filter { $0.status != .answered }.count
     }
 
+    /// 未回答かつ対応者が決まっていない案件の数(相談一覧タブのバッジ用)
+    var unassignedCaseCount: Int {
+        visibleCases.filter { $0.status != .answered && $0.handledBy.isEmpty }.count
+    }
+
     init() {
         // 合言葉の SHA-256 がワークスペースID(Web版と同じ)
         let digest = SHA256.hash(data: Data(FirebaseSetup.workspaceCode.utf8))

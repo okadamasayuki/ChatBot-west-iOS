@@ -29,14 +29,11 @@ struct MainTabView: View {
                     Label(store.isExpert ? "相談一覧" : "質問者",
                           systemImage: "bubble.left.and.bubble.right.fill")
                 }
+                // 未回答かつ対応者が決まっていない案件の数(財務のみ)
+                .badge(store.isExpert ? store.unassignedCaseCount : 0)
                 .tag(AppTab.chat)
 
             if store.isExpert {
-                ExpertView()
-                    .tabItem { Label("BA", systemImage: "person.badge.shield.checkmark.fill") }
-                    .badge(store.pendingCaseCount)
-                    .tag(AppTab.expert)
-
                 NaikiView()
                     .tabItem { Label("社内ルール", systemImage: "doc.text.fill") }
                     .tag(AppTab.naiki)
