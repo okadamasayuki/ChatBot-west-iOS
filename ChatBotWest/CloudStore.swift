@@ -39,6 +39,11 @@ final class CloudStore: ObservableObject {
     @Published var sending = false
     var pendingRoom: Room? // 未送信の新規相談(最初のメッセージ送信まで保存しない)
 
+    /// 開発モード: 質問するとAIを呼ばずに即座に「BA回答が必要」としてエスカレーションする(BAフローのテスト用)
+    @Published var devMode: Bool = UserDefaults.standard.bool(forKey: "devMode") {
+        didSet { UserDefaults.standard.set(devMode, forKey: "devMode") }
+    }
+
     private let db = Firestore.firestore()
     private let wid: String
     private var authHandle: AuthStateDidChangeListenerHandle?
@@ -534,8 +539,20 @@ final class CloudStore: ObservableObject {
                 history.append(.init(role: "user", content: text))
             }
 
+            var system = Prompts.withNaiki(Prompts.triageSystem, naiki: naiki, manuals: manuals)
+            if devMode {
+                // 開発モード: すぐ結果が返るよう聞き返しを省略し、BAへのエスカレーションを起きやすくする
+                system += """
+
+
+                【開発モード】この会話はBAフローのテスト中です。上記の判断基準より優先して、次のルールで判断してください:
+                - clarify(聞き返し)は使わない。decision は "answer" か "escalate" のどちらかにする
+                - ごく基本的な一般知識で確実に即答できる質問だけ "answer" にする
+                - それ以外は積極的に "escalate" とし、質問に応じた escalation_reason と options を生成する
+                """
+            }
             let raw = try await ClaudeService.call(
-                system: Prompts.withNaiki(Prompts.triageSystem, naiki: naiki, manuals: manuals),
+                system: system,
                 messages: history,
                 schema: Prompts.triageSchema
             )

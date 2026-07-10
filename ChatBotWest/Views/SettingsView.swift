@@ -125,6 +125,13 @@ struct SettingsView: View {
                     }
                 }
 
+                Section {
+                    Toggle("🛠 開発モード", isOn: $store.devMode)
+                        .tint(Theme.accent)
+                } footer: {
+                    Text("オンにすると、聞き返しを省略してすぐに応答が返ります。ごく基本的な質問はAIが回答し、それ以外は「AIアシスタントでは解決できずBA回答が必要」としてエスカレーションされます(BAフローのテスト用)。")
+                }
+
                 Section("⬇ Q&A履歴のダウンロード") {
                     LabeledContent("保存されているQ&A", value: "\(store.qaLog.count)件")
                     Button("JSON をエクスポート") { export(asCsv: false) }
