@@ -176,12 +176,14 @@ struct ManualPreviewSheet: View {
     let manual: Manual
     var highlight: String? = nil
     @State private var showExtract = false
+    // PDFDocumentはbodyの再評価ごとに作り直さない(差し替えでハイライトがリセットされるレースを防ぐ)
+    @State private var pdfDoc: PDFDocument?
+    @State private var pdfLoaded = false
 
     var body: some View {
         NavigationStack {
             Group {
-                if let b64 = manual.pdfData, let data = Data(base64Encoded: b64),
-                   let doc = PDFDocument(data: data) {
+                if let doc = pdfDoc {
                     PdfKitView(document: doc, highlight: highlight)
                 } else {
                     ScrollView {
@@ -195,6 +197,13 @@ struct ManualPreviewSheet: View {
             }
             .navigationTitle(manual.title)
             .navigationBarTitleDisplayMode(.inline)
+            .onAppear {
+                guard !pdfLoaded else { return }
+                pdfLoaded = true
+                if let b64 = manual.pdfData, let data = Data(base64Encoded: b64) {
+                    pdfDoc = PDFDocument(data: data)
+                }
+            }
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("📋 社内ルールを抽出") { showExtract = true }
@@ -308,10 +317,6 @@ struct PdfKitView: UIViewRepresentable {
     /// 空白を除去した正規化テキスト同士で照合し、見つかった範囲を元のテキスト位置に
     /// 逆マッピングして選択範囲を作る(引用の全体がハイライトされる)。
     private func findSelections(_ text: String) -> [PDFSelection] {
-        // 1) まずは素直に全文検索(そのまま一致すればこれが最速・最正確)
-        let direct = document.findString(text, withOptions: [.caseInsensitive])
-        if !direct.isEmpty { return direct }
-
         let (normExcerpt, _) = Self.normalizedWithMap(text)
         guard normExcerpt.count >= 6 else { return [] }
         let anchorLen = min(10, normExcerpt.count)
@@ -342,11 +347,10 @@ struct PdfKitView: UIViewRepresentable {
             let chars = Array(pageText)
             var s = map[startNorm]
             var e = map[endNorm]
-            if best < normExcerpt.count {
-                // 部分一致 → 文の区切りまで広げる(項目全体をハイライト)
-                while s > 0, chars[s - 1] != "。", chars[s - 1] != "\n" { s -= 1 }
-                while e < chars.count - 1, chars[e] != "。", chars[e] != "\n" { e += 1 }
-            }
+            // 常に文の区切り(「。」・改行)まで広げ、項目全体をハイライトする
+            // (引用が短い場合や途中までしか一致しない場合でも中途半端にならない)
+            while s > 0, chars[s - 1] != "。", chars[s - 1] != "\n" { s -= 1 }
+            while e < chars.count - 1, chars[e] != "。", chars[e] != "\n" { e += 1 }
             let sIdx = pageText.index(pageText.startIndex, offsetBy: s)
             let eIdx = pageText.index(pageText.startIndex, offsetBy: e + 1)
             if let sel = page.selection(for: NSRange(sIdx..<eIdx, in: pageText)) {
