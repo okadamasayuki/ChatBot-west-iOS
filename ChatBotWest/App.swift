@@ -12,8 +12,10 @@ enum FirebaseSetup {
             FirebaseApp.configure()
             return
         }
+        // アプリIDは iOS SDK の形式チェックを通すため ios 形式にする
+        // (Auth/Firestore/Functions は apiKey と projectID で動作し、アプリIDの実在は不要)
         let options = FirebaseOptions(
-            googleAppID: "1:36025349912:web:e89a3ad0b8eb1fe4b6d06d",
+            googleAppID: "1:36025349912:ios:e89a3ad0b8eb1fe4b6d06d",
             gcmSenderID: "36025349912"
         )
         options.apiKey = "AIzaSyBh_8IDFllTnaJlZm3xPMm-TY_mTGWJ7Es"
