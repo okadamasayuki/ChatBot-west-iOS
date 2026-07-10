@@ -352,6 +352,10 @@ struct PdfKitView: UIViewRepresentable {
                 while s > 0, chars[s - 1] != "。", budget > 0 { s -= 1; budget -= 1 }
                 budget = 120
                 while e < chars.count - 1, chars[e] != "。", budget > 0 { e += 1; budget -= 1 }
+                // 範囲の先頭・末尾の空白/改行を除く(改行が前の行末に描画され、
+                // 前の文の「。」までマーカーが付いて見えるのを防ぐ)
+                while s < e, chars[s].isWhitespace || chars[s].isNewline { s += 1 }
+                while e > s, chars[e].isWhitespace || chars[e].isNewline { e -= 1 }
                 let sIdx = pageText.index(pageText.startIndex, offsetBy: s)
                 let eIdx = pageText.index(pageText.startIndex, offsetBy: e + 1)
                 if let sel = page.selection(for: NSRange(sIdx..<eIdx, in: pageText)) {
