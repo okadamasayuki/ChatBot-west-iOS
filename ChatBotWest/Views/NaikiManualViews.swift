@@ -278,27 +278,27 @@ struct PdfKitView: UIViewRepresentable {
     }
 
     /// PDFViewの描画準備が終わる前に設定すると反映されないことがあるため、
-    /// 少し遅らせて2回適用する(適用は冪等)
+    /// 時間差で複数回適用する(適用は冪等。スクロールは初回のみ)
     private func scheduleHighlight(_ view: PDFView) {
-        DispatchQueue.main.async { applyHighlight(view) }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            if (view.highlightedSelections ?? []).isEmpty {
+        for delay in [0.0, 0.3, 0.8, 1.5] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
                 applyHighlight(view)
             }
         }
     }
 
-    /// 該当箇所を黄色でハイライトし、最初のマッチへスクロールする
+    /// 該当箇所を黄色でハイライトし、最初のマッチへスクロールする(再適用は冪等・スクロールは初回のみ)
     private func applyHighlight(_ view: PDFView) {
         guard let h = highlight?.trimmingCharacters(in: .whitespacesAndNewlines), !h.isEmpty else { return }
         let selections = findSelections(h)
         guard !selections.isEmpty else { return }
+        let firstTime = (view.highlightedSelections ?? []).isEmpty
         for sel in selections {
             sel.color = UIColor.systemYellow.withAlphaComponent(0.6)
         }
         // 注釈ではなく PDFView 標準のハイライト表示を使う(注釈は環境によって描画されないため)
         view.highlightedSelections = selections
-        if let first = selections.first {
+        if firstTime, let first = selections.first {
             DispatchQueue.main.async { view.go(to: first) }
         }
     }
