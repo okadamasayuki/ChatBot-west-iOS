@@ -15,6 +15,13 @@ struct LoginView: View {
     @State private var company = Companies.all[0]
     @State private var department = Departments.all[0]
     @State private var section = Departments.sections(for: Departments.all[0])[0]
+
+    private func syncOrgDefaults() {
+        if !store.orgCompanies.contains(company) { company = store.orgCompanies.first ?? "" }
+        if !store.orgDepartments.contains(department) { department = store.orgDepartments.first ?? "" }
+        let secs = store.orgSections[department] ?? []
+        if !secs.contains(section) { section = secs.first ?? "" }
+    }
     @State private var position = Positions.all.last ?? "一般"
     @State private var errorMessage: String?
     @State private var busy = false
@@ -83,22 +90,22 @@ struct LoginView: View {
 
                         Section("所属") {
                             Picker("所属会社", selection: $company) {
-                                ForEach(Companies.all, id: \.self) { c in
+                                ForEach(store.orgCompanies, id: \.self) { c in
                                     Text(c).tag(c)
                                 }
                             }
                             .pickerStyle(.menu)
                             Picker("所属部署", selection: $department) {
-                                ForEach(Departments.all, id: \.self) { dept in
+                                ForEach(store.orgDepartments, id: \.self) { dept in
                                     Text(dept).tag(dept)
                                 }
                             }
                             .pickerStyle(.menu)
                             .onChange(of: department) { dept in
-                                section = Departments.sections(for: dept).first ?? ""
+                                section = (store.orgSections[dept] ?? []).first ?? ""
                             }
                             Picker("所属担当", selection: $section) {
-                                ForEach(Departments.sections(for: department), id: \.self) { sec in
+                                ForEach(store.orgSections[department] ?? [], id: \.self) { sec in
                                     Text(sec).tag(sec)
                                 }
                             }
@@ -153,6 +160,7 @@ struct LoginView: View {
                 }
             }
             .navigationTitle(mode == .signup ? "新規登録" : mode == .login ? "ログイン" : "💬 会計相談チャット")
+            .onAppear { syncOrgDefaults() }
             .navigationBarTitleDisplayMode(.inline)
         }
         .tint(Theme.accentDark)

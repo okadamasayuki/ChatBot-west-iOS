@@ -35,6 +35,11 @@ final class CloudStore: ObservableObject {
     @Published var qaLog: [QaEntry] = []
     @Published var manuals: [Manual] = []
 
+    // 組織の選択肢(会社・部署・担当)。ワークスペース設定で編集でき、全員に同期される
+    @Published var orgCompanies: [String] = CloudStore.cachedList("orgCompanies") ?? Companies.all
+    @Published var orgDepartments: [String] = CloudStore.cachedList("orgDepartments") ?? Departments.all
+    @Published var orgSections: [String: [String]] = CloudStore.cachedSections() ?? Departments.sections
+
     struct MemberInfo: Identifiable, Equatable {
         let id: String   // uid
         let name: String // ニックネーム(なければメール)
@@ -259,6 +264,33 @@ final class CloudStore: ObservableObject {
         }
     }
 
+    /// 組織の選択肢を保存(ログイン画面用に端末にもキャッシュする)
+    func saveOrgConfig() {
+        wsRef().collection("config").document("org").setData([
+            "companies": orgCompanies,
+            "departments": orgDepartments,
+            "sections": orgSections,
+        ], merge: true)
+        cacheOrgConfig()
+    }
+
+    private func cacheOrgConfig() {
+        let ud = UserDefaults.standard
+        ud.set(orgCompanies, forKey: "orgCompanies")
+        ud.set(orgDepartments, forKey: "orgDepartments")
+        ud.set(orgSections, forKey: "orgSections")
+    }
+
+    static func cachedList(_ key: String) -> [String]? {
+        let v = UserDefaults.standard.stringArray(forKey: key)
+        return (v?.isEmpty ?? true) ? nil : v
+    }
+
+    static func cachedSections() -> [String: [String]]? {
+        let v = UserDefaults.standard.dictionary(forKey: "orgSections") as? [String: [String]]
+        return (v?.isEmpty ?? true) ? nil : v
+    }
+
     /// ニックネームを保存(過去の担当記録・送信者名も新名に書き換える)
     func saveNickname(_ name: String) {
         let trimmed = name.trimmingCharacters(in: .whitespaces)
@@ -375,6 +407,21 @@ final class CloudStore: ObservableObject {
                     // ワークスペース未作成 → 既定の社内ルールで初期化(既存は上書きしない)
                     try? await self.wsRef().setData(["naiki": self.naiki], merge: true)
                 }
+            }
+        })
+
+        // 組織の選択肢(会社・部署・担当)
+        listeners.append(wsRef().collection("config").document("org").addSnapshotListener { [weak self] snap, _ in
+            Task { @MainActor in
+                guard let self, let d = snap?.data() else { return }
+                if let c = d["companies"] as? [String], !c.isEmpty { self.orgCompanies = c }
+                if let dep = d["departments"] as? [String], !dep.isEmpty { self.orgDepartments = dep }
+                if let sec = d["sections"] as? [String: Any] {
+                    var m: [String: [String]] = [:]
+                    for (k, v) in sec { m[k] = (v as? [Any])?.compactMap { $0 as? String } ?? [] }
+                    if !m.isEmpty { self.orgSections = m }
+                }
+                self.cacheOrgConfig()
             }
         })
 

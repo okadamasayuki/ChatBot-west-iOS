@@ -170,6 +170,106 @@ struct IconSettingView: View {
     }
 }
 
+/// 組織の選択肢(会社・部署・担当)の編集。財務のみ。全ユーザーに同期される
+struct OrgSettingsView: View {
+    @EnvironmentObject var store: CloudStore
+    @State private var newCompany = ""
+    @State private var newDepartment = ""
+    @State private var newSection = ""
+    @State private var sectionDept = ""
+
+    var body: some View {
+        Form {
+            Section {
+                ForEach(store.orgCompanies, id: \.self) { c in
+                    Text(c)
+                }
+                .onDelete { idx in
+                    store.orgCompanies.remove(atOffsets: idx)
+                    store.saveOrgConfig()
+                }
+                addRow(placeholder: "会社を追加", text: $newCompany) {
+                    addItem(newCompany, to: \.orgCompanies)
+                    newCompany = ""
+                }
+            } header: {
+                Text("所属会社")
+            } footer: {
+                Text("左にスワイプで削除できます。削除しても登録済みユーザーの所属は変わりません。")
+            }
+
+            Section("所属部署") {
+                ForEach(store.orgDepartments, id: \.self) { d in
+                    Text(d)
+                }
+                .onDelete { idx in
+                    // 部署を消したらその部署の担当リストも消す
+                    for i in idx { store.orgSections[store.orgDepartments[i]] = nil }
+                    store.orgDepartments.remove(atOffsets: idx)
+                    if !store.orgDepartments.contains(sectionDept) {
+                        sectionDept = store.orgDepartments.first ?? ""
+                    }
+                    store.saveOrgConfig()
+                }
+                addRow(placeholder: "部署を追加", text: $newDepartment) {
+                    addItem(newDepartment, to: \.orgDepartments)
+                    newDepartment = ""
+                }
+            }
+
+            Section("所属担当") {
+                Picker("部署", selection: $sectionDept) {
+                    ForEach(store.orgDepartments, id: \.self) { d in
+                        Text(d).tag(d)
+                    }
+                }
+                .pickerStyle(.menu)
+                ForEach(store.orgSections[sectionDept] ?? [], id: \.self) { s in
+                    Text(s)
+                }
+                .onDelete { idx in
+                    var list = store.orgSections[sectionDept] ?? []
+                    list.remove(atOffsets: idx)
+                    store.orgSections[sectionDept] = list
+                    store.saveOrgConfig()
+                }
+                addRow(placeholder: "担当を追加", text: $newSection) {
+                    let name = newSection.trimmingCharacters(in: .whitespaces)
+                    guard !name.isEmpty, !sectionDept.isEmpty else { return }
+                    var list = store.orgSections[sectionDept] ?? []
+                    guard !list.contains(name) else { newSection = ""; return }
+                    list.append(name)
+                    store.orgSections[sectionDept] = list
+                    store.saveOrgConfig()
+                    newSection = ""
+                }
+            }
+        }
+        .navigationTitle("組織の選択肢")
+        .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            if sectionDept.isEmpty { sectionDept = store.orgDepartments.first ?? "" }
+        }
+    }
+
+    private func addItem(_ raw: String, to keyPath: ReferenceWritableKeyPath<CloudStore, [String]>) {
+        let name = raw.trimmingCharacters(in: .whitespaces)
+        guard !name.isEmpty, !store[keyPath: keyPath].contains(name) else { return }
+        store[keyPath: keyPath].append(name)
+        store.saveOrgConfig()
+    }
+
+    private func addRow(placeholder: String, text: Binding<String>, onAdd: @escaping () -> Void) -> some View {
+        HStack {
+            TextField(placeholder, text: text)
+                .submitLabel(.done)
+                .onSubmit(onAdd)
+            Button("追加", action: onAdd)
+                .disabled(text.wrappedValue.trimmingCharacters(in: .whitespaces).isEmpty)
+        }
+    }
+}
+
 /// 設定タブ: アカウント / サンプルデータ / 財務向け管理 / 回答の癖 / Q&A履歴ダウンロード
 struct SettingsView: View {
     @EnvironmentObject var store: CloudStore
@@ -254,6 +354,12 @@ struct SettingsView: View {
                 }
 
                 if store.isExpert {
+                    Section("🏢 組織") {
+                        NavigationLink("会社・部署・担当の選択肢を編集") {
+                            OrgSettingsView()
+                        }
+                    }
+
                     Section("💬 相談データ") {
                         Button(role: .destructive) {
                             confirmDeleteAll = true
