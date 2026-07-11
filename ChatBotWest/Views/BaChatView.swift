@@ -230,8 +230,6 @@ struct NewBaTalkSheet: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-            // 会社・部署・担当・役職で絞り込み、まとめて選択できる
-            MemberFilterBar(filter: $filter, pool: pool)
             Form {
                 if !selected.isEmpty {
                     Section("選択中 — \(selected.count)人") {
@@ -241,7 +239,31 @@ struct NewBaTalkSheet: View {
                     }
                 }
 
-                Section("財務アカウント一覧 — トークする相手を選択") {
+                if selected.count > 1 {
+                    Section("グループ名(任意)") {
+                        TextField("例: 決算チーム", text: $groupName)
+                    }
+                }
+
+                // 検索・絞り込みはメンバー選択の真上に置く
+                Section {
+                    VStack(spacing: 0) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "magnifyingglass")
+                                .foregroundColor(.secondary)
+                            TextField("ユーザー名で検索", text: $searchText)
+                                .autocorrectionDisabled()
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 11)
+                        Divider().padding(.leading, 16)
+                        MemberFilterBar(filter: $filter, pool: pool,
+                                        barBackground: Color(.secondarySystemGroupedBackground))
+                    }
+                    .listRowInsets(EdgeInsets())
+                }
+
+                Section("メンバー選択") {
                     if candidates.isEmpty {
                         Text("該当する財務アカウントがありません。")
                             .font(.footnote)
@@ -286,29 +308,6 @@ struct NewBaTalkSheet: View {
                     }
                 }
 
-                if selected.count > 1 {
-                    Section("グループ名(任意)") {
-                        TextField("例: 決算チーム", text: $groupName)
-                    }
-                }
-
-                Section {
-                    Button {
-                        // 絞り込みを変えても選択は保持されるよう、全体から選ぶ
-                        let picked = pool.filter { selected.contains($0.id) }
-                        let talkId = store.startBaTalk(with: picked, groupName: groupName)
-                        dismiss()
-                        store.openBaTalk(talkId)
-                    } label: {
-                        HStack {
-                            Spacer()
-                            Text(selected.count > 1 ? "グループトークを開始(\(selected.count)人)" : "トークを開始").bold()
-                            Spacer()
-                        }
-                    }
-                    .disabled(selected.isEmpty)
-                }
-
                 Section {
                     // 自分しかいないトーク(メモとして利用)
                     Button {
@@ -327,10 +326,23 @@ struct NewBaTalkSheet: View {
             }
             .navigationTitle("新規トーク")
             .navigationBarTitleDisplayMode(.inline)
-            .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always),
-                        prompt: "ユーザー名で検索")
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    // 開始とキャンセルは別々の枠のボタンで表示
+                    Button {
+                        // 絞り込みを変えても選択は保持されるよう、全体から選ぶ
+                        let picked = pool.filter { selected.contains($0.id) }
+                        let talkId = store.startBaTalk(with: picked, groupName: groupName)
+                        dismiss()
+                        store.openBaTalk(talkId)
+                    } label: {
+                        Text(selected.count > 1 ? "開始する(\(selected.count)人)" : "開始する")
+                            .font(.system(size: 13, weight: .bold))
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(Theme.accent)
+                    .disabled(selected.isEmpty)
+
                     Button("キャンセル") { dismiss() }
                 }
             }
