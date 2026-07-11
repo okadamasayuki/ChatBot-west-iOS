@@ -325,7 +325,7 @@ struct NewBaTalkSheet: View {
                         store.openBaTalk(talkId)
                     } label: {
                         // 誰も選択していなければ自分だけのトーク(メモ)として開始できる
-                        Text(selected.count > 1 ? "開始する(\(selected.count)人)" : "開始する")
+                        Text("開始")
                             .font(.system(size: 13, weight: .bold))
                     }
                     .buttonStyle(.borderedProminent)
