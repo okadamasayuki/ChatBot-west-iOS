@@ -108,6 +108,7 @@ struct RoomListView: View {
                 ForEach(visibleRooms) { room in
                     RoomRowView(room: room,
                                 openCaseHandler: openCaseHandlers[room.id],
+                                handlerName: effectiveHandler(room),
                                 selectable: store.isExpert,
                                 selected: selectedRooms.contains(room.id),
                                 onToggleSelect: {
@@ -186,6 +187,17 @@ struct RoomListView: View {
         }
     }
 
+    /// 相談の実質的な担当BA(ルームの担当 → 未回答案件の対応者 → 最新の回答済み案件の対応者)
+    private func effectiveHandler(_ room: Room) -> String {
+        if !room.handler.isEmpty { return room.handler }
+        if let open = store.cases.first(where: { $0.roomId == room.id && $0.status != .answered && !$0.handledBy.isEmpty }) {
+            return open.handledBy
+        }
+        return store.cases
+            .filter { $0.roomId == room.id && $0.status == .answered && !$0.handledBy.isEmpty }
+            .last?.handledBy ?? ""
+    }
+
     /// すべての相談が選択済みか
     private var allSelected: Bool {
         !visibleRooms.isEmpty && visibleRooms.allSatisfy { selectedRooms.contains($0.id) }
@@ -240,6 +252,8 @@ struct RoomRowView: View {
     let room: Room
     /// nil=案件なし / ""=対応者未決定 / 名前=対応中
     let openCaseHandler: String?
+    /// この相談の実質的な担当BA(空=未定)
+    var handlerName: String = ""
     var selectable = false
     var selected = false
     var onToggleSelect: () -> Void = {}
@@ -263,11 +277,11 @@ struct RoomRowView: View {
                     .lineLimit(1)
                 HStack(spacing: 6) {
                     statusTag
-                    if selectable, !room.handler.isEmpty {
-                        // 財務には相談の担当BAを表示
-                        Text("担当: \(room.handler)")
+                    if selectable {
+                        // 財務には各相談の担当BAを常に表示
+                        Text("担当: \(handlerName.isEmpty ? "未定" : handlerName)")
                             .font(.system(size: 10))
-                            .foregroundColor(Color(.tertiaryLabel))
+                            .foregroundColor(handlerName.isEmpty ? Color(red: 0xc0 / 255.0, green: 0x39 / 255.0, blue: 0x2b / 255.0) : Color(.secondaryLabel))
                     }
                 }
             }
