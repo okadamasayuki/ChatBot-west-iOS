@@ -397,7 +397,7 @@ struct SettingsView: View {
 
                 if store.isExpert {
                     Section("🏢 組織") {
-                        NavigationLink("会社・部署・担当の選択肢を編集") {
+                        NavigationLink("会社・部署・担当を編集") {
                             OrgSettingsView()
                         }
                     }
