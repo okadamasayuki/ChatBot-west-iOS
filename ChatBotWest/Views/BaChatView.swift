@@ -263,7 +263,7 @@ struct NewBaTalkSheet: View {
                     .listRowInsets(EdgeInsets())
                 }
 
-                Section("メンバー選択") {
+                Section("ユーザ選択") {
                     if candidates.isEmpty {
                         Text("該当する財務アカウントがありません。")
                             .font(.footnote)
@@ -507,6 +507,8 @@ struct BaTalkView: View {
             .background(Color(.secondarySystemBackground))
         }
         .navigationBarTitleDisplayMode(.inline)
+        // 戻るボタンは出さない(BAチャットタブの再タップ・左端スワイプで戻る)
+        .navigationBarBackButtonHidden(true)
         .toolbar {
             // タイトル部分。グループトーク・メモはタップでルーム名を変更できる
             ToolbarItem(placement: .principal) {

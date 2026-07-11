@@ -28,8 +28,9 @@ struct MainTabView: View {
         TabView(selection: Binding(
             get: { store.activeTab },
             set: { newTab in
-                if newTab == store.activeTab, newTab == .chat {
-                    store.backToRooms()
+                if newTab == store.activeTab {
+                    if newTab == .chat { store.backToRooms() }
+                    if newTab == .baChat { store.backToBaTalks() }
                 }
                 store.activeTab = newTab
             }

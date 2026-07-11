@@ -1070,6 +1070,10 @@ final class CloudStore: ObservableObject {
         if baTalkPath != [id] { baTalkPath = [id] }
     }
 
+    func backToBaTalks() {
+        closeBaTalk()
+    }
+
     func handleBaTalkPathChange() {
         if baTalkPath.isEmpty, currentBaTalkId != nil { closeBaTalk() }
     }
