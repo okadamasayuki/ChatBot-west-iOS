@@ -156,9 +156,9 @@ struct ChatRoomView: View {
                         }
                         let lastIdx = displayMessages.count - 1
                         ForEach(Array(displayMessages.enumerated()), id: \.element.id) { idx, msg in
-                            let style = bubbleStyle(for: msg)
                             let avatar = avatarInfo(for: msg)
-                            let bubble = MessageBubble(
+                            let style = bubbleStyle(for: msg)
+                            MessageBubble(
                                 message: msg,
                                 senderLabel: style.label,
                                 alignRight: style.right,
@@ -175,79 +175,61 @@ struct ChatRoomView: View {
                                 showClarify: idx == lastIdx && msg.role == .ai && !msg.clarifyOptions.isEmpty && !viewOnly && !msg.deleted,
                                 onChoice: { choice in
                                     Task { await store.submitQuestion(choice) }
+                                },
+                                // 長押しでリアクション・コピー(全メッセージ)・編集・削除・復元
+                                menuContent: {
+                                    AnyView(Group {
+                                        if !msg.deleted {
+                                            // 1列目: リアクション絵文字を1行に横並び
+                                            if #available(iOS 17.0, *) {
+                                                ControlGroup {
+                                                    ForEach(CloudStore.reactionEmojis, id: \.self) { emoji in
+                                                        Button(emoji) {
+                                                            store.toggleReaction(msg, emoji: emoji)
+                                                        }
+                                                    }
+                                                }
+                                                .controlGroupStyle(.palette)
+                                            } else {
+                                                ControlGroup {
+                                                    ForEach(CloudStore.reactionEmojis, id: \.self) { emoji in
+                                                        Button(emoji) {
+                                                            store.toggleReaction(msg, emoji: emoji)
+                                                        }
+                                                    }
+                                                }
+                                                .controlGroupStyle(.compactMenu)
+                                            }
+                                            Button {
+                                                UIPasteboard.general.string = msg.text
+                                            } label: {
+                                                Label("コピー", systemImage: "doc.on.doc")
+                                            }
+                                        }
+                                        if canEdit(msg) {
+                                            if msg.deleted {
+                                                Button {
+                                                    store.restoreMessage(msg)
+                                                } label: {
+                                                    Label("元に戻す", systemImage: "arrow.uturn.backward")
+                                                }
+                                            } else {
+                                                Button {
+                                                    editingMessage = msg
+                                                } label: {
+                                                    Label("編集", systemImage: "pencil")
+                                                }
+                                                Button(role: .destructive) {
+                                                    store.deleteMessage(msg)
+                                                } label: {
+                                                    Label("削除", systemImage: "trash")
+                                                }
+                                            }
+                                        }
+                                    })
                                 }
                             )
                             .id(msg.id)
-                            // 長押しでリアクション・コピー(全メッセージ)・編集・削除・復元
-                            bubble.contextMenu {
-                                if !msg.deleted {
-                                    // 1列目: リアクション絵文字を1行に横並び
-                                    if #available(iOS 17.0, *) {
-                                        ControlGroup {
-                                            ForEach(CloudStore.reactionEmojis, id: \.self) { emoji in
-                                                Button(emoji) {
-                                                    store.toggleReaction(msg, emoji: emoji)
-                                                }
-                                            }
-                                        }
-                                        .controlGroupStyle(.palette)
-                                    } else {
-                                        ControlGroup {
-                                            ForEach(CloudStore.reactionEmojis, id: \.self) { emoji in
-                                                Button(emoji) {
-                                                    store.toggleReaction(msg, emoji: emoji)
-                                                }
-                                            }
-                                        }
-                                        .controlGroupStyle(.compactMenu)
-                                    }
-                                    Button {
-                                        UIPasteboard.general.string = msg.text
-                                    } label: {
-                                        Label("コピー", systemImage: "doc.on.doc")
-                                    }
-                                }
-                                if canEdit(msg) {
-                                    if msg.deleted {
-                                        Button {
-                                            store.restoreMessage(msg)
-                                        } label: {
-                                            Label("元に戻す", systemImage: "arrow.uturn.backward")
-                                        }
-                                    } else {
-                                        Button {
-                                            editingMessage = msg
-                                        } label: {
-                                            Label("編集", systemImage: "pencil")
-                                        }
-                                        Button(role: .destructive) {
-                                            store.deleteMessage(msg)
-                                        } label: {
-                                            Label("削除", systemImage: "trash")
-                                        }
-                                    }
-                                }
-                            } preview: {
-                                // 長押しプレビューは元のバブルと同じ形・色で本文だけを表示
-                                let previewText = msg.text.isEmpty ? "(添付ファイル)" : msg.text
-                                Text(previewText)
-                                    .font(.system(size: 14))
-                                    .lineSpacing(4)
-                                    .fixedSize(horizontal: false, vertical: true)
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 9)
-                                    // 長文は幅を固定して確実に折り返す(横に伸ばさない)
-                                    .frame(width: previewText.count > 15 ? 300 : nil, alignment: .leading)
-                                    .background(LineBubbleShape(isMine: style.right).fill(style.color))
-                                    .overlay(
-                                        LineBubbleShape(isMine: style.right)
-                                            .stroke(style.border ?? .clear, lineWidth: 1)
-                                    )
-                                    .padding(.top, 8)      // しっぽが切れないよう余白
-                                    .padding(.horizontal, 10)
-                                    .padding(.bottom, 8)
-                                    .background(Theme.chatBg)
-                            }
                         }
                         if store.pendingTyping {
                             // 財務視点ではAIは自分側(右)に表示
@@ -649,6 +631,8 @@ struct MessageBubble: View {
     var onReaction: (String) -> Void = { _ in }
     let showClarify: Bool
     var onChoice: (String) -> Void = { _ in }
+    /// 長押しメニュー(バブル本体に付けるので、プレビューは画面のバブルがそのまま使われる)
+    var menuContent: (() -> AnyView)? = nil
 
     var body: some View {
         if message.role == .system {
@@ -675,11 +659,19 @@ struct MessageBubble: View {
                             LineBubbleShape(isMine: alignRight)
                                 .stroke(borderColor ?? .clear, lineWidth: 1)
                         )
+                        // 長押しメニューはバブル本体に付ける(プレビュー=画面のバブルそのまま)
+                        .contextMenu {
+                            if let menuContent {
+                                menuContent()
+                            }
+                        }
                         // 既読・時刻はバブルの下端の真横に固定(リアクションの幅に影響されない)。
-                        // 幅0のフレームからバブルの外側へあふれさせる
+                        // 幅0のフレームからバブルの外側へあふれさせる。
+                        // リアクションがある時は少し持ち上げて重ならないようにする
                         .overlay(alignment: alignRight ? .bottomLeading : .bottomTrailing) {
                             sideMeta
                                 .padding(alignRight ? .trailing : .leading, 4)
+                                .padding(.bottom, (!message.reactions.isEmpty && !message.deleted) ? 10 : 0)
                                 .fixedSize()
                                 .frame(width: 0, alignment: alignRight ? .trailing : .leading)
                         }
