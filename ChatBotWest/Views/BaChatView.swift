@@ -14,6 +14,8 @@ struct BaChatView: View {
                     BaTalkView()
                 }
         }
+        // トーク中はタブバーを隠し、一覧に戻った瞬間に表示する
+        .toolbar(store.baTalkPath.isEmpty ? .visible : .hidden, for: .tabBar)
         .onChange(of: store.baTalkPath) { _ in
             store.handleBaTalkPathChange()
         }
@@ -486,8 +488,6 @@ struct BaTalkView: View {
         .navigationBarTitleDisplayMode(.inline)
         // 戻るボタンは出さない(BAチャットタブの再タップ・左端スワイプで戻る)
         .navigationBarBackButtonHidden(true)
-        // トーク中は下のタブバーも隠す
-        .toolbar(.hidden, for: .tabBar)
         .toolbar {
             // タイトル部分。どのトークもタップでルーム名を変更できる
             // (メンバー名の羅列が長いときは省略して右上のボタンに重ならないようにする)

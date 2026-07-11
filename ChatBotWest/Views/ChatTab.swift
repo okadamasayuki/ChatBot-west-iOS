@@ -12,6 +12,8 @@ struct ChatTab: View {
                     ChatRoomView()
                 }
         }
+        // チャット中はタブバーを隠し、一覧に戻った瞬間に表示する
+        .toolbar(store.chatPath.isEmpty ? .visible : .hidden, for: .tabBar)
         .onChange(of: store.chatPath) { _ in
             store.handleChatPathChange()
         }
