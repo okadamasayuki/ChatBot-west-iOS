@@ -657,6 +657,27 @@ struct AddBaMembersSheet: View {
             // 会社・部署・担当・役職で絞り込み、まとめて選択できる
             MemberFilterBar(filter: $filter, pool: pool)
             Form {
+                // ユーザー数が多くてもスクロールせずに済むよう、操作は一覧の上に置く
+                Section {
+                    Toggle("過去の履歴も見せる", isOn: $showHistory)
+                        .tint(Theme.accent)
+                    Button {
+                        // 絞り込みを変えても選択は保持されるよう、全体から選ぶ
+                        let picked = pool.filter { selected.contains($0.id) }
+                        store.addBaTalkMembers(talk.id, members: picked, showHistory: showHistory)
+                        dismiss()
+                    } label: {
+                        HStack {
+                            Spacer()
+                            Text(selected.count > 1 ? "追加する(\(selected.count)人)" : "追加する").bold()
+                            Spacer()
+                        }
+                    }
+                    .disabled(selected.isEmpty)
+                } footer: {
+                    Text("「過去の履歴も見せる」をオフにすると、追加したメンバーには追加した時点より後のメッセージだけが表示されます。")
+                }
+
                 Section("追加するメンバーを選択") {
                     if candidates.isEmpty {
                         Text("追加できるメンバーがいません。")
@@ -702,28 +723,6 @@ struct AddBaMembersSheet: View {
                     }
                 }
 
-                Section {
-                    Toggle("過去の履歴も見せる", isOn: $showHistory)
-                        .tint(Theme.accent)
-                } footer: {
-                    Text("オフにすると、追加したメンバーには追加した時点より後のメッセージだけが表示されます。")
-                }
-
-                Section {
-                    Button {
-                        // 絞り込みを変えても選択は保持されるよう、全体から選ぶ
-                        let picked = pool.filter { selected.contains($0.id) }
-                        store.addBaTalkMembers(talk.id, members: picked, showHistory: showHistory)
-                        dismiss()
-                    } label: {
-                        HStack {
-                            Spacer()
-                            Text(selected.count > 1 ? "追加する(\(selected.count)人)" : "追加する").bold()
-                            Spacer()
-                        }
-                    }
-                    .disabled(selected.isEmpty)
-                }
             }
             }
             .navigationTitle("メンバーを追加")
