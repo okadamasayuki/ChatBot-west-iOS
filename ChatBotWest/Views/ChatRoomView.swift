@@ -301,6 +301,8 @@ struct ChatRoomView: View {
         }
         .navigationTitle(room?.title ?? "相談")
         .navigationBarTitleDisplayMode(.inline)
+        // 戻るボタンは出さない(相談一覧タブの再タップ・左端スワイプで戻る)
+        .navigationBarBackButtonHidden(true)
         .sheet(item: $editingMessage) { msg in
             EditMessageSheet(initialText: msg.text) { newText in
                 store.updateMessageText(msg, newText: newText)
@@ -360,7 +362,7 @@ struct ChatRoomView: View {
                             Button {
                                 store.assignRoomHandler(r.id, to: store.myName())
                             } label: {
-                                Label("自分が担当になる", systemImage: "person.fill.checkmark")
+                                Label("自分が担当する", systemImage: "person.fill.checkmark")
                             }
                         }
                         let others = store.expertNames.filter { $0 != store.myName() && $0 != handler }
@@ -384,7 +386,7 @@ struct ChatRoomView: View {
                             }
                         }
                     } label: {
-                        Text(handler.isEmpty ? "担当になる" : "担当: \(handler)")
+                        Text(handler.isEmpty ? "担当する" : "担当: \(handler)")
                             .font(.system(size: 13))
                             .lineLimit(1)
                             .foregroundColor(handler.isEmpty ? Theme.accentDark : Color(red: 0xc2 / 255.0, green: 0x6a / 255.0, blue: 0x00 / 255.0))
@@ -400,7 +402,7 @@ struct ChatRoomView: View {
                     Button {
                         if let id = store.currentRoomId { store.toggleRoomDone(id) }
                     } label: {
-                        Text(room?.isDone == true ? "✓ 完了" : "完了にする")
+                        Text(room?.isDone == true ? "✓ 完了" : "完了")
                             .font(.system(size: 13))
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)

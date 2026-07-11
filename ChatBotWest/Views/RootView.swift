@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct RootView: View {
     @EnvironmentObject var store: CloudStore
@@ -23,7 +24,16 @@ struct MainTabView: View {
     @EnvironmentObject var store: CloudStore
 
     var body: some View {
-        TabView(selection: $store.activeTab) {
+        // 同じタブをもう一度タップしたら、開いている画面(相談チャットなど)を閉じて一覧に戻す
+        TabView(selection: Binding(
+            get: { store.activeTab },
+            set: { newTab in
+                if newTab == store.activeTab, newTab == .chat {
+                    store.backToRooms()
+                }
+                store.activeTab = newTab
+            }
+        )) {
             ChatTab()
                 .tabItem {
                     Label(store.isExpert ? "相談一覧" : "質問者",
@@ -54,5 +64,17 @@ struct MainTabView: View {
                 .tag(AppTab.settings)
         }
         .tint(Theme.accentDark)
+    }
+}
+
+/// 戻るボタンを隠しても左端スワイプで戻れるようにする
+extension UINavigationController: UIGestureRecognizerDelegate {
+    override open func viewDidLoad() {
+        super.viewDidLoad()
+        interactivePopGestureRecognizer?.delegate = self
+    }
+
+    public func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        viewControllers.count > 1
     }
 }
