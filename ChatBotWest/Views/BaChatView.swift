@@ -458,12 +458,16 @@ struct BaTalkView: View {
             FlowLayout(spacing: 6) {
                 ForEach(Self.quickReplies, id: \.label) { reply in
                     Button {
-                        if input.isEmpty {
-                            input = reply.text
-                        } else {
-                            input += reply.text
+                        // 文字を入れるだけ(フォーカスもモーションも発生させない)
+                        var t = Transaction()
+                        t.disablesAnimations = true
+                        withTransaction(t) {
+                            if input.isEmpty {
+                                input = reply.text
+                            } else {
+                                input += reply.text
+                            }
                         }
-                        inputFocused = true
                     } label: {
                         Text(reply.label)
                             .font(.system(size: 12))
