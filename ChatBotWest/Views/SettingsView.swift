@@ -204,8 +204,6 @@ struct OrgSettingsView: View {
                 }
             } header: {
                 Text("会社")
-            } footer: {
-                Text("左にスライドすると削除ボタンが出ます。長押しして上下に動かすと並び替えでき、並び順は新規登録の選択肢にも反映されます。削除しても登録済みユーザーの所属は変わりません。")
             }
 
             Section("部署") {
@@ -320,39 +318,54 @@ struct OrgSettingsView: View {
     }
 }
 
-/// 左にスライドすると赤い四角形の削除ボタンが出てくる行
+/// 左にスライドすると赤い四角形の削除ボタンが指に追従して滑らかに出てくる行
 /// (OS標準のスワイプ削除はボタンが丸く表示されるため自作)
 struct SwipeDeleteRow<Content: View>: View {
     let onDelete: () -> Void
     @ViewBuilder var content: () -> Content
-    @State private var revealed = false
+    @State private var width: CGFloat = 0   // 削除ボタンの見えている幅(ドラッグに追従)
+    @State private var opened = false
+
+    private let full: CGFloat = 52
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 0) {
             content()
                 .frame(maxWidth: .infinity, alignment: .leading)
-            if revealed {
-                Button {
-                    withAnimation(.easeOut(duration: 0.15)) { revealed = false }
-                    onDelete()
-                } label: {
-                    Image(systemName: "trash.fill")
-                        .font(.system(size: 13))
-                        .foregroundColor(.white)
-                        .frame(width: 48, height: 30)
-                        .background(Rectangle().fill(Color.red)) // 四角形・赤
+            Button {
+                withAnimation(.spring(response: 0.25, dampingFraction: 0.9)) {
+                    width = 0
+                    opened = false
                 }
-                .buttonStyle(.borderless)
-                .transition(.move(edge: .trailing).combined(with: .opacity))
+                onDelete()
+            } label: {
+                Rectangle()
+                    .fill(Color.red) // 四角形・赤
+                    .frame(width: width, height: 30)
+                    .overlay(
+                        Image(systemName: "trash.fill")
+                            .font(.system(size: 13))
+                            .foregroundColor(.white)
+                            .opacity(width > 30 ? 1 : 0)
+                    )
+                    .clipped()
+                    .padding(.leading, width > 0 ? 8 : 0)
             }
+            .buttonStyle(.borderless)
         }
         .contentShape(Rectangle())
-        .gesture(
-            DragGesture(minimumDistance: 15)
-                .onEnded { v in
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 10)
+                .onChanged { v in
                     guard abs(v.translation.width) > abs(v.translation.height) else { return }
-                    withAnimation(.easeOut(duration: 0.15)) {
-                        revealed = v.translation.width < 0
+                    let base: CGFloat = opened ? full : 0
+                    width = max(0, min(full + 12, base - v.translation.width))
+                }
+                .onEnded { _ in
+                    let shouldOpen = width > full * 0.5
+                    withAnimation(.spring(response: 0.25, dampingFraction: 0.9)) {
+                        width = shouldOpen ? full : 0
+                        opened = shouldOpen
                     }
                 }
         )
