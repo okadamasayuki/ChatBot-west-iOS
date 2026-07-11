@@ -405,21 +405,11 @@ struct BaMessageBubble: View {
     var mentionNames: [String] = []
 
     var body: some View {
-        HStack(alignment: .top, spacing: 8) {
+        HStack {
             if isMine { Spacer(minLength: 60) }
-            if !isMine {
-                // 相手側はアイコンが話しているように見せる(イニシャルの丸アイコン)
-                ZStack {
-                    Circle().fill(Theme.chatBg)
-                    Text(String(message.senderName.prefix(1)).uppercased())
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundColor(.white)
-                }
-                .frame(width: 34, height: 34)
-            }
             VStack(alignment: isMine ? .trailing : .leading, spacing: 3) {
                 if !isMine {
-                    Text(message.senderName)
+                    Text("👤 \(message.senderName)")
                         .font(.system(size: 11))
                         .foregroundColor(Theme.header.opacity(0.8))
                 }

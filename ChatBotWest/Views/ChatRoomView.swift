@@ -62,22 +62,22 @@ struct ChatRoomView: View {
         if store.isExpert {
             switch msg.role {
             case .user:
-                return (questionerName, false, Color(.systemBackground), nil)
+                return ("🙋 \(questionerName)", false, Color(.systemBackground), nil)
             case .ai:
-                return ("AIアシスタント", true, Color(.systemBackground), nil)
+                return ("🤖 AIアシスタント", true, Color(.systemBackground), nil)
             default:
-                return (baName, true, Theme.myBubble, nil)
+                return ("👤 \(baName)", true, Theme.myBubble, nil)
             }
         } else {
             switch msg.role {
             case .user:
                 // 自分の相談では自分のメッセージに名前は付けない(LINEと同じ)
                 let isMine = room.map { store.isMyRoom($0) } ?? true
-                return (isMine ? nil : questionerName, true, Theme.myBubble, nil)
+                return (isMine ? nil : "🙋 \(questionerName)", true, Theme.myBubble, nil)
             case .ai:
-                return ("AIアシスタント", false, Color(.systemBackground), nil)
+                return ("🤖 AIアシスタント", false, Color(.systemBackground), nil)
             default:
-                return (baName, false, Theme.expertBubble, Theme.expertBorder)
+                return ("👤 \(baName)", false, Theme.expertBubble, Theme.expertBorder)
             }
         }
     }
@@ -173,7 +173,7 @@ struct ChatRoomView: View {
                         }
                         if store.devTypingRoomId == store.currentRoomId, store.devTypingRoomId != nil {
                             // 開発モード: 担当者役が返信を生成中(質問者側に表示)
-                            TypingBubble(label: "質問者が入力中…", avatarEmoji: "🙋", alignRight: !store.isExpert)
+                            TypingBubble(label: "🙋 質問者が入力中…", alignRight: !store.isExpert)
                                 .id("devTyping")
                         }
                         // BAタブの該当案件をチャット内に統合表示(財務のみ・未回答の案件)
@@ -423,12 +423,8 @@ struct MessageBubble: View {
         if message.role == .system {
             SystemBubble(text: message.text)
         } else {
-            HStack(alignment: .top, spacing: 8) {
+            HStack {
                 if alignRight { Spacer(minLength: 60) }
-                if !alignRight {
-                    // 相手側はアイコンが話しているように見せる(LINE風)
-                    avatar
-                }
                 VStack(alignment: alignRight ? .trailing : .leading, spacing: 3) {
                     if let senderLabel {
                         Text(senderLabel)
@@ -456,22 +452,6 @@ struct MessageBubble: View {
                 if !alignRight { Spacer(minLength: 60) }
             }
         }
-    }
-
-    /// 発言者のアバター(相手側のみ表示)
-    private var avatar: some View {
-        let emoji: String
-        let bg: Color
-        switch message.role {
-        case .ai: emoji = "🤖"; bg = Color(.systemGray5)
-        case .expert: emoji = "👤"; bg = Theme.expertBubble
-        default: emoji = "🙋"; bg = Color(.systemBackground)
-        }
-        return ZStack {
-            Circle().fill(bg)
-            Text(emoji).font(.system(size: 17))
-        }
-        .frame(width: 34, height: 34)
     }
 
     @ViewBuilder
@@ -543,20 +523,12 @@ struct SystemBubble: View {
 }
 
 struct TypingBubble: View {
-    var label = "AIアシスタント"
-    var avatarEmoji = "🤖"
+    var label = "🤖 AIアシスタント"
     var alignRight = false
 
     var body: some View {
-        HStack(alignment: .top, spacing: 8) {
+        HStack {
             if alignRight { Spacer(minLength: 60) }
-            if !alignRight {
-                ZStack {
-                    Circle().fill(Color(.systemGray5))
-                    Text(avatarEmoji).font(.system(size: 17))
-                }
-                .frame(width: 34, height: 34)
-            }
             VStack(alignment: alignRight ? .trailing : .leading, spacing: 3) {
                 Text(label)
                     .font(.system(size: 11))
