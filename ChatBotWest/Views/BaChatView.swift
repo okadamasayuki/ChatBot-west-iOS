@@ -1226,12 +1226,9 @@ struct FlowLayout: Layout {
 }
 
 
-/// チップを押したときに少し縮んで薄くなるモーション
+/// チップを押してもモーションを付けない(ハイライトなし)
 struct ChipPressStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .scaleEffect(configuration.isPressed ? 0.92 : 1)
-            .opacity(configuration.isPressed ? 0.6 : 1)
-            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
     }
 }
