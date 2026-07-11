@@ -75,12 +75,6 @@ struct NotificationsView: View {
                     .foregroundColor(Color(.tertiaryLabel))
             }
             Spacer()
-            if !n.read {
-                Circle()
-                    .fill(Theme.accent)
-                    .frame(width: 8, height: 8)
-                    .padding(.top, 6)
-            }
         }
         .padding(.vertical, 2)
     }
