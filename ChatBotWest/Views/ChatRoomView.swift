@@ -684,7 +684,6 @@ struct MessageBubble: View {
                         ReactionChipsView(reactions: message.reactions, myUid: myUid,
                                           memberFor: reactionMemberFor, onToggle: onReaction)
                             .padding(.top, -7) // 間隔3pt込みで枠に4pt重なる
-                            .padding(alignRight ? .trailing : .leading, 10)
                             .zIndex(1)
                     }
                 }

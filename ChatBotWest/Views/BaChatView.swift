@@ -1077,7 +1077,6 @@ struct BaMessageBubble: View {
                         store.toggleBaReaction(message, emoji: emoji)
                     }
                     .padding(.top, -7) // 間隔3pt込みで枠に4pt重なる
-                    .padding(isMine ? .trailing : .leading, 10)
                     .zIndex(1)
                 }
             }
