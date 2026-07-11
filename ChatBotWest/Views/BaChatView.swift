@@ -929,8 +929,9 @@ struct RoomLinkPickerSheet: View {
     let onPick: (Room) -> Void
 
     private var rooms: [Room] {
+        // 完了した相談はリンクの選択肢に出さない
         store.rooms
-            .filter { !$0.lastText.trimmingCharacters(in: .whitespaces).isEmpty }
+            .filter { !$0.lastText.trimmingCharacters(in: .whitespaces).isEmpty && !$0.isDone }
             .sorted { $0.lastTs > $1.lastTs }
     }
 
