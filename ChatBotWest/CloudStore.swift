@@ -23,6 +23,7 @@ final class CloudStore: ObservableObject {
     @Published var authReady = false
     var pendingRole: MemberRole = .questioner   // 新規登録時に使う
     var pendingNickname: String = ""
+    var pendingCompany: String = ""
     var pendingDepartment: String = ""
     var pendingSection: String = ""
 
@@ -39,19 +40,21 @@ final class CloudStore: ObservableObject {
         let role: String
         var icon: String = ""      // アイコン(絵文字)
         var iconData: String = ""  // アイコン画像(base64 JPEG。こちらを優先表示)
+        var company: String = ""    // 所属会社
         var department: String = "" // 所属部署
         var section: String = ""    // 所属担当
 
         init(id: String, name: String, role: String, icon: String = "", iconData: String = "",
-             department: String = "", section: String = "") {
+             company: String = "", department: String = "", section: String = "") {
             self.id = id; self.name = name; self.role = role; self.icon = icon; self.iconData = iconData
+            self.company = company
             self.department = department
             self.section = section
         }
 
-        /// 「経理部・財務担当」のような所属表示
+        /// 「ウエスト株式会社・経理部・財務担当」のような所属表示
         var affiliation: String {
-            [department, section].filter { !$0.isEmpty }.joined(separator: "・")
+            [company, department, section].filter { !$0.isEmpty }.joined(separator: "・")
         }
     }
 
@@ -171,6 +174,7 @@ final class CloudStore: ObservableObject {
                         "email": user.email ?? "",
                         "role": pendingRole.rawValue,
                         "nickname": pendingNickname,
+                        "company": pendingCompany,
                         "department": pendingDepartment,
                         "section": pendingSection,
                         "createdAt": nowIso(),
@@ -214,9 +218,10 @@ final class CloudStore: ObservableObject {
     }
 
     func signup(email: String, password: String, role: MemberRole, nickname: String,
-                department: String, section: String) async throws {
+                company: String, department: String, section: String) async throws {
         pendingRole = role
         pendingNickname = nickname
+        pendingCompany = company
         pendingDepartment = department
         pendingSection = section
         try await Auth.auth().createUser(withEmail: email, password: password)
@@ -419,6 +424,7 @@ final class CloudStore: ObservableObject {
                                       role: data["role"] as? String ?? "",
                                       icon: data["icon"] as? String ?? "",
                                       iconData: data["iconData"] as? String ?? "",
+                                      company: data["company"] as? String ?? "",
                                       department: data["department"] as? String ?? "",
                                       section: data["section"] as? String ?? "")
                 } ?? []

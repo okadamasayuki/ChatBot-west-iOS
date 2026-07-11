@@ -467,7 +467,17 @@ enum MemberRole: String {
     var label: String { self == .expert ? "財務" : "担当者" }
 }
 
-// MARK: - 所属部署・所属担当(一般的な会社を想定した選択肢)
+// MARK: - 所属会社・所属部署・所属担当(一般的な企業グループを想定した選択肢)
+
+enum Companies {
+    static let all = [
+        "ウエスト株式会社",
+        "ウエスト販売株式会社",
+        "ウエスト製造株式会社",
+        "ウエスト物流株式会社",
+        "ウエストシステムズ株式会社",
+    ]
+}
 
 enum Departments {
     static let all = [

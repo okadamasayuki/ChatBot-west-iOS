@@ -12,6 +12,7 @@ struct LoginView: View {
     @State private var password = ""
     @State private var nicknameInput = ""
     @State private var role: MemberRole = .questioner
+    @State private var company = Companies.all[0]
     @State private var department = Departments.all[0]
     @State private var section = Departments.sections(for: Departments.all[0])[0]
     @State private var errorMessage: String?
@@ -80,6 +81,12 @@ struct LoginView: View {
                         }
 
                         Section("所属") {
+                            Picker("所属会社", selection: $company) {
+                                ForEach(Companies.all, id: \.self) { c in
+                                    Text(c).tag(c)
+                                }
+                            }
+                            .pickerStyle(.menu)
                             Picker("所属部署", selection: $department) {
                                 ForEach(Departments.all, id: \.self) { dept in
                                     Text(dept).tag(dept)
@@ -166,7 +173,8 @@ struct LoginView: View {
             do {
                 if mode == .signup {
                     try await store.signup(email: email, password: password, role: role,
-                                           nickname: nickname, department: department, section: section)
+                                           nickname: nickname, company: company,
+                                           department: department, section: section)
                 } else {
                     try await store.login(email: email, password: password)
                 }
