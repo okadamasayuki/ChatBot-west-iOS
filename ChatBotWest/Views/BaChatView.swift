@@ -1069,11 +1069,14 @@ struct BaMessageBubble: View {
                     }
                 } preview: {
                     // 長押しプレビューは本文だけ(リアクションバッジ等は含めない)
-                    Text(message.text.isEmpty ? "(添付ファイル)" : message.text)
+                    let previewText = message.text.isEmpty ? "(添付ファイル)" : message.text
+                    Text(previewText)
                         .font(.system(size: 14))
                         .lineSpacing(4)
+                        .fixedSize(horizontal: false, vertical: true)
                         .padding(12)
-                        .frame(maxWidth: 300, alignment: .leading) // バブルと同じ幅感で折り返す
+                        // 長文は幅を固定して確実に折り返す(横に伸ばさない)
+                        .frame(width: previewText.count > 15 ? 300 : nil, alignment: .leading)
                         .background(Color(.systemBackground))
                 }
                 .sheet(isPresented: $showEdit) {
