@@ -173,14 +173,11 @@ struct ReactionChipsView: View {
                     Button {
                         onToggle(emoji)
                     } label: {
+                        // 背景なしの透明表示(絵文字と数だけ)
                         Text("\(emoji) \(uids.count)")
                             .font(.system(size: 12))
-                            .padding(.horizontal, 8)
                             .padding(.vertical, 3)
-                            // チャット背景に馴染む半透明チップ(自分が付けたものは少し濃く)
-                            .background(Color.white.opacity(uids.contains(myUid) ? 0.85 : 0.35))
-                            .foregroundColor(Theme.header)
-                            .clipShape(Capsule())
+                            .foregroundColor(Theme.header.opacity(uids.contains(myUid) ? 1.0 : 0.7))
                     }
                     .buttonStyle(.plain)
                 }
