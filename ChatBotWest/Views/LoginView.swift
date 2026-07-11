@@ -20,7 +20,7 @@ struct LoginView: View {
         if !store.orgCompanies.contains(company) { company = store.orgCompanies.first ?? "" }
         let depts = store.departments(for: company)
         if !depts.contains(department) { department = depts.first ?? "" }
-        let secs = store.orgSections[department] ?? []
+        let secs = store.sections(company: company, department: department)
         if !secs.contains(section) { section = secs.first ?? "" }
     }
     @State private var position = Positions.all.last ?? "一般"
@@ -99,7 +99,7 @@ struct LoginView: View {
                             .onChange(of: company) { c in
                                 // 会社を変えたら、その会社の部署・担当に合わせ直す
                                 department = store.departments(for: c).first ?? ""
-                                section = (store.orgSections[department] ?? []).first ?? ""
+                                section = store.sections(company: c, department: department).first ?? ""
                             }
                             Picker("部署", selection: $department) {
                                 ForEach(store.departments(for: company), id: \.self) { dept in
@@ -108,10 +108,10 @@ struct LoginView: View {
                             }
                             .pickerStyle(.menu)
                             .onChange(of: department) { dept in
-                                section = (store.orgSections[dept] ?? []).first ?? ""
+                                section = store.sections(company: company, department: dept).first ?? ""
                             }
                             Picker("担当", selection: $section) {
-                                ForEach(store.orgSections[department] ?? [], id: \.self) { sec in
+                                ForEach(store.sections(company: company, department: department), id: \.self) { sec in
                                     Text(sec).tag(sec)
                                 }
                             }

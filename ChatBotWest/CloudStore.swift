@@ -38,11 +38,20 @@ final class CloudStore: ObservableObject {
     // 組織の選択肢(会社・部署・担当)。ワークスペース設定で編集でき、全員に同期される
     @Published var orgCompanies: [String] = CloudStore.cachedList("orgCompanies") ?? Companies.all
     @Published var orgDepartments: [String: [String]] = CloudStore.cachedMap("orgDepartmentsMap") ?? Departments.byCompany
-    @Published var orgSections: [String: [String]] = CloudStore.cachedMap("orgSections") ?? Departments.sections
+    @Published var orgSections: [String: [String]] = CloudStore.cachedMap("orgSections2") ?? Departments.defaultOrgSections()
 
     /// 会社に紐づく部署の選択肢
     func departments(for company: String) -> [String] {
         orgDepartments[company] ?? []
+    }
+
+    /// 会社+部署に紐づく担当の選択肢
+    func sections(company: String, department: String) -> [String] {
+        orgSections[CloudStore.sectionKey(company, department)] ?? []
+    }
+
+    static func sectionKey(_ company: String, _ department: String) -> String {
+        "\(company)|\(department)"
     }
 
     /// 全社の部署の選択肢(重複なし・会社順)
@@ -296,7 +305,7 @@ final class CloudStore: ObservableObject {
         let ud = UserDefaults.standard
         ud.set(orgCompanies, forKey: "orgCompanies")
         ud.set(orgDepartments, forKey: "orgDepartmentsMap")
-        ud.set(orgSections, forKey: "orgSections")
+        ud.set(orgSections, forKey: "orgSections2")
     }
 
     static func cachedList(_ key: String) -> [String]? {
@@ -441,8 +450,20 @@ final class CloudStore: ObservableObject {
                 if let c = d["companies"] as? [String], !c.isEmpty { self.orgCompanies = c }
                 let dep = stringMap(d["departments"])
                 if !dep.isEmpty { self.orgDepartments = dep }
-                let sec = stringMap(d["sections"])
-                if !sec.isEmpty { self.orgSections = sec }
+                var sec = stringMap(d["sections"])
+                if !sec.isEmpty {
+                    // 旧形式(部署のみのキー)は「会社|部署」に展開して読み込む
+                    if !sec.keys.contains(where: { $0.contains("|") }) {
+                        var expanded: [String: [String]] = [:]
+                        for c in self.orgCompanies {
+                            for dept in self.orgDepartments[c] ?? [] {
+                                if let list = sec[dept] { expanded[Self.sectionKey(c, dept)] = list }
+                            }
+                        }
+                        sec = expanded
+                    }
+                    self.orgSections = sec
+                }
                 self.cacheOrgConfig()
             }
         })

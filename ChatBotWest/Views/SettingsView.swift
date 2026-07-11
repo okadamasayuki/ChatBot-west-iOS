@@ -177,6 +177,7 @@ struct OrgSettingsView: View {
     @State private var newDepartment = ""
     @State private var newSection = ""
     @State private var sectionDept = ""
+    @State private var sectionCompany = ""
 
     @State private var deptCompany = ""
 
@@ -184,11 +185,14 @@ struct OrgSettingsView: View {
         Form {
             Section {
                 ForEach(store.orgCompanies, id: \.self) { c in
-                    HStack {
-                        Text(c)
-                        Spacer()
-                        deleteButton { deleteCompany(c) }
-                    }
+                    Text(c)
+                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                            Button(role: .destructive) {
+                                deleteCompany(c)
+                            } label: {
+                                Label("削除", systemImage: "trash.fill")
+                            }
+                        }
                 }
                 .onMove { from, to in
                     // 並び順は新規登録の会社選択肢にもそのまま反映される
@@ -206,10 +210,10 @@ struct OrgSettingsView: View {
             } header: {
                 Text("会社")
             } footer: {
-                Text("長押しして上下に動かすと並び替えできます。並び順は新規登録の選択肢にも反映されます。削除しても登録済みユーザーの所属は変わりません。")
+                Text("左にスライドで削除、長押しして上下に動かすと並び替えできます。並び順は新規登録の選択肢にも反映されます。削除しても登録済みユーザーの所属は変わりません。")
             }
 
-            Section("部署(会社ごと)") {
+            Section("部署") {
                 Picker("会社", selection: $deptCompany) {
                     ForEach(store.orgCompanies, id: \.self) { c in
                         Text(c).tag(c)
@@ -217,11 +221,14 @@ struct OrgSettingsView: View {
                 }
                 .pickerStyle(.menu)
                 ForEach(store.departments(for: deptCompany), id: \.self) { d in
-                    HStack {
-                        Text(d)
-                        Spacer()
-                        deleteButton { deleteDepartment(d) }
-                    }
+                    Text(d)
+                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                            Button(role: .destructive) {
+                                deleteDepartment(d)
+                            } label: {
+                                Label("削除", systemImage: "trash.fill")
+                            }
+                        }
                 }
                 addRow(placeholder: "部署を追加", text: $newDepartment) {
                     let name = newDepartment.trimmingCharacters(in: .whitespaces)
@@ -235,27 +242,41 @@ struct OrgSettingsView: View {
                 }
             }
 
-            Section("担当(部署ごと)") {
+            Section("担当") {
+                // 担当は会社+部署に紐づく
+                Picker("会社", selection: $sectionCompany) {
+                    ForEach(store.orgCompanies, id: \.self) { c in
+                        Text(c).tag(c)
+                    }
+                }
+                .pickerStyle(.menu)
+                .onChange(of: sectionCompany) { c in
+                    sectionDept = store.departments(for: c).first ?? ""
+                }
                 Picker("部署", selection: $sectionDept) {
-                    ForEach(store.allDepartments, id: \.self) { d in
+                    ForEach(store.departments(for: sectionCompany), id: \.self) { d in
                         Text(d).tag(d)
                     }
                 }
                 .pickerStyle(.menu)
-                ForEach(store.orgSections[sectionDept] ?? [], id: \.self) { s in
-                    HStack {
-                        Text(s)
-                        Spacer()
-                        deleteButton { deleteSection(s) }
-                    }
+                ForEach(store.sections(company: sectionCompany, department: sectionDept), id: \.self) { s in
+                    Text(s)
+                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                            Button(role: .destructive) {
+                                deleteSection(s)
+                            } label: {
+                                Label("削除", systemImage: "trash.fill")
+                            }
+                        }
                 }
                 addRow(placeholder: "担当を追加", text: $newSection) {
                     let name = newSection.trimmingCharacters(in: .whitespaces)
-                    guard !name.isEmpty, !sectionDept.isEmpty else { return }
-                    var list = store.orgSections[sectionDept] ?? []
+                    guard !name.isEmpty, !sectionCompany.isEmpty, !sectionDept.isEmpty else { return }
+                    let key = CloudStore.sectionKey(sectionCompany, sectionDept)
+                    var list = store.orgSections[key] ?? []
                     guard !list.contains(name) else { newSection = ""; return }
                     list.append(name)
-                    store.orgSections[sectionDept] = list
+                    store.orgSections[key] = list
                     store.saveOrgConfig()
                     newSection = ""
                 }
@@ -265,53 +286,41 @@ struct OrgSettingsView: View {
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             if deptCompany.isEmpty { deptCompany = store.orgCompanies.first ?? "" }
-            if sectionDept.isEmpty { sectionDept = store.allDepartments.first ?? "" }
+            if sectionCompany.isEmpty { sectionCompany = store.orgCompanies.first ?? "" }
+            if sectionDept.isEmpty { sectionDept = store.departments(for: sectionCompany).first ?? "" }
         }
-    }
-
-    /// 四角い削除ボタン(行の右端)
-    private func deleteButton(_ action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: "trash")
-                .font(.system(size: 12))
-                .foregroundColor(.red)
-                .frame(width: 28, height: 28)
-                .background(
-                    RoundedRectangle(cornerRadius: 6)
-                        .stroke(Color.red.opacity(0.4), lineWidth: 1)
-                )
-        }
-        .buttonStyle(.borderless)
     }
 
     private func deleteCompany(_ c: String) {
-        // 会社を消したらその会社の部署リストも消す
+        // 会社を消したらその会社の部署・担当リストも消す
+        for d in store.departments(for: c) {
+            store.orgSections[CloudStore.sectionKey(c, d)] = nil
+        }
         store.orgDepartments[c] = nil
         store.orgCompanies.removeAll { $0 == c }
         if !store.orgCompanies.contains(deptCompany) {
             deptCompany = store.orgCompanies.first ?? ""
         }
-        if !store.allDepartments.contains(sectionDept) {
-            sectionDept = store.allDepartments.first ?? ""
+        if !store.orgCompanies.contains(sectionCompany) {
+            sectionCompany = store.orgCompanies.first ?? ""
+            sectionDept = store.departments(for: sectionCompany).first ?? ""
         }
         store.saveOrgConfig()
     }
 
     private func deleteDepartment(_ d: String) {
-        // 他の会社で使われていない部署なら担当リストも消す
-        let usedElsewhere = store.orgCompanies.contains {
-            $0 != deptCompany && (store.orgDepartments[$0] ?? []).contains(d)
-        }
-        if !usedElsewhere { store.orgSections[d] = nil }
+        // その会社の部署の担当リストも消す
+        store.orgSections[CloudStore.sectionKey(deptCompany, d)] = nil
         store.orgDepartments[deptCompany] = store.departments(for: deptCompany).filter { $0 != d }
-        if !store.allDepartments.contains(sectionDept) {
-            sectionDept = store.allDepartments.first ?? ""
+        if sectionCompany == deptCompany, sectionDept == d {
+            sectionDept = store.departments(for: sectionCompany).first ?? ""
         }
         store.saveOrgConfig()
     }
 
     private func deleteSection(_ s: String) {
-        store.orgSections[sectionDept] = (store.orgSections[sectionDept] ?? []).filter { $0 != s }
+        let key = CloudStore.sectionKey(sectionCompany, sectionDept)
+        store.orgSections[key] = (store.orgSections[key] ?? []).filter { $0 != s }
         store.saveOrgConfig()
     }
 
@@ -383,7 +392,7 @@ struct SettingsView: View {
                     } label: {
                         HStack {
                             if sampleBusy { ProgressView().padding(.trailing, 6) }
-                            Text("サンプル相談を追加(デモ)")
+                            Text("サンプル相談を追加")
                         }
                     }
                     .disabled(sampleBusy)
@@ -393,7 +402,7 @@ struct SettingsView: View {
                         } label: {
                             HStack {
                                 if baTalkBusy { ProgressView().padding(.trailing, 6) }
-                                Text("サンプルBAチャットを追加(デモ)")
+                                Text("サンプルBAチャットを追加")
                             }
                         }
                         .disabled(baTalkBusy)
@@ -408,7 +417,7 @@ struct SettingsView: View {
                     } label: {
                         HStack {
                             if manualBusy != nil { ProgressView().padding(.trailing, 6) }
-                            Text("サンプルマニュアルを追加(デモ)")
+                            Text("サンプルマニュアルを追加")
                                 .foregroundColor(Theme.accentDark)
                         }
                     }

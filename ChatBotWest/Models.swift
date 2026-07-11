@@ -531,4 +531,15 @@ enum Departments {
     static func sections(for department: String) -> [String] {
         sections[department] ?? []
     }
+
+    /// 「会社|部署」をキーにした既定の担当マップ(担当は会社と部署の両方に紐づく)
+    static func defaultOrgSections() -> [String: [String]] {
+        var m: [String: [String]] = [:]
+        for (company, depts) in byCompany {
+            for d in depts {
+                m["\(company)|\(d)"] = sections[d] ?? []
+            }
+        }
+        return m
+    }
 }
