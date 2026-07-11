@@ -27,7 +27,8 @@ struct BaChatView: View {
                         Text("ユーザ").tag(Mode.users)
                     }
                     .pickerStyle(.segmented)
-                    .frame(width: 190)
+                    .controlSize(.small)
+                    .frame(width: 160)
                 }
             }
             // 戻りアニメーション中はナビバーを出さず、一覧に戻り切ってから表示する

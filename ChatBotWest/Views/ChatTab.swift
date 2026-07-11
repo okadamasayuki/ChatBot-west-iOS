@@ -138,22 +138,24 @@ struct RoomListView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             if store.isExpert {
-                ToolbarItem(placement: .principal) {
+                ToolbarItem(placement: .topBarLeading) {
                     Picker("フィルタ", selection: $expertFilter) {
                         Text("すべて").tag(ExpertFilter.all)
                         Text("自分が対応中").tag(ExpertFilter.handling)
                     }
                     .pickerStyle(.segmented)
-                    .frame(width: 210)
+                    .controlSize(.small)
+                    .frame(width: 160)
                 }
             } else {
-                ToolbarItem(placement: .principal) {
+                ToolbarItem(placement: .topBarLeading) {
                     Picker("フィルタ", selection: $filter) {
                         Text("自分の相談").tag(RoomFilter.mine)
                         Text("全員の相談").tag(RoomFilter.all)
                     }
                     .pickerStyle(.segmented)
-                    .frame(width: 190)
+                    .controlSize(.small)
+                    .frame(width: 160)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
