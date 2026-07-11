@@ -6,6 +6,7 @@ struct ChatRoomView: View {
     @State private var input = ""
     @FocusState private var inputFocused: Bool
     @State private var editingMessage: Message?
+    @State private var showSummary = false
 
     private var lastMessageId: String? {
         if store.devTypingRoomId != nil, store.devTypingRoomId == store.currentRoomId { return "devTyping" }
@@ -195,8 +196,18 @@ struct ChatRoomView: View {
                 store.updateMessageText(msg, newText: newText)
             }
         }
+        .sheet(isPresented: $showSummary) {
+            SummarySheet { try await store.summarizeCurrentRoom() }
+        }
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
+                if !store.roomMessages.isEmpty {
+                    Button {
+                        showSummary = true
+                    } label: {
+                        Image(systemName: "doc.text.magnifyingglass")
+                    }
+                }
                 if canToggleDone {
                     Button {
                         if let id = store.currentRoomId { store.toggleRoomDone(id) }
@@ -210,6 +221,67 @@ struct ChatRoomView: View {
                             .cornerRadius(8)
                     }
                 }
+            }
+        }
+    }
+}
+
+// MARK: - 要約シート
+
+struct SummarySheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let summarize: () async throws -> String
+    @State private var summary = ""
+    @State private var busy = true
+    @State private var errorMessage: String?
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                if busy {
+                    VStack(spacing: 10) {
+                        ProgressView()
+                        Text("要約を作成中…").font(.footnote).foregroundColor(.secondary)
+                    }
+                } else if let errorMessage {
+                    Text("⚠ \(errorMessage)")
+                        .font(.footnote)
+                        .foregroundColor(.red)
+                        .padding()
+                } else {
+                    ScrollView {
+                        Text(summary)
+                            .font(.system(size: 14))
+                            .lineSpacing(5)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(14)
+                            .textSelection(.enabled)
+                    }
+                }
+            }
+            .navigationTitle("これまでのやり取りの要約")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    if !busy, errorMessage == nil {
+                        Button {
+                            UIPasteboard.general.string = summary
+                        } label: {
+                            Label("コピー", systemImage: "doc.on.doc")
+                        }
+                    }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("閉じる") { dismiss() }
+                }
+            }
+            .task {
+                do {
+                    summary = try await summarize()
+                } catch {
+                    errorMessage = error.localizedDescription
+                }
+                busy = false
             }
         }
     }

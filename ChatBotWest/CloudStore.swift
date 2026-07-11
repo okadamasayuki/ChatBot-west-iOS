@@ -711,6 +711,29 @@ final class CloudStore: ObservableObject {
                           "answeredAt": nowIso(), "handledBy": handler])
     }
 
+    /// 開いている相談のこれまでのやり取りを要約する
+    func summarizeCurrentRoom() async throws -> String {
+        let transcript = roomMessages
+            .filter { $0.role != .system && !$0.deleted }
+            .map { m -> String in
+                switch m.role {
+                case .user: return "質問者: \(m.text)"
+                case .ai: return "AIアシスタント: \(m.text)"
+                case .expert: return "BA(専門家): \(m.text)"
+                case .system: return ""
+                }
+            }
+            .joined(separator: "\n\n")
+        guard !transcript.isEmpty else {
+            throw ClaudeService.ClaudeError.server("この相談にはまだやり取りがありません。")
+        }
+        let summary = try await ClaudeService.call(
+            system: Prompts.summarySystem,
+            messages: [.init(role: "user", content: "以下の会計相談チャットのやり取りを要約してください。\n\n\(transcript)")]
+        )
+        return summary.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     // MARK: - 開発モード(APIによる担当者役)
 
     /// 開いている相談が「担当者の返答待ち」の状態なら、担当者役の返信をスケジュールする。
