@@ -521,6 +521,25 @@ final class CloudStore: ObservableObject {
         for c in cases where c.roomId == roomId && c.status != .answered {
             updateCase(c.id, ["handledBy": newHandler])
         }
+        // 担当が付いたら、AI回答待ちだった質問への回答を開始する
+        if !newHandler.isEmpty { triggerPendingTriage(roomId) }
+    }
+
+    /// 担当BA待ちで止まっていた質問があれば、AIのトリアージを実行する
+    private func triggerPendingTriage(_ roomId: String) {
+        guard currentRoomId == roomId, !sending,
+              let last = roomMessages.last(where: { !$0.deleted && $0.role != .system }),
+              last.role == .user else { return }
+        Task { [weak self] in
+            guard let self, !self.sending else { return }
+            self.sending = true
+            self.pendingTyping = true
+            defer {
+                self.pendingTyping = false
+                self.sending = false
+            }
+            await self.runTriage(text: last.text, roomId: roomId)
+        }
     }
 
     func addQa(_ entry: QaEntry) {
@@ -660,6 +679,22 @@ final class CloudStore: ObservableObject {
             sending = false
         }
 
+        // 担当BAが決まるまでAIは回答しない(担当が付いた時点で回答が始まる)
+        let handler = currentRoom().map { $0.handler.isEmpty ? derivedHandler(roomId: $0.id) : $0.handler } ?? ""
+        if handler.isEmpty {
+            pendingTyping = false
+            let notice = "担当BAが割り当てられると、AIアシスタントが回答します。しばらくお待ちください。"
+            if !roomMessages.contains(where: { $0.role == .system && $0.text == notice }) {
+                addMessage(Message(role: .system, text: notice), roomId: roomId)
+            }
+            return
+        }
+
+        await runTriage(text: text, roomId: roomId)
+    }
+
+    /// 直近のユーザー質問に対してAIのトリアージ(回答/聞き返し/エスカレーション)を実行する
+    private func runTriage(text: String, roomId: String) async {
         do {
             // このルーム内の直近の会話履歴をコンテキストとして渡す
             var history = roomMessages
