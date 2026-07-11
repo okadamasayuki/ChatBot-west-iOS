@@ -37,15 +37,17 @@ struct MainTabView: View {
                 BaChatView()
                     .tabItem { Label("BAチャット", systemImage: "person.2.fill") }
                     .tag(AppTab.baChat)
-
-                ManualView()
-                    .tabItem { Label("マニュアル", systemImage: "books.vertical.fill") }
-                    .tag(AppTab.manual)
             }
 
             MembersView()
                 .tabItem { Label("ユーザー", systemImage: "person.3.fill") }
                 .tag(AppTab.membersList)
+
+            if store.isExpert {
+                ManualView()
+                    .tabItem { Label("マニュアル", systemImage: "books.vertical.fill") }
+                    .tag(AppTab.manual)
+            }
 
             SettingsView()
                 .tabItem { Label("設定", systemImage: "gearshape.fill") }
