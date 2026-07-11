@@ -125,9 +125,19 @@ struct MemberFilterBar: View {
     }
 }
 
-/// ユーザー一覧: 財務(BA)のアカウントを表示(どちらの役割からも見られる)
-/// 財務は「選択」から複数ユーザを選んでグループトークを組める
+/// ユーザタブ(単体で開く場合のラッパー)
 struct MembersView: View {
+    var body: some View {
+        NavigationStack {
+            MembersListCore()
+        }
+    }
+}
+
+/// ユーザー一覧: 財務(BA)のアカウントを表示(どちらの役割からも見られる)
+/// 財務は「選択」から複数ユーザを選んでグループトークを組める。
+/// BAチャットタブの「ユーザ」切替からも表示される
+struct MembersListCore: View {
     @EnvironmentObject var store: CloudStore
     @State private var searchText = ""
     @State private var filter = MemberFilter()
@@ -149,7 +159,6 @@ struct MembersView: View {
     }
 
     var body: some View {
-        NavigationStack {
             VStack(spacing: 0) {
                 MemberFilterBar(filter: $filter, pool: allExperts)
                 List {
@@ -191,7 +200,6 @@ struct MembersView: View {
                     }
                 }
             }
-            .navigationTitle("ユーザ一覧")
             .navigationBarTitleDisplayMode(.inline)
             .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always),
                         prompt: "ユーザ名で検索")
@@ -226,7 +234,6 @@ struct MembersView: View {
                     }
                 }
             }
-        }
     }
 }
 

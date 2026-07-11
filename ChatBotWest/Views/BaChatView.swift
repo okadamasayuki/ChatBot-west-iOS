@@ -7,12 +7,34 @@ import UniformTypeIdentifiers
 struct BaChatView: View {
     @EnvironmentObject var store: CloudStore
 
+    enum Mode { case talks, users }
+    @State private var mode: Mode = .talks
+
     var body: some View {
         NavigationStack(path: $store.baTalkPath) {
-            BaTalkListView()
-                .navigationDestination(for: String.self) { _ in
-                    BaTalkView()
+            Group {
+                if mode == .talks {
+                    BaTalkListView()
+                } else {
+                    MembersListCore()
                 }
+            }
+            // 「すべて/自分が対応中」と同じく、中央の切替でトーク一覧⇄ユーザ一覧を切り替える
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Picker("表示", selection: $mode) {
+                        Text("トーク").tag(Mode.talks)
+                        Text("ユーザ").tag(Mode.users)
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(width: 190)
+                }
+            }
+            // 戻りアニメーション中はナビバーを出さず、一覧に戻り切ってから表示する
+            .toolbar(store.baTalkPath.isEmpty ? .visible : .hidden, for: .navigationBar)
+            .navigationDestination(for: String.self) { _ in
+                BaTalkView()
+            }
         }
         // トーク中はタブバーを隠し、一覧に戻った瞬間に表示する
         .toolbar(store.baTalkPath.isEmpty ? .visible : .hidden, for: .tabBar)
@@ -61,7 +83,6 @@ struct BaTalkListView: View {
             }
         }
         .listStyle(.plain)
-        .navigationTitle("BAチャット")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
