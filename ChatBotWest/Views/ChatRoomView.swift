@@ -261,12 +261,12 @@ struct ChatRoomView: View {
                         Button {
                             showPhotoPicker = true
                         } label: {
-                            Label("写真を選択", systemImage: "photo")
+                            Label("写真", systemImage: "photo")
                         }
                         Button {
                             showFileImporter = true
                         } label: {
-                            Label("ファイルを選択", systemImage: "folder")
+                            Label("ファイル", systemImage: "folder")
                         }
                     } label: {
                         Image(systemName: "plus")
