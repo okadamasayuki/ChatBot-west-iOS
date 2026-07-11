@@ -22,7 +22,8 @@ struct BaChatView: View {
             // 切替は常に左上に固定(モードによって位置が動かないように)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Picker("表示", selection: $mode) {
+                    // 切り替えはアニメーション付きで(急に入れ替わらないように)
+                    Picker("表示", selection: $mode.animation(.easeInOut(duration: 0.25))) {
                         Text("トーク").tag(Mode.talks)
                         Text("ユーザ").tag(Mode.users)
                     }
