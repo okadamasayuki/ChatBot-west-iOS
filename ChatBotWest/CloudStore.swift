@@ -62,14 +62,16 @@ final class CloudStore: ObservableObject {
         let role: String
         var icon: String = ""      // アイコン(絵文字)
         var iconData: String = ""  // アイコン画像(base64 JPEG。こちらを優先表示)
+        var email: String = ""
         var companies: [String] = [] // 所属会社(複数所属あり)
         var department: String = ""  // 所属部署
         var section: String = ""     // 所属担当
         var position: String = ""    // 役職
 
-        init(id: String, name: String, role: String, icon: String = "", iconData: String = "",
+        init(id: String, name: String, role: String, icon: String = "", iconData: String = "", email: String = "",
              companies: [String] = [], department: String = "", section: String = "", position: String = "") {
             self.id = id; self.name = name; self.role = role; self.icon = icon; self.iconData = iconData
+            self.email = email
             self.companies = companies
             self.department = department
             self.section = section
@@ -497,6 +499,7 @@ final class CloudStore: ObservableObject {
                                       role: data["role"] as? String ?? "",
                                       icon: data["icon"] as? String ?? "",
                                       iconData: data["iconData"] as? String ?? "",
+                                      email: email,
                                       companies: data["companies"] as? [String]
                                           ?? [(data["company"] as? String ?? "")].filter { !$0.isEmpty },
                                       department: data["department"] as? String ?? "",

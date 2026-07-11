@@ -113,7 +113,18 @@ enum SampleData {
         let ws = db.collection("workspaces").document(wid)
         var added = 0
 
+        // サンプル質問者アカウント(なければ自分)から質問がきた形にする
+        let questioners = store.members
+            .filter { $0.role == MemberRole.questioner.rawValue }
+            .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        var qi = 0
+
         for e in examples() {
+            let owner = questioners.isEmpty ? nil : questioners[qi % questioners.count]
+            qi += 1
+            let ownerUid = owner?.id ?? store.myUid()
+            let ownerEmail = owner?.email ?? store.user?.email ?? ""
+            let ownerName = owner?.name ?? ""
             let roomRef = ws.collection("rooms").document(e.room.id)
             if store.rooms.contains(where: { $0.id == e.room.id }) {
                 // 既存サンプル: 正規の状態にリセットする(旧IDの残骸や重複を消し、時刻も揃える)
@@ -128,6 +139,7 @@ enum SampleData {
                 try await roomRef.setData([
                     "title": e.room.title, "createdAt": e.room.createdAt,
                     "lastTs": e.room.lastTs, "lastText": e.room.lastText, "status": "",
+                    "ownerUid": ownerUid, "ownerEmail": ownerEmail, "ownerName": ownerName,
                 ], merge: true)
                 // 案件も正規の状態にリセット(チャットとBAタブの不整合を残さない)
                 for c in store.cases where c.roomId == e.room.id && c.id != e.caseObj?.id {
@@ -139,8 +151,9 @@ enum SampleData {
                 continue
             }
             var room = e.room
-            room.ownerUid = store.myUid()
-            room.ownerEmail = store.user?.email ?? ""
+            room.ownerUid = ownerUid
+            room.ownerEmail = ownerEmail
+            room.ownerName = ownerName
             try await roomRef.setData(room.dict)
             for msg in e.msgs {
                 try await roomRef.collection("messages").document(msg.id).setData(msg.dict)
