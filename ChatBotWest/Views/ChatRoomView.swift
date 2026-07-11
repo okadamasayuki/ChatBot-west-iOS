@@ -112,27 +112,27 @@ struct ChatRoomView: View {
         return nil
     }
 
-    /// メッセージの送信者のアイコン情報(設定済みアイコン → 役割の絵文字)
-    private func avatarInfo(for msg: Message) -> (data: String, icon: String) {
+    /// メッセージの送信者のアイコン情報(設定済みアイコンのみ。未設定はシンボルの丸)
+    private func avatarInfo(for msg: Message) -> (data: String, icon: String, fallback: String) {
         switch msg.role {
         case .ai:
-            return ("", "🤖")
+            return ("", "", "sparkles")
         case .expert:
             if !msg.senderName.isEmpty,
                let m = store.members.first(where: { $0.name == msg.senderName }) {
-                return (m.iconData, m.icon.isEmpty ? "👤" : m.icon)
+                return (m.iconData, m.icon, "person.fill")
             }
             if let r = room, let m = store.members.first(where: { $0.name == r.handler }) {
-                return (m.iconData, m.icon.isEmpty ? "👤" : m.icon)
+                return (m.iconData, m.icon, "person.fill")
             }
-            return ("", "👤")
+            return ("", "", "person.fill")
         case .user:
             if let r = room, let m = store.member(r.ownerUid) {
-                return (m.iconData, m.icon.isEmpty ? "🙋" : m.icon)
+                return (m.iconData, m.icon, "person.fill")
             }
-            return ("", "🙋")
+            return ("", "", "person.fill")
         case .system:
-            return ("", "")
+            return ("", "", "person.fill")
         }
     }
 
@@ -162,6 +162,7 @@ struct ChatRoomView: View {
                                 borderColor: style.border,
                                 avatarIconData: avatar.data,
                                 avatarIcon: avatar.icon,
+                                avatarFallback: avatar.fallback,
                                 readStatus: msg.deleted ? nil : readStatus(for: msg),
                                 myUid: store.myUid(),
                                 onReaction: { emoji in store.toggleReaction(msg, emoji: emoji) },
@@ -525,6 +526,7 @@ struct MessageBubble: View {
     var borderColor: Color? = nil
     var avatarIconData: String = ""
     var avatarIcon: String = ""
+    var avatarFallback: String = "person.fill"
     var readStatus: String? = nil
     var myUid: String = ""
     var onReaction: (String) -> Void = { _ in }
@@ -539,7 +541,8 @@ struct MessageBubble: View {
                 if alignRight { Spacer(minLength: 60) }
                 if !alignRight {
                     // 相手側はアイコン付きで表示
-                    AvatarCircleView(iconData: avatarIconData, icon: avatarIcon, size: 34)
+                    AvatarCircleView(iconData: avatarIconData, icon: avatarIcon,
+                                     fallbackSystemImage: avatarFallback, size: 34)
                 }
                 VStack(alignment: alignRight ? .trailing : .leading, spacing: 3) {
                     if let senderLabel {
