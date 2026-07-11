@@ -521,15 +521,14 @@ struct BaTalkView: View {
         // 戻るボタンは出さない(BAチャットタブの再タップ・左端スワイプで戻る)
         .navigationBarBackButtonHidden(true)
         .toolbar {
-            // タイトル部分。どのトークもタップでルーム名を変更できる
+            // タイトル部分。タイトルのタップでメンバー一覧、ペンのタップでルーム名変更
             // (メンバー名の羅列が長いときは省略して右上のボタンに重ならないようにする)
             ToolbarItem(placement: .principal) {
                 if let t = talk {
-                    Button {
-                        renameText = t.name
-                        showRename = true
-                    } label: {
-                        HStack(spacing: 4) {
+                    HStack(spacing: 4) {
+                        Button {
+                            showMembers = true
+                        } label: {
                             Text(store.baTalkName(t))
                                 .font(.headline)
                                 .foregroundColor(.primary)
@@ -537,6 +536,11 @@ struct BaTalkView: View {
                                 .truncationMode(.tail)
                                 .frame(maxWidth: 160)
                                 .fixedSize(horizontal: false, vertical: true)
+                        }
+                        Button {
+                            renameText = t.name
+                            showRename = true
+                        } label: {
                             Image(systemName: "pencil")
                                 .font(.system(size: 15))
                                 .foregroundColor(.secondary)
