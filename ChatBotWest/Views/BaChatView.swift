@@ -1001,16 +1001,16 @@ struct BaMessageBubble: View {
                 .padding(.horizontal, 12)
                 .padding(.vertical, 9)
                 .background(LineBubbleShape(isMine: isMine).fill(isMine ? Theme.myBubble : Color(.systemBackground)))
-                // Teams風: リアクションはバブルの下角に重ねて表示
+                // Teams風: リアクションはバブルの下角に重ねて表示。
+                // 時刻の位置が動かないよう、余白は増やさず重ねるだけにする
                 .overlay(alignment: isMine ? .bottomLeading : .bottomTrailing) {
                     if !message.reactions.isEmpty, !message.deleted {
                         ReactionChipsView(reactions: message.reactions, myUid: store.myUid()) { emoji in
                             store.toggleBaReaction(message, emoji: emoji)
                         }
-                        .offset(x: isMine ? -4 : 4, y: 11)
+                        .offset(x: isMine ? -4 : 4, y: 9)
                     }
                 }
-                .padding(.bottom, (!message.reactions.isEmpty && !message.deleted) ? 10 : 0)
                 .contextMenu {
                     if !message.deleted {
                         // 1列目: リアクション絵文字を1行に横並び
