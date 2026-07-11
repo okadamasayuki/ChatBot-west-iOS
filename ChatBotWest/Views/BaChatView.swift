@@ -585,8 +585,6 @@ struct BaTalkView: View {
                 }
             }
             Button("キャンセル", role: .cancel) {}
-        } message: {
-            Text("空にすると相手の名前・メンバー名が表示されます。")
         }
         .sheet(isPresented: $showRoomPicker) {
             RoomLinkPickerSheet { room in
