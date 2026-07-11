@@ -331,6 +331,8 @@ struct SwipeDeleteRow<Content: View>: View {
     var body: some View {
         HStack(spacing: 0) {
             content()
+                .padding(.leading, 20)
+                .padding(.vertical, 11)
                 .frame(maxWidth: .infinity, alignment: .leading)
             Button {
                 withAnimation(.spring(response: 0.25, dampingFraction: 0.9)) {
@@ -340,8 +342,9 @@ struct SwipeDeleteRow<Content: View>: View {
                 onDelete()
             } label: {
                 Rectangle()
-                    .fill(Color.red) // 四角形・赤
-                    .frame(width: width, height: 30)
+                    .fill(Color.red) // 四角形・赤。行の上下(区切り線)いっぱいに広がる
+                    .frame(width: width)
+                    .frame(maxHeight: .infinity)
                     .overlay(
                         Image(systemName: "trash.fill")
                             .font(.system(size: 13))
@@ -349,10 +352,10 @@ struct SwipeDeleteRow<Content: View>: View {
                             .opacity(width > 30 ? 1 : 0)
                     )
                     .clipped()
-                    .padding(.leading, width > 0 ? 8 : 0)
             }
             .buttonStyle(.borderless)
         }
+        .listRowInsets(EdgeInsets())
         .contentShape(Rectangle())
         .simultaneousGesture(
             DragGesture(minimumDistance: 10)
