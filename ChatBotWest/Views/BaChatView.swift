@@ -542,7 +542,7 @@ struct BaTalkView: View {
                             showRename = true
                         } label: {
                             Image(systemName: "pencil")
-                                .font(.system(size: 15))
+                                .font(.system(size: 16, weight: .bold))
                                 .foregroundColor(.secondary)
                         }
                     }
