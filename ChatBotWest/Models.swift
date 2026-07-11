@@ -472,6 +472,7 @@ enum MemberRole: String {
 enum Companies {
     static let all = [
         "ウエスト株式会社",
+        "ウエストアカウンティング株式会社",
         "ウエスト販売株式会社",
         "ウエスト製造株式会社",
         "ウエスト物流株式会社",

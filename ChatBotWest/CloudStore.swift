@@ -23,7 +23,7 @@ final class CloudStore: ObservableObject {
     @Published var authReady = false
     var pendingRole: MemberRole = .questioner   // 新規登録時に使う
     var pendingNickname: String = ""
-    var pendingCompany: String = ""
+    var pendingCompanies: [String] = []
     var pendingDepartment: String = ""
     var pendingSection: String = ""
 
@@ -40,21 +40,22 @@ final class CloudStore: ObservableObject {
         let role: String
         var icon: String = ""      // アイコン(絵文字)
         var iconData: String = ""  // アイコン画像(base64 JPEG。こちらを優先表示)
-        var company: String = ""    // 所属会社
-        var department: String = "" // 所属部署
-        var section: String = ""    // 所属担当
+        var companies: [String] = [] // 所属会社(複数所属あり)
+        var department: String = ""  // 所属部署
+        var section: String = ""     // 所属担当
 
         init(id: String, name: String, role: String, icon: String = "", iconData: String = "",
-             company: String = "", department: String = "", section: String = "") {
+             companies: [String] = [], department: String = "", section: String = "") {
             self.id = id; self.name = name; self.role = role; self.icon = icon; self.iconData = iconData
-            self.company = company
+            self.companies = companies
             self.department = department
             self.section = section
         }
 
-        /// 「ウエスト株式会社・経理部・財務担当」のような所属表示
+        /// 「ウエスト株式会社/ウエストアカウンティング株式会社・経理部・財務担当」のような所属表示
         var affiliation: String {
-            [company, department, section].filter { !$0.isEmpty }.joined(separator: "・")
+            ([companies.joined(separator: "/")] + [department, section])
+                .filter { !$0.isEmpty }.joined(separator: "・")
         }
     }
 
@@ -174,7 +175,7 @@ final class CloudStore: ObservableObject {
                         "email": user.email ?? "",
                         "role": pendingRole.rawValue,
                         "nickname": pendingNickname,
-                        "company": pendingCompany,
+                        "companies": pendingCompanies,
                         "department": pendingDepartment,
                         "section": pendingSection,
                         "createdAt": nowIso(),
@@ -218,10 +219,10 @@ final class CloudStore: ObservableObject {
     }
 
     func signup(email: String, password: String, role: MemberRole, nickname: String,
-                company: String, department: String, section: String) async throws {
+                companies: [String], department: String, section: String) async throws {
         pendingRole = role
         pendingNickname = nickname
-        pendingCompany = company
+        pendingCompanies = companies
         pendingDepartment = department
         pendingSection = section
         try await Auth.auth().createUser(withEmail: email, password: password)
@@ -424,7 +425,8 @@ final class CloudStore: ObservableObject {
                                       role: data["role"] as? String ?? "",
                                       icon: data["icon"] as? String ?? "",
                                       iconData: data["iconData"] as? String ?? "",
-                                      company: data["company"] as? String ?? "",
+                                      companies: data["companies"] as? [String]
+                                          ?? [(data["company"] as? String ?? "")].filter { !$0.isEmpty },
                                       department: data["department"] as? String ?? "",
                                       section: data["section"] as? String ?? "")
                 } ?? []

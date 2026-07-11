@@ -9,7 +9,7 @@ struct MembersView: View {
     @State private var filterSection = ""
 
     private func matches(_ member: CloudStore.MemberInfo) -> Bool {
-        if !filterCompany.isEmpty, member.company != filterCompany { return false }
+        if !filterCompany.isEmpty, !member.companies.contains(filterCompany) { return false }
         if !filterDepartment.isEmpty, member.department != filterDepartment { return false }
         if !filterSection.isEmpty, member.section != filterSection { return false }
         let q = searchText.trimmingCharacters(in: .whitespaces)
@@ -27,15 +27,15 @@ struct MembersView: View {
 
     /// 実在するメンバーの値だけを選択肢に出す(会社→部署→担当と上位の絞り込みを反映)
     private var companyOptions: [String] {
-        Array(Set(allExperts.map(\.company).filter { !$0.isEmpty })).sorted()
+        Array(Set(allExperts.flatMap(\.companies).filter { !$0.isEmpty })).sorted()
     }
     private var departmentOptions: [String] {
-        let pool = allExperts.filter { filterCompany.isEmpty || $0.company == filterCompany }
+        let pool = allExperts.filter { filterCompany.isEmpty || $0.companies.contains(filterCompany) }
         return Array(Set(pool.map(\.department).filter { !$0.isEmpty })).sorted()
     }
     private var sectionOptions: [String] {
         let pool = allExperts.filter {
-            (filterCompany.isEmpty || $0.company == filterCompany)
+            (filterCompany.isEmpty || $0.companies.contains(filterCompany))
                 && (filterDepartment.isEmpty || $0.department == filterDepartment)
         }
         return Array(Set(pool.map(\.section).filter { !$0.isEmpty })).sorted()
