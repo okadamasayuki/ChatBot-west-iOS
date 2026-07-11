@@ -383,6 +383,17 @@ struct BaTalkView: View {
         store.baTalks.first { $0.id == store.currentBaTalkId }
     }
 
+    /// 返答例(対応依頼のやりとりを想定。タップで入力欄に挿入)
+    static let quickReplies = [
+        "承知しました。対応します。",
+        "確認して折り返します。",
+        "すみません、いま対応が難しいです。",
+        "明日以降なら対応できます。",
+        "詳細を教えてもらえますか?",
+        "対応ありがとうございます!",
+        "よろしくお願いします。",
+    ]
+
     /// 入力中の「@…」部分(空白が入るまでをクエリとする)
     private var mentionQuery: String? {
         guard let atIdx = input.lastIndex(of: "@") else { return nil }
@@ -445,6 +456,35 @@ struct BaTalkView: View {
                 }
                 .onTapGesture { inputFocused = false }
             }
+
+            // 返答例(タップで入力欄に挿入するだけ。送信はしない)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(Self.quickReplies, id: \.self) { reply in
+                        Button {
+                            if input.isEmpty {
+                                input = reply
+                            } else {
+                                input += reply
+                            }
+                            inputFocused = true
+                        } label: {
+                            Text(reply)
+                                .font(.system(size: 12))
+                                .lineLimit(1)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(Color(.systemBackground))
+                                .foregroundColor(.primary)
+                                .cornerRadius(14)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 6)
+            }
+            .background(Color(.secondarySystemBackground))
 
             // @メンションの候補(入力中の「@…」に応じて表示。タップで挿入)
             if !mentionCandidates.isEmpty {
