@@ -394,10 +394,10 @@ struct ChatRoomView: View {
                     }
                 } label: {
                     Text(handler.isEmpty ? "担当" : "担当: \(handler)")
-                        .font(.system(size: 13))
+                        .font(.system(size: 13, weight: .bold))
                         .lineLimit(1)
                         .frame(maxWidth: 150)
-                        .foregroundColor(Color(.systemGray))
+                        .foregroundColor(Color(.darkGray))
                 }
                 // ラベルの文字数が変わってもMenuが幅を再計算せず一瞬崩れるため、担当名が変わったら作り直す
                 .id("handler-\(handler)")
@@ -413,27 +413,27 @@ struct ChatRoomView: View {
                     }
                 } label: {
                     Image(systemName: linkCopied ? "checkmark" : "link")
-                        .font(.system(size: 13))
-                        .foregroundColor(Color(.systemGray))
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundColor(Color(.darkGray))
                 }
             }
             if !store.roomMessages.isEmpty {
                 Button("要約") {
                     showSummary = true
                 }
-                .font(.system(size: 13))
-                .foregroundColor(Color(.systemGray))
+                .font(.system(size: 13, weight: .bold))
+                .foregroundColor(Color(.darkGray))
             }
             if canToggleDone {
                 Button {
                     if let id = store.currentRoomId { store.toggleRoomDone(id) }
                 } label: {
                     Text(room?.isDone == true ? "✓ 完了" : "完了")
-                        .font(.system(size: 13))
+                        .font(.system(size: 13, weight: .bold))
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
                         .background(room?.isDone == true ? Theme.accent : Color(.systemBackground))
-                        .foregroundColor(room?.isDone == true ? .white : Color(.systemGray))
+                        .foregroundColor(room?.isDone == true ? .white : Color(.darkGray))
                         .cornerRadius(8)
                 }
             }
