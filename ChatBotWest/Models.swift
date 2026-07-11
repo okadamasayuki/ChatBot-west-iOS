@@ -126,12 +126,15 @@ struct Message: Identifiable, Equatable {
     var deletedText: String?
     /// 送信者の表示名(ニックネーム)。空なら役割ラベルで代替表示
     var senderName: String
+    /// 財務(BA)のみに表示するメッセージ(対応依頼の記録など)
+    var expertOnly: Bool
 
     init(id: String = newUid(), role: MessageRole, text: String, ts: String = nowIso(),
-         clarifyOptions: [String] = [], senderName: String = "") {
+         clarifyOptions: [String] = [], senderName: String = "", expertOnly: Bool = false) {
         self.id = id; self.role = role; self.text = text; self.ts = ts; self.clarifyOptions = clarifyOptions
         self.deleted = false; self.deletedText = nil
         self.senderName = senderName
+        self.expertOnly = expertOnly
     }
 
     init?(dict: [String: Any]) {
@@ -145,12 +148,14 @@ struct Message: Identifiable, Equatable {
         deleted = dict["deleted"] as? Bool ?? false
         deletedText = dict["deletedText"] as? String
         senderName = dict["senderName"] as? String ?? ""
+        expertOnly = dict["expertOnly"] as? Bool ?? false
     }
 
     var dict: [String: Any] {
         var d: [String: Any] = ["id": id, "role": role.rawValue, "text": text, "ts": ts]
         if !clarifyOptions.isEmpty { d["clarifyOptions"] = clarifyOptions }
         if !senderName.isEmpty { d["senderName"] = senderName }
+        if expertOnly { d["expertOnly"] = true }
         return d
     }
 }

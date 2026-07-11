@@ -564,8 +564,10 @@ final class CloudStore: ObservableObject {
         // 担当が付いたら、待機案内を消してAI回答待ちだった質問への回答を開始する
         removeHandlerWaitNotices(roomId)
         if handler != myName() {
-            // 他のBAへの依頼はチャットに記録して相手にも分かるようにする
-            addMessage(Message(role: .system, text: "\(myName())さんが\(handler)さんに対応を依頼しました。"), roomId: roomId)
+            // 他のBAへの依頼はチャットに記録して相手にも分かるようにする(財務のみ表示)
+            addMessage(Message(role: .system,
+                               text: "\(myName())さんが\(handler)さんに対応を依頼しました。",
+                               expertOnly: true), roomId: roomId)
         }
         triggerPendingTriage(roomId)
     }

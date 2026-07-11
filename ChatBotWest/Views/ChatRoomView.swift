@@ -8,9 +8,18 @@ struct ChatRoomView: View {
     @State private var editingMessage: Message?
     @State private var showSummary = false
 
+    /// 表示するメッセージ(財務のみ表示のメッセージは質問者には見せない)
+    private var displayMessages: [Message] {
+        store.isExpert
+            ? store.roomMessages
+            : store.roomMessages.filter {
+                !$0.expertOnly && !($0.role == .system && $0.text.contains("対応を依頼しました"))
+            }
+    }
+
     private var lastMessageId: String? {
         if store.devTypingRoomId != nil, store.devTypingRoomId == store.currentRoomId { return "devTyping" }
-        return store.pendingTyping ? "typing" : store.roomMessages.last?.id
+        return store.pendingTyping ? "typing" : displayMessages.last?.id
     }
 
     private var room: Room? { store.currentRoom() }
@@ -108,11 +117,11 @@ struct ChatRoomView: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(spacing: 10) {
-                        if store.roomMessages.isEmpty && !store.pendingTyping {
+                        if displayMessages.isEmpty && !store.pendingTyping {
                             SystemBubble(text: "会計に関する質問を入力してください。AIが回答できない場合はBAにおつなぎします。")
                         }
-                        let lastIdx = store.roomMessages.count - 1
-                        ForEach(Array(store.roomMessages.enumerated()), id: \.element.id) { idx, msg in
+                        let lastIdx = displayMessages.count - 1
+                        ForEach(Array(displayMessages.enumerated()), id: \.element.id) { idx, msg in
                             let style = bubbleStyle(for: msg)
                             let bubble = MessageBubble(
                                 message: msg,
