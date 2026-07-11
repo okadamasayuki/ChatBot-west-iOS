@@ -12,13 +12,17 @@ struct BaChatView: View {
 
     var body: some View {
         NavigationStack(path: $store.baTalkPath) {
-            Group {
+            // LINEのタブ切替のように左右にスライドして入れ替わる
+            ZStack {
                 if mode == .talks {
                     BaTalkListView()
+                        .transition(.move(edge: .leading))
                 } else {
                     MembersListCore()
+                        .transition(.move(edge: .trailing))
                 }
             }
+            .clipped()
             // 切替は常に左上に固定(モードによって位置が動かないように)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
