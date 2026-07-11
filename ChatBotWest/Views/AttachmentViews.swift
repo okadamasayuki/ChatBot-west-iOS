@@ -173,12 +173,14 @@ struct ReactionChipsView: View {
                     Button {
                         onToggle(emoji)
                     } label: {
-                        // 背景なしの透明表示(絵文字と数だけ)。自分が付けたものは枠線で分かるようにする
+                        // 背景なしの透明表示(絵文字と数だけ)。自分が付けたものは枠線+うっすら白背景で分かるようにする
                         Text("\(emoji) \(uids.count)")
                             .font(.system(size: 12, weight: uids.contains(myUid) ? .semibold : .regular))
                             .padding(.horizontal, 6)
                             .padding(.vertical, 3)
                             .foregroundColor(Theme.header.opacity(uids.contains(myUid) ? 1.0 : 0.7))
+                            .background(Color.white.opacity(uids.contains(myUid) ? 0.25 : 0))
+                            .clipShape(Capsule())
                             .overlay(
                                 Capsule().stroke(Theme.header.opacity(uids.contains(myUid) ? 0.6 : 0), lineWidth: 1)
                             )
