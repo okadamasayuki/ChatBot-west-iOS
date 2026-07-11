@@ -774,7 +774,7 @@ struct AddBaMembersSheet: View {
 
             }
             }
-            .navigationTitle("メンバーを追加")
+            .navigationTitle("メンバー追加")
             .navigationBarTitleDisplayMode(.inline)
             .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always),
                         prompt: "ユーザー名で検索")
