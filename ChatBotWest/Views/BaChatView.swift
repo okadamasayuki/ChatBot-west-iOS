@@ -944,11 +944,8 @@ struct BaMessageBubble: View {
     }
 
     private var bubbleBody: some View {
-        HStack(alignment: .bottom, spacing: 6) {
+        HStack(alignment: .top, spacing: 8) {
             if isMine { Spacer(minLength: 60) }
-            if isMine, !message.deleted {
-                reactionQuickMenu
-            }
             if !isMine {
                 // 相手のアイコン(タップでプロフィール)
                 let m = store.member(message.senderUid)
@@ -956,7 +953,6 @@ struct BaMessageBubble: View {
                                  icon: m?.icon ?? "",
                                  size: 34)
                     .onTapGesture { if let m { onAvatarTap?(m) } }
-                    .frame(maxHeight: .infinity, alignment: .top)
             }
             VStack(alignment: isMine ? .trailing : .leading, spacing: 3) {
                 if !isMine {
@@ -1078,33 +1074,7 @@ struct BaMessageBubble: View {
                         .foregroundColor(Theme.header.opacity(0.6))
                 }
             }
-            if !isMine, !message.deleted {
-                reactionQuickMenu
-            }
             if !isMine { Spacer(minLength: 60) }
-        }
-    }
-
-    /// 長押ししなくてもリアクションできる、バブル横のスマイルボタン
-    private var reactionQuickMenu: some View {
-        Menu {
-            if #available(iOS 17.0, *) {
-                ControlGroup {
-                    ForEach(CloudStore.reactionEmojis, id: \.self) { emoji in
-                        Button(emoji) { store.toggleBaReaction(message, emoji: emoji) }
-                    }
-                }
-                .controlGroupStyle(.palette)
-            } else {
-                ForEach(CloudStore.reactionEmojis, id: \.self) { emoji in
-                    Button(emoji) { store.toggleBaReaction(message, emoji: emoji) }
-                }
-            }
-        } label: {
-            Image(systemName: "face.smiling")
-                .font(.system(size: 15))
-                .foregroundColor(Theme.header.opacity(0.45))
-                .padding(.bottom, 18) // 時刻表示ぶん浮かせてバブルの下端に合わせる
         }
     }
 
