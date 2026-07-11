@@ -727,7 +727,7 @@ struct AddBaMembersSheet: View {
                     .disabled(selected.isEmpty)
                 }
 
-                Section("追加するメンバーを選択") {
+                Section("メンバー選択") {
                     if candidates.isEmpty {
                         Text("追加できるメンバーがいません。")
                             .font(.footnote)
