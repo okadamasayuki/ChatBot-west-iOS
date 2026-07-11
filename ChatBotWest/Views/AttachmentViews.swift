@@ -177,8 +177,9 @@ struct ReactionChipsView: View {
                             .font(.system(size: 12))
                             .padding(.horizontal, 8)
                             .padding(.vertical, 3)
-                            .background(uids.contains(myUid) ? Theme.tagWaitingBg : Color(.systemBackground))
-                            .overlay(Capsule().stroke(uids.contains(myUid) ? Theme.tagWaitingFg : Color(.separator), lineWidth: 1))
+                            // チャット背景に馴染む半透明チップ(自分が付けたものは少し濃く)
+                            .background(Color.white.opacity(uids.contains(myUid) ? 0.85 : 0.35))
+                            .foregroundColor(Theme.header)
                             .clipShape(Capsule())
                     }
                     .buttonStyle(.plain)
