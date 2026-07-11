@@ -66,7 +66,7 @@ struct NotificationsView: View {
                         .foregroundColor(n.read ? Color(.secondaryLabel) : Theme.accentDark)
                         .lineLimit(2)
                 }
-                Text("\(fmtDate(n.ts)) \(fmtTime(n.ts))")
+                Text(fmtTime(n.ts)) // "M/d H:mm"
                     .font(.system(size: 10))
                     .foregroundColor(Color(.tertiaryLabel))
             }
