@@ -202,11 +202,10 @@ struct ChatRoomView: View {
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
                 if !store.roomMessages.isEmpty {
-                    Button {
+                    Button("要約") {
                         showSummary = true
-                    } label: {
-                        Image(systemName: "doc.text.magnifyingglass")
                     }
+                    .font(.system(size: 13))
                 }
                 if canToggleDone {
                     Button {
