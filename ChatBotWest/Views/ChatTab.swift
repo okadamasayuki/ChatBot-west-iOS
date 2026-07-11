@@ -150,8 +150,8 @@ struct RoomListView: View {
             } else {
                 ToolbarItem(placement: .topBarLeading) {
                     Picker("フィルタ", selection: $filter) {
-                        Text("自分の相談").tag(RoomFilter.mine)
-                        Text("全員の相談").tag(RoomFilter.all)
+                        Text("すべて").tag(RoomFilter.all)
+                        Text("自分").tag(RoomFilter.mine)
                     }
                     .pickerStyle(.segmented)
                     .controlSize(.small)
