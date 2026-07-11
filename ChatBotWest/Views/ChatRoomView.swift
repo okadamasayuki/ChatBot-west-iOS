@@ -146,6 +146,7 @@ struct ChatRoomView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            actionBar
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(spacing: 10) {
@@ -352,82 +353,91 @@ struct ChatRoomView: View {
                 MemberProfilePopup(member: m) { profileMember = nil }
             }
         }
-        .toolbar {
-            ToolbarItemGroup(placement: .topBarTrailing) {
-                if store.isExpert, let r = room, store.pendingRoom?.id != r.id {
-                    // 相談の担当BA(一覧と同じロジック: rooms.handler、未反映の間は案件から補完)。
-                    // メニューから自分が担当になる/他のBAに対応を依頼/担当を外す、ができる
-                    let handler = r.handler.isEmpty ? store.derivedHandler(roomId: r.id) : r.handler
-                    Menu {
-                        if handler != store.myName() {
-                            Button {
-                                store.assignRoomHandler(r.id, to: store.myName())
-                            } label: {
-                                Label("自分が担当する", systemImage: "person.fill.checkmark")
-                            }
+    }
+
+    /// タイトルを隠さないよう、担当・リンク・要約・完了はナビゲーションバーの一段下に置く
+    @ViewBuilder
+    private var actionBar: some View {
+        HStack(spacing: 14) {
+            if store.isExpert, let r = room, store.pendingRoom?.id != r.id {
+                // 相談の担当BA(一覧と同じロジック: rooms.handler、未反映の間は案件から補完)。
+                // メニューから自分が担当する/他のBAに対応を依頼/担当を外す、ができる
+                let handler = r.handler.isEmpty ? store.derivedHandler(roomId: r.id) : r.handler
+                Menu {
+                    if handler != store.myName() {
+                        Button {
+                            store.assignRoomHandler(r.id, to: store.myName())
+                        } label: {
+                            Label("自分が担当する", systemImage: "person.fill.checkmark")
                         }
-                        let others = store.expertNames.filter { $0 != store.myName() && $0 != handler }
-                        if !others.isEmpty {
-                            // 「対応を依頼する」→ 対応者を選択
-                            Menu {
-                                ForEach(others, id: \.self) { name in
-                                    Button(name) {
-                                        store.assignRoomHandler(r.id, to: name)
-                                    }
+                    }
+                    let others = store.expertNames.filter { $0 != store.myName() && $0 != handler }
+                    if !others.isEmpty {
+                        // 「対応を依頼する」→ 対応者を選択
+                        Menu {
+                            ForEach(others, id: \.self) { name in
+                                Button(name) {
+                                    store.assignRoomHandler(r.id, to: name)
                                 }
-                            } label: {
-                                Label("対応を依頼する", systemImage: "arrowshape.turn.up.right")
                             }
+                        } label: {
+                            Label("対応を依頼する", systemImage: "arrowshape.turn.up.right")
                         }
-                        if !handler.isEmpty {
-                            Button(role: .destructive) {
-                                store.assignRoomHandler(r.id, to: "")
-                            } label: {
-                                Label("担当を外す", systemImage: "person.fill.xmark")
-                            }
+                    }
+                    if !handler.isEmpty {
+                        Button(role: .destructive) {
+                            store.assignRoomHandler(r.id, to: "")
+                        } label: {
+                            Label("担当を外す", systemImage: "person.fill.xmark")
                         }
-                    } label: {
-                        Text(handler.isEmpty ? "担当する" : "担当: \(handler)")
-                            .font(.system(size: 13))
-                            .lineLimit(1)
-                            .foregroundColor(handler.isEmpty ? Theme.accentDark : Color(red: 0xc2 / 255.0, green: 0x6a / 255.0, blue: 0x00 / 255.0))
                     }
+                } label: {
+                    Text(handler.isEmpty ? "担当する" : "担当: \(handler)")
+                        .font(.system(size: 13))
+                        .lineLimit(1)
+                        .foregroundColor(handler.isEmpty ? Theme.accentDark : Color(red: 0xc2 / 255.0, green: 0x6a / 255.0, blue: 0x00 / 255.0))
                 }
-                if store.isExpert, let r = room {
-                    // この相談へのリンクをコピー(BAチャットに貼るとリンクカードになる)
-                    Button {
-                        UIPasteboard.general.string = "chatbotwest://room/\(r.id)"
-                        linkCopied = true
-                        Task {
-                            try? await Task.sleep(nanoseconds: 1_500_000_000)
-                            linkCopied = false
-                        }
-                    } label: {
-                        Image(systemName: linkCopied ? "checkmark" : "link")
-                            .font(.system(size: 13))
+            }
+            Spacer()
+            if store.isExpert, let r = room {
+                // この相談へのリンクをコピー(BAチャットに貼るとリンクカードになる)
+                Button {
+                    UIPasteboard.general.string = "chatbotwest://room/\(r.id)"
+                    linkCopied = true
+                    Task {
+                        try? await Task.sleep(nanoseconds: 1_500_000_000)
+                        linkCopied = false
                     }
+                } label: {
+                    Image(systemName: linkCopied ? "checkmark" : "link")
+                        .font(.system(size: 13))
+                        .foregroundColor(Theme.accentDark)
                 }
-                if !store.roomMessages.isEmpty {
-                    Button("要約") {
-                        showSummary = true
-                    }
-                    .font(.system(size: 13))
+            }
+            if !store.roomMessages.isEmpty {
+                Button("要約") {
+                    showSummary = true
                 }
-                if canToggleDone {
-                    Button {
-                        if let id = store.currentRoomId { store.toggleRoomDone(id) }
-                    } label: {
-                        Text(room?.isDone == true ? "✓ 完了" : "完了")
-                            .font(.system(size: 13))
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(room?.isDone == true ? Theme.accent : Color(.secondarySystemBackground))
-                            .foregroundColor(room?.isDone == true ? .white : .primary)
-                            .cornerRadius(8)
-                    }
+                .font(.system(size: 13))
+                .foregroundColor(Theme.accentDark)
+            }
+            if canToggleDone {
+                Button {
+                    if let id = store.currentRoomId { store.toggleRoomDone(id) }
+                } label: {
+                    Text(room?.isDone == true ? "✓ 完了" : "完了")
+                        .font(.system(size: 13))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(room?.isDone == true ? Theme.accent : Color(.systemBackground))
+                        .foregroundColor(room?.isDone == true ? .white : .primary)
+                        .cornerRadius(8)
                 }
             }
         }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(Theme.panelBg)
     }
 }
 
