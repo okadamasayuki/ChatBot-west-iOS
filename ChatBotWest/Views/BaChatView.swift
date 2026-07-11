@@ -486,6 +486,8 @@ struct BaTalkView: View {
         .navigationBarTitleDisplayMode(.inline)
         // 戻るボタンは出さない(BAチャットタブの再タップ・左端スワイプで戻る)
         .navigationBarBackButtonHidden(true)
+        // トーク中は下のタブバーも隠す
+        .toolbar(.hidden, for: .tabBar)
         .toolbar {
             // タイトル部分。どのトークもタップでルーム名を変更できる
             // (メンバー名の羅列が長いときは省略して右上のボタンに重ならないようにする)

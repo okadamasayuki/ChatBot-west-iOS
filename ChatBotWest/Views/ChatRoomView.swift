@@ -306,6 +306,8 @@ struct ChatRoomView: View {
         // 戻るは相談一覧タブの再タップ・左端スワイプ
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
+        // チャット中は下のタブバーも隠す
+        .toolbar(.hidden, for: .tabBar)
         .sheet(item: $editingMessage) { msg in
             EditMessageSheet(initialText: msg.text) { newText in
                 store.updateMessageText(msg, newText: newText)
