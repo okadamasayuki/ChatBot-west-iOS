@@ -1,27 +1,51 @@
 import SwiftUI
 
 /// Web版のLINE風配色
-/// 吹き出し(角丸+下角の小さなしっぽ)。isMine=true で右下、false で左下にしっぽ
+/// LINEの吹き出しと同じ形(強い丸み+上角の跳ねたしっぽ)を1つの連続パスで描く。
+/// isMine=true で右上、false で左上にしっぽ
 struct LineBubbleShape: Shape {
     var isMine: Bool
 
     func path(in rect: CGRect) -> Path {
-        let r: CGFloat = 14
-        var p = Path(roundedRect: rect, cornerRadius: r)
-        var tail = Path()
+        let r = min(16, rect.height / 2)          // 角の丸み(1行ならカプセルに近い)
+        let drop = min(16, rect.height * 0.55)    // しっぽが辺に合流する位置
+        var p = Path()
         if isMine {
-            // 右下の角から小さな三角が出る
-            tail.move(to: CGPoint(x: rect.maxX - r - 4, y: rect.maxY - 1))
-            tail.addLine(to: CGPoint(x: rect.maxX - 3, y: rect.maxY + 6))
-            tail.addLine(to: CGPoint(x: rect.maxX - 1, y: rect.maxY - r + 2))
+            p.move(to: CGPoint(x: rect.minX + r, y: rect.minY))
+            p.addLine(to: CGPoint(x: rect.maxX - 8, y: rect.minY))
+            // 右上のしっぽ: 外へ跳ねて右辺に合流
+            p.addQuadCurve(to: CGPoint(x: rect.maxX + 6, y: rect.minY + 2),
+                           control: CGPoint(x: rect.maxX + 2, y: rect.minY - 2))
+            p.addQuadCurve(to: CGPoint(x: rect.maxX, y: rect.minY + drop),
+                           control: CGPoint(x: rect.maxX - 1, y: rect.minY + drop / 2))
+            p.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY - r))
+            p.addQuadCurve(to: CGPoint(x: rect.maxX - r, y: rect.maxY),
+                           control: CGPoint(x: rect.maxX, y: rect.maxY))
+            p.addLine(to: CGPoint(x: rect.minX + r, y: rect.maxY))
+            p.addQuadCurve(to: CGPoint(x: rect.minX, y: rect.maxY - r),
+                           control: CGPoint(x: rect.minX, y: rect.maxY))
+            p.addLine(to: CGPoint(x: rect.minX, y: rect.minY + r))
+            p.addQuadCurve(to: CGPoint(x: rect.minX + r, y: rect.minY),
+                           control: CGPoint(x: rect.minX, y: rect.minY))
         } else {
-            // 左下の角から小さな三角が出る
-            tail.move(to: CGPoint(x: rect.minX + r + 4, y: rect.maxY - 1))
-            tail.addLine(to: CGPoint(x: rect.minX + 3, y: rect.maxY + 6))
-            tail.addLine(to: CGPoint(x: rect.minX + 1, y: rect.maxY - r + 2))
+            p.move(to: CGPoint(x: rect.maxX - r, y: rect.minY))
+            p.addLine(to: CGPoint(x: rect.minX + 8, y: rect.minY))
+            // 左上のしっぽ: 外へ跳ねて左辺に合流
+            p.addQuadCurve(to: CGPoint(x: rect.minX - 6, y: rect.minY + 2),
+                           control: CGPoint(x: rect.minX - 2, y: rect.minY - 2))
+            p.addQuadCurve(to: CGPoint(x: rect.minX, y: rect.minY + drop),
+                           control: CGPoint(x: rect.minX + 1, y: rect.minY + drop / 2))
+            p.addLine(to: CGPoint(x: rect.minX, y: rect.maxY - r))
+            p.addQuadCurve(to: CGPoint(x: rect.minX + r, y: rect.maxY),
+                           control: CGPoint(x: rect.minX, y: rect.maxY))
+            p.addLine(to: CGPoint(x: rect.maxX - r, y: rect.maxY))
+            p.addQuadCurve(to: CGPoint(x: rect.maxX, y: rect.maxY - r),
+                           control: CGPoint(x: rect.maxX, y: rect.maxY))
+            p.addLine(to: CGPoint(x: rect.maxX, y: rect.minY + r))
+            p.addQuadCurve(to: CGPoint(x: rect.maxX - r, y: rect.minY),
+                           control: CGPoint(x: rect.maxX, y: rect.minY))
         }
-        tail.closeSubpath()
-        p.addPath(tail)
+        p.closeSubpath()
         return p
     }
 }
