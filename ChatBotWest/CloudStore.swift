@@ -236,13 +236,64 @@ final class CloudStore: ObservableObject {
         }
     }
 
-    /// ニックネームを保存
+    /// ニックネームを保存(過去の担当記録・送信者名も新名に書き換える)
     func saveNickname(_ name: String) {
         let trimmed = name.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty, trimmed != nickname, let uid = user?.uid else { return }
+        let oldName = myName()
         nickname = trimmed
         wsRef().collection("members").document(uid)
             .setData(["nickname": trimmed], merge: true)
+        guard oldName != trimmed else { return }
+        Task { await renameInRecords(from: oldName, to: trimmed, uid: uid) }
+    }
+
+    /// 旧名で記録されている担当・送信者名を一括で新名に書き換える
+    private func renameInRecords(from oldName: String, to newName: String, uid: String) async {
+        let ws = wsRef()
+        // 相談の担当
+        if let snap = try? await ws.collection("rooms")
+            .whereField("handler", isEqualTo: oldName).getDocuments() {
+            for doc in snap.documents {
+                try? await doc.reference.setData(["handler": newName], merge: true)
+            }
+        }
+        // 案件の対応者
+        if let snap = try? await ws.collection("cases")
+            .whereField("handledBy", isEqualTo: oldName).getDocuments() {
+            for doc in snap.documents {
+                try? await doc.reference.setData(["handledBy": newName], merge: true)
+            }
+        }
+        // 相談チャットの自分のメッセージの送信者名
+        if let rooms = try? await ws.collection("rooms").getDocuments() {
+            for room in rooms.documents {
+                if let msgs = try? await room.reference.collection("messages")
+                    .whereField("senderName", isEqualTo: oldName).getDocuments() {
+                    for m in msgs.documents {
+                        try? await m.reference.setData(["senderName": newName], merge: true)
+                    }
+                }
+            }
+        }
+        // BAトークのメンバー名と自分のメッセージの送信者名
+        if let talks = try? await ws.collection("baTalks")
+            .whereField("memberUids", arrayContains: uid).getDocuments() {
+            for talk in talks.documents {
+                let uids = talk.data()["memberUids"] as? [String] ?? []
+                var names = talk.data()["memberNames"] as? [String] ?? []
+                if let i = uids.firstIndex(of: uid), i < names.count, names[i] == oldName {
+                    names[i] = newName
+                    try? await talk.reference.setData(["memberNames": names], merge: true)
+                }
+                if let msgs = try? await talk.reference.collection("messages")
+                    .whereField("senderUid", isEqualTo: uid).getDocuments() {
+                    for m in msgs.documents where (m.data()["senderName"] as? String) == oldName {
+                        try? await m.reference.setData(["senderName": newName], merge: true)
+                    }
+                }
+            }
+        }
     }
 
     /// アイコン(絵文字)を保存(画像アイコンは解除)
