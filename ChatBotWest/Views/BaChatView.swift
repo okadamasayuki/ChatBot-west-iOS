@@ -1063,16 +1063,21 @@ struct BaMessageBubble: View {
                         }
                     }
                 } preview: {
-                    // 長押しプレビューは本文だけ(リアクションバッジ等は含めない)
+                    // 長押しプレビューは元のバブルと同じ形・色で本文だけを表示
                     let previewText = message.text.isEmpty ? "(添付ファイル)" : message.text
                     Text(previewText)
                         .font(.system(size: 14))
                         .lineSpacing(4)
                         .fixedSize(horizontal: false, vertical: true)
-                        .padding(12)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 9)
                         // 長文は幅を固定して確実に折り返す(横に伸ばさない)
                         .frame(width: previewText.count > 15 ? 300 : nil, alignment: .leading)
-                        .background(Color(.systemBackground))
+                        .background(LineBubbleShape(isMine: isMine).fill(isMine ? Theme.myBubble : Color(.systemBackground)))
+                        .padding(.top, 8)      // しっぽが切れないよう余白
+                        .padding(.horizontal, 10)
+                        .padding(.bottom, 8)
+                        .background(Theme.chatBg)
                 }
                 .sheet(isPresented: $showEdit) {
                     EditMessageSheet(initialText: message.text) { newText in
