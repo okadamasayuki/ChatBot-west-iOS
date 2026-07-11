@@ -224,9 +224,11 @@ struct MembersListCore: View {
                             .tint(Theme.accent)
                             .disabled(selected.isEmpty)
 
-                            Button("キャンセル") {
+                            Button {
                                 selecting = false
                                 selected = []
+                            } label: {
+                                Image(systemName: "xmark")
                             }
                         } else {
                             Button("選択") { selecting = true }
