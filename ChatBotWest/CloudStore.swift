@@ -1184,7 +1184,7 @@ final class CloudStore: ObservableObject {
                 addNotification(kind: "room", targetId: r.id,
                                 title: "対応依頼: \(r.title.isEmpty ? "相談" : r.title)",
                                 body: "\(r.pendingHandlerBy)さんから対応を依頼されています。",
-                                action: "相談を開いて「承諾する/辞退」を選んでください")
+                                action: "相談を開いて「承諾/辞退」を選んでください")
             } else if notified.contains(r.id) {
                 notified.remove(r.id); changed = true // 依頼が片付いたら再依頼でまた通知できるようにする
             }
