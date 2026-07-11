@@ -173,18 +173,33 @@ struct NewBaTalkSheet: View {
     @State private var selected: Set<String> = [] // uid
     @State private var groupName = ""
     @State private var searchText = ""
+    @State private var filter = MemberFilter()
+
+    private var pool: [CloudStore.MemberInfo] {
+        store.members
+            .filter { $0.role == MemberRole.expert.rawValue && $0.id != store.myUid() && !$0.name.isEmpty }
+    }
 
     private var candidates: [CloudStore.MemberInfo] {
-        let all = store.members
-            .filter { $0.role == MemberRole.expert.rawValue && $0.id != store.myUid() && !$0.name.isEmpty }
-            .sorted { $0.name < $1.name }
         let q = searchText.trimmingCharacters(in: .whitespaces)
-        guard !q.isEmpty else { return all }
-        return all.filter { $0.name.localizedCaseInsensitiveContains(q) }
+        return pool
+            .filter {
+                filter.matches($0) && (q.isEmpty || $0.name.localizedCaseInsensitiveContains(q)
+                    || $0.affiliation.localizedCaseInsensitiveContains(q))
+            }
+            .sorted { $0.name < $1.name }
+    }
+
+    /// 表示中(絞り込み後)の全員が選択済みか
+    private var allShownSelected: Bool {
+        !candidates.isEmpty && Set(candidates.map(\.id)).isSubset(of: selected)
     }
 
     var body: some View {
         NavigationStack {
+            VStack(spacing: 0) {
+            // 会社・部署・担当・役職で絞り込み、まとめて選択できる
+            MemberFilterBar(filter: $filter, pool: pool)
             Form {
                 Section {
                     // 自分しかいないトーク(メモとして利用)
@@ -201,9 +216,25 @@ struct NewBaTalkSheet: View {
 
                 Section("財務アカウント一覧 — トークする相手を選択") {
                     if candidates.isEmpty {
-                        Text("他の財務アカウントがまだありません。")
+                        Text("該当する財務アカウントがありません。")
                             .font(.footnote)
                             .foregroundColor(.secondary)
+                    }
+                    if !candidates.isEmpty, filter.isActive || !searchText.isEmpty {
+                        // 担当・部署などで絞り込んで、その単位でまとめて追加できる
+                        Button {
+                            let ids = Set(candidates.map(\.id))
+                            if allShownSelected { selected.subtract(ids) }
+                            else { selected.formUnion(ids) }
+                        } label: {
+                            HStack {
+                                Image(systemName: allShownSelected ? "checkmark.square.fill" : "square")
+                                    .foregroundColor(allShownSelected ? Theme.accent : .secondary)
+                                Text("表示中の\(candidates.count)人をまとめて選択")
+                                    .foregroundColor(Theme.accentDark)
+                                Spacer()
+                            }
+                        }
                     }
                     ForEach(candidates) { member in
                         Button {
@@ -213,8 +244,15 @@ struct NewBaTalkSheet: View {
                             HStack {
                                 Image(systemName: selected.contains(member.id) ? "checkmark.circle.fill" : "circle")
                                     .foregroundColor(selected.contains(member.id) ? Theme.accent : .secondary)
-                                Text(member.name)
-                                    .foregroundColor(.primary)
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text(member.name)
+                                        .foregroundColor(.primary)
+                                    if !member.affiliation.isEmpty {
+                                        Text(member.affiliation)
+                                            .font(.system(size: 10))
+                                            .foregroundColor(.secondary)
+                                    }
+                                }
                                 Spacer()
                             }
                         }
@@ -229,19 +267,21 @@ struct NewBaTalkSheet: View {
 
                 Section {
                     Button {
-                        let picked = candidates.filter { selected.contains($0.id) }
+                        // 絞り込みを変えても選択は保持されるよう、全体から選ぶ
+                        let picked = pool.filter { selected.contains($0.id) }
                         let talkId = store.startBaTalk(with: picked, groupName: groupName)
                         dismiss()
                         store.openBaTalk(talkId)
                     } label: {
                         HStack {
                             Spacer()
-                            Text(selected.count > 1 ? "グループトークを開始" : "トークを開始").bold()
+                            Text(selected.count > 1 ? "グループトークを開始(\(selected.count)人)" : "トークを開始").bold()
                             Spacer()
                         }
                     }
                     .disabled(selected.isEmpty)
                 }
+            }
             }
             .navigationTitle("新規トーク")
             .navigationBarTitleDisplayMode(.inline)
