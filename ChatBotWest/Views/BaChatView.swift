@@ -1058,9 +1058,10 @@ struct BaMessageBubble: View {
                         store.updateBaMessageText(message, newText: newText)
                     }
                 }
-                // リアクションは既読・時刻と同じ行に表示する
+                // リアクションは既読・時刻と同じ行に表示する。
+                // 既読・時刻の位置が動かないよう、チップは時刻の外側(反対側)に置く
                 HStack(spacing: 4) {
-                    if !isMine, !message.reactions.isEmpty {
+                    if isMine, !message.reactions.isEmpty {
                         ReactionChipsView(reactions: message.reactions, myUid: store.myUid()) { emoji in
                             store.toggleBaReaction(message, emoji: emoji)
                         }
@@ -1073,7 +1074,7 @@ struct BaMessageBubble: View {
                     Text(fmtTime(message.ts))
                         .font(.system(size: 10))
                         .foregroundColor(Theme.header.opacity(0.6))
-                    if isMine, !message.reactions.isEmpty {
+                    if !isMine, !message.reactions.isEmpty {
                         ReactionChipsView(reactions: message.reactions, myUid: store.myUid()) { emoji in
                             store.toggleBaReaction(message, emoji: emoji)
                         }
