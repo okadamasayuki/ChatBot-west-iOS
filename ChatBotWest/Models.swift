@@ -320,6 +320,45 @@ struct Manual: Identifiable, Equatable {
     }
 }
 
+// MARK: - BAトーク(財務同士のトークルーム)
+
+struct BaTalk: Identifiable, Equatable {
+    var id: String
+    /// グループ名(1:1やBA全体では空)
+    var name: String
+    var memberUids: [String]   // 空 = 全員(BA全体)
+    var memberNames: [String]
+    var isGroup: Bool
+    var lastText: String
+    var lastTs: String
+    var createdAt: String
+
+    init(id: String, name: String = "", memberUids: [String] = [], memberNames: [String] = [],
+         isGroup: Bool = false, lastText: String = "", lastTs: String = nowIso(), createdAt: String = nowIso()) {
+        self.id = id; self.name = name
+        self.memberUids = memberUids; self.memberNames = memberNames
+        self.isGroup = isGroup
+        self.lastText = lastText; self.lastTs = lastTs; self.createdAt = createdAt
+    }
+
+    init?(dict: [String: Any]) {
+        guard let id = dict["id"] as? String else { return nil }
+        self.id = id
+        name = dict["name"] as? String ?? ""
+        memberUids = dict["memberUids"] as? [String] ?? []
+        memberNames = dict["memberNames"] as? [String] ?? []
+        isGroup = dict["isGroup"] as? Bool ?? false
+        lastText = dict["lastText"] as? String ?? ""
+        lastTs = dict["lastTs"] as? String ?? ""
+        createdAt = dict["createdAt"] as? String ?? ""
+    }
+
+    var dict: [String: Any] {
+        ["id": id, "name": name, "memberUids": memberUids, "memberNames": memberNames,
+         "isGroup": isGroup, "lastText": lastText, "lastTs": lastTs, "createdAt": createdAt]
+    }
+}
+
 // MARK: - BAチャット(財務同士のチャット)
 
 struct BaMessage: Identifiable, Equatable {

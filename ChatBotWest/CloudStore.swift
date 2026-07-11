@@ -35,7 +35,13 @@ final class CloudStore: ObservableObject {
         let role: String
     }
     @Published var members: [MemberInfo] = []
-    @Published var baMessages: [BaMessage] = [] // BAチャット(財務同士)
+
+    // BAトーク(財務同士のトークルーム)
+    @Published var baTalks: [BaTalk] = []
+    @Published var baTalkPath: [String] = []       // NavigationStack のパス
+    @Published var currentBaTalkId: String?
+    @Published var baTalkMessages: [BaMessage] = []
+    private var baTalkMsgListener: ListenerRegistration?
 
     /// BA(財務)メンバーの表示名一覧(対応依頼の宛先に使う)
     var expertNames: [String] {
@@ -266,10 +272,10 @@ final class CloudStore: ObservableObject {
             }
         })
 
-        // BAチャット(財務同士のチャット)
-        listeners.append(wsRef().collection("baChat").order(by: "ts").addSnapshotListener { [weak self] snap, _ in
+        // BAトーク一覧(財務同士のトークルーム)
+        listeners.append(wsRef().collection("baTalks").addSnapshotListener { [weak self] snap, _ in
             Task { @MainActor in
-                self?.baMessages = snap?.documents.compactMap { BaMessage(dict: $0.data()) } ?? []
+                self?.baTalks = snap?.documents.compactMap { BaTalk(dict: $0.data()) } ?? []
             }
         })
 
@@ -716,18 +722,91 @@ final class CloudStore: ObservableObject {
         return extracted.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    // MARK: - BAチャット
+    // MARK: - BAトーク(財務同士のトークルーム)
 
-    /// BAチャットにメッセージを送る(roomId を渡すと相談チャットへのリンク付き)
-    func sendBaMessage(_ text: String, roomId: String? = nil, roomTitle: String? = nil) {
-        let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard isExpert, !t.isEmpty || roomId != nil else { return }
-        let msg = BaMessage(text: t, senderUid: myUid(), senderName: myName(),
-                            roomId: roomId, roomTitle: roomTitle)
-        wsRef().collection("baChat").document(msg.id).setData(msg.dict)
+    /// 自分が参加しているトーク(BA全体は常に含む)
+    var myBaTalks: [BaTalk] {
+        baTalks
+            .filter { $0.id == "all" || $0.memberUids.contains(myUid()) }
+            .sorted { $0.lastTs > $1.lastTs }
     }
 
-    /// BAチャットの相談リンクから相談チャットを開く
+    /// トークの表示名(1:1は相手の名前、グループは名前かメンバー列挙)
+    func baTalkName(_ t: BaTalk) -> String {
+        if t.id == "all" { return "BA全体" }
+        if t.isGroup {
+            return t.name.isEmpty ? t.memberNames.joined(separator: "、") : t.name
+        }
+        return t.memberNames.first { $0 != myName() } ?? t.memberNames.joined(separator: "、")
+    }
+
+    func openBaTalk(_ id: String) {
+        currentBaTalkId = id
+        subscribeBaTalkMessages(id)
+        if baTalkPath != [id] { baTalkPath = [id] }
+    }
+
+    func handleBaTalkPathChange() {
+        if baTalkPath.isEmpty, currentBaTalkId != nil { closeBaTalk() }
+    }
+
+    private func closeBaTalk() {
+        currentBaTalkId = nil
+        baTalkMsgListener?.remove()
+        baTalkMsgListener = nil
+        baTalkMessages = []
+        if !baTalkPath.isEmpty { baTalkPath = [] }
+    }
+
+    private func subscribeBaTalkMessages(_ id: String) {
+        baTalkMsgListener?.remove()
+        baTalkMessages = []
+        baTalkMsgListener = wsRef().collection("baTalks").document(id).collection("messages")
+            .order(by: "ts").addSnapshotListener { [weak self] snap, _ in
+                Task { @MainActor in
+                    self?.baTalkMessages = snap?.documents.compactMap { BaMessage(dict: $0.data()) } ?? []
+                }
+            }
+    }
+
+    /// 1:1 / グループのトークを開始する(1:1は同じ相手との既存トークがあればそれを返す)
+    func startBaTalk(with selected: [MemberInfo], groupName: String = "") -> String {
+        let all = [MemberInfo(id: myUid(), name: myName(), role: MemberRole.expert.rawValue)] + selected
+        let uids = all.map { $0.id }.sorted()
+        let isGroup = selected.count > 1
+        let talkId = isGroup ? newUid() : "dm_" + uids.joined(separator: "_")
+        if !baTalks.contains(where: { $0.id == talkId }) {
+            let talk = BaTalk(id: talkId,
+                              name: isGroup ? groupName.trimmingCharacters(in: .whitespaces) : "",
+                              memberUids: uids,
+                              memberNames: all.map { $0.name },
+                              isGroup: isGroup)
+            wsRef().collection("baTalks").document(talkId).setData(talk.dict)
+        }
+        return talkId
+    }
+
+    /// 開いているトークにメッセージを送る(roomId を渡すと相談チャットへのリンク付き)
+    func sendBaTalkMessage(_ text: String, roomId: String? = nil, roomTitle: String? = nil) {
+        let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard isExpert, let talkId = currentBaTalkId, !t.isEmpty || roomId != nil else { return }
+        let msg = BaMessage(text: t, senderUid: myUid(), senderName: myName(),
+                            roomId: roomId, roomTitle: roomTitle)
+        let talkRef = wsRef().collection("baTalks").document(talkId)
+        talkRef.collection("messages").document(msg.id).setData(msg.dict)
+        let preview = t.isEmpty ? "🔗 \(roomTitle?.isEmpty == false ? roomTitle! : "相談")" : t
+        if talkId == "all", !baTalks.contains(where: { $0.id == "all" }) {
+            // BA全体トークは最初の送信時に作成
+            var talk = BaTalk(id: "all", name: "BA全体", isGroup: true)
+            talk.lastText = preview
+            talk.lastTs = msg.ts
+            talkRef.setData(talk.dict)
+        } else {
+            talkRef.setData(["lastText": preview, "lastTs": msg.ts], merge: true)
+        }
+    }
+
+    /// トークの相談リンクから相談チャットを開く
     func openRoomFromBaChat(_ roomId: String) {
         guard rooms.contains(where: { $0.id == roomId }) else { return }
         activeTab = .chat
