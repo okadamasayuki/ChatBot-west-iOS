@@ -383,11 +383,11 @@ struct BaTalkView: View {
         store.baTalks.first { $0.id == store.currentBaTalkId }
     }
 
-    /// 返答例(対応依頼のやりとりを想定。タップで入力欄に挿入)
-    static let quickReplies = [
-        "承知しました。対応します。",
-        "すみません、いま対応が難しいです。",
-        "確認して折り返します。",
+    /// 返答例(常にこの3つを表示。タップで全文を入力欄に挿入)
+    static let quickReplies: [(label: String, text: String)] = [
+        ("対応依頼", "お疲れ様です。\nこちらの対応をお願いしてもよろしいでしょうか。\nよろしくお願いいたします。"),
+        ("依頼承諾", "お疲れ様です。\n承知しました。対応いたします。\nよろしくお願いいたします。"),
+        ("お礼", "ありがとうございます。\nよろしくお願いします。"),
     ]
 
     /// 入力中の「@…」部分(空白が入るまでをクエリとする)
@@ -456,16 +456,16 @@ struct BaTalkView: View {
             // 返答例(タップで入力欄に挿入するだけ。送信はしない)。
             // スクロールせず、入り切らない分は折り返して全部見えるようにする
             FlowLayout(spacing: 6) {
-                ForEach(Self.quickReplies, id: \.self) { reply in
+                ForEach(Self.quickReplies, id: \.label) { reply in
                     Button {
                         if input.isEmpty {
-                            input = reply
+                            input = reply.text
                         } else {
-                            input += reply
+                            input += reply.text
                         }
                         inputFocused = true
                     } label: {
-                        Text(reply)
+                        Text(reply.label)
                             .font(.system(size: 12))
                             .lineLimit(1)
                             .padding(.horizontal, 10)
