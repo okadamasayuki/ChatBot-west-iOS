@@ -945,8 +945,21 @@ struct BaMessageBubble: View {
     }
 
     private var bubbleBody: some View {
-        HStack(alignment: .top, spacing: 8) {
+        HStack(alignment: .bottom, spacing: 6) {
             if isMine { Spacer(minLength: 60) }
+            if isMine {
+                // LINEと同じく、自分側はバブルの左横に既読・時刻(下揃え・2段)
+                VStack(alignment: .trailing, spacing: 1) {
+                    if let readStatus {
+                        Text(readStatus)
+                            .font(.system(size: 10))
+                            .foregroundColor(Theme.header.opacity(0.6))
+                    }
+                    Text(fmtTime(message.ts))
+                        .font(.system(size: 10))
+                        .foregroundColor(Theme.header.opacity(0.6))
+                }
+            }
             if !isMine {
                 // 相手のアイコン(タップでプロフィール)
                 let m = store.member(message.senderUid)
@@ -954,6 +967,7 @@ struct BaMessageBubble: View {
                                  icon: m?.icon ?? "",
                                  size: 34)
                     .onTapGesture { if let m { onAvatarTap?(m) } }
+                    .frame(maxHeight: .infinity, alignment: .top)
             }
             VStack(alignment: isMine ? .trailing : .leading, spacing: 3) {
                 if !isMine {
@@ -1070,17 +1084,12 @@ struct BaMessageBubble: View {
                         store.updateBaMessageText(message, newText: newText)
                     }
                 }
-                // 時刻・未読既読はメッセージの下に表示
-                HStack(spacing: 4) {
-                    if isMine, let readStatus {
-                        Text(readStatus)
-                            .font(.system(size: 10))
-                            .foregroundColor(Theme.header.opacity(0.6))
-                    }
-                    Text(fmtTime(message.ts))
-                        .font(.system(size: 10))
-                        .foregroundColor(Theme.header.opacity(0.6))
-                }
+            }
+            if !isMine {
+                // 相手側はバブルの右横に時刻(下揃え)
+                Text(fmtTime(message.ts))
+                    .font(.system(size: 10))
+                    .foregroundColor(Theme.header.opacity(0.6))
             }
             if !isMine { Spacer(minLength: 60) }
         }

@@ -634,13 +634,21 @@ struct MessageBubble: View {
         if message.role == .system {
             SystemBubble(text: message.text)
         } else {
-            HStack(alignment: .top, spacing: 8) {
+            HStack(alignment: .bottom, spacing: 6) {
                 if alignRight { Spacer(minLength: 60) }
+                if alignRight {
+                    // LINEと同じく、自分側はバブルの左横に既読・時刻(下揃え・2段)
+                    VStack(alignment: .trailing, spacing: 1) {
+                        readStatusText
+                        timeText
+                    }
+                }
                 if !alignRight {
                     // 相手側はアイコン付きで表示(タップでプロフィール)
                     AvatarCircleView(iconData: avatarIconData, icon: avatarIcon,
                                      fallbackSystemImage: avatarFallback, size: 34)
                         .onTapGesture { onAvatarTap?() }
+                        .frame(maxHeight: .infinity, alignment: .top)
                 }
                 VStack(alignment: alignRight ? .trailing : .leading, spacing: 3) {
                     if let senderLabel {
@@ -667,11 +675,12 @@ struct MessageBubble: View {
                         // 聞き返しの選択肢ボタン
                         FlowChoices(options: message.clarifyOptions, onChoice: onChoice)
                     }
-                    // 時刻・未読既読はメッセージの下に表示
-                    HStack(spacing: 4) {
-                        if alignRight { readStatusText }
+                }
+                if !alignRight {
+                    // 相手側はバブルの右横に時刻・未読(下揃え・2段)
+                    VStack(alignment: .leading, spacing: 1) {
+                        readStatusText
                         timeText
-                        if !alignRight { readStatusText }
                     }
                 }
                 if !alignRight { Spacer(minLength: 60) }
