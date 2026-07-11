@@ -59,13 +59,9 @@ struct NotificationsView: View {
                     .font(.system(size: 13, weight: n.read ? .regular : .semibold))
                     .foregroundColor(.primary)
                     .lineLimit(1)
-                Text(n.body)
-                    .font(.system(size: 12))
-                    .foregroundColor(.secondary)
-                    .lineLimit(2)
                 // どんな対応が必要か
                 if let action = n.action, !action.isEmpty {
-                    Text("▶ \(action)")
+                    Text(action)
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundColor(n.read ? Color(.secondaryLabel) : Theme.accentDark)
                         .lineLimit(2)

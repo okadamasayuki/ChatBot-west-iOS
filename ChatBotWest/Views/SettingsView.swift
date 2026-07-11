@@ -1,6 +1,7 @@
 import SwiftUI
 import UIKit
 import PhotosUI
+import Combine
 
 /// プロフィール設定: ニックネーム / アイコン(絵文字・写真・AI生成)
 struct IconSettingView: View {
@@ -333,57 +334,81 @@ struct SwipeDeleteRow<Content: View>: View {
     @State private var leadWidth: CGFloat = 0   // 左側アクションの見えている幅
     @State private var opened = false
     @State private var leadOpened = false
+    @State private var rowId = UUID()
+    @State private var postedOpenSignal = false
 
     private let full: CGFloat = 72
+    /// どこかの行に触れたら、他の行の開いているスライドを閉じるための合図
+    private static var closeAllNotification: Notification.Name { Notification.Name("SwipeDeleteRowCloseAll") }
 
     var body: some View {
-        HStack(spacing: 0) {
-            if let leadingIcon, let onLeading {
-                Button {
-                    closeAll()
-                    onLeading()
-                } label: {
-                    Rectangle()
-                        .fill(leadingColor)
-                        .frame(width: leadWidth)
-                        .frame(maxHeight: .infinity)
-                        .overlay(
-                            Image(systemName: leadingIcon)
-                                .font(.system(size: 13))
-                                .foregroundColor(.white)
-                                .opacity(leadWidth > 30 ? 1 : 0)
-                        )
-                        .clipped()
+        // 行本体は幅を変えずに横へスライドさせる(圧縮すると折り返しが増えて行が高くなるため)。
+        // ボタンは背面に固定幅で置き、本体がずれた分だけ見える
+        content()
+            .padding(contentInsets)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color(.systemBackground))
+            .overlay {
+                // 開いている間は行本体のタップを吸収して、閉じるだけにする(LINEと同じ)
+                if opened || leadOpened {
+                    Color.black.opacity(0.001)
+                        .onTapGesture { closeAll() }
                 }
-                .buttonStyle(.borderless)
             }
-            content()
-                .padding(contentInsets)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            Button {
-                closeAll()
-                onDelete()
-            } label: {
-                Rectangle()
-                    .fill(Color.red) // 四角形・赤。行の上下(区切り線)いっぱいに広がる
+            .offset(x: leadWidth - width)
+            .background {
+                HStack(spacing: 0) {
+                    if let leadingIcon, let onLeading {
+                        Button {
+                            closeAll()
+                            onLeading()
+                        } label: {
+                            Rectangle()
+                                .fill(leadingColor)
+                                .overlay(
+                                    Image(systemName: leadingIcon)
+                                        .font(.system(size: 13))
+                                        .foregroundColor(.white)
+                                        .opacity(leadWidth > 30 ? 1 : 0)
+                                )
+                        }
+                        .buttonStyle(.borderless)
+                        .frame(width: leadWidth)
+                        .clipped()
+                    }
+                    Spacer(minLength: 0)
+                    Button {
+                        closeAll()
+                        onDelete()
+                    } label: {
+                        Rectangle()
+                            .fill(Color.red) // 四角形・赤。行の上下(区切り線)いっぱいに広がる
+                            .overlay(
+                                Image(systemName: deleteIcon)
+                                    .font(.system(size: 13))
+                                    .foregroundColor(.white)
+                                    .opacity(width > 30 ? 1 : 0)
+                            )
+                    }
+                    .buttonStyle(.borderless)
                     .frame(width: width)
-                    .frame(maxHeight: .infinity)
-                    .overlay(
-                        Image(systemName: deleteIcon)
-                            .font(.system(size: 13))
-                            .foregroundColor(.white)
-                            .opacity(width > 30 ? 1 : 0)
-                    )
                     .clipped()
+                }
             }
-            .buttonStyle(.borderless)
-        }
         .listRowInsets(EdgeInsets())
         .contentShape(Rectangle())
+        .simultaneousGesture(TapGesture().onEnded {
+            // 行のどこかに触れたら、他の行の開いているスライドを閉じる
+            NotificationCenter.default.post(name: Self.closeAllNotification, object: rowId)
+        })
         .simultaneousGesture(
             DragGesture(minimumDistance: 10)
                 .onChanged { v in
                     guard abs(v.translation.width) > abs(v.translation.height) else { return }
+                    if !postedOpenSignal {
+                        postedOpenSignal = true
+                        NotificationCenter.default.post(name: Self.closeAllNotification, object: rowId)
+                    }
                     if leadOpened || (v.translation.width > 0 && !opened) {
                         guard leadingIcon != nil, onLeading != nil else { return }
                         let base: CGFloat = leadOpened ? full : 0
@@ -394,6 +419,7 @@ struct SwipeDeleteRow<Content: View>: View {
                     }
                 }
                 .onEnded { _ in
+                    postedOpenSignal = false
                     withAnimation(.spring(response: 0.25, dampingFraction: 0.9)) {
                         opened = width > full * 0.5
                         width = opened ? full : 0
@@ -402,6 +428,11 @@ struct SwipeDeleteRow<Content: View>: View {
                     }
                 }
         )
+        .onReceive(NotificationCenter.default.publisher(for: Self.closeAllNotification)) { note in
+            // 他の行がスライド・タップされたら自分は閉じる
+            guard note.object as? UUID != rowId, opened || leadOpened || width > 0 || leadWidth > 0 else { return }
+            closeAll()
+        }
     }
 
     private func closeAll() {

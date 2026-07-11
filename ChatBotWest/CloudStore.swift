@@ -436,7 +436,7 @@ final class CloudStore: ObservableObject {
             addNotification(kind: "baTalk", targetId: t.id,
                             title: "BAチャット: \(baTalkName(t))",
                             body: snippet(t.lastText, 60),
-                            action: "新着メッセージがあります。トークを開いて確認してください")
+                            action: "新着メッセージがあります。")
         }
         UserDefaults.standard.set(talkNotifyTs, forKey: notifyTsKey("baTalk"))
     }
@@ -1212,11 +1212,11 @@ final class CloudStore: ObservableObject {
             addNotification(kind: "room", targetId: r.id,
                             title: "対応依頼: \(r.title.isEmpty ? "相談" : r.title)",
                             body: accepted
-                                ? "\(r.handlerRequestResultBy)さんが対応承諾しました。"
-                                : "\(r.handlerRequestResultBy)さんが対応を辞退されました。",
+                                ? "\(r.handlerRequestResultBy)さんが対応を承諾しました。"
+                                : "\(r.handlerRequestResultBy)さんが対応を辞退しました。",
                             action: accepted
-                                ? "\(r.handlerRequestResultBy)さんが担当します。あなたの対応は不要です"
-                                : "別のBAに依頼し直すか、担当を決めてください")
+                                ? "\(r.handlerRequestResultBy)さんが対応を承諾しました。"
+                                : "\(r.handlerRequestResultBy)さんが対応を辞退しました。")
         }
         if changed { UserDefaults.standard.set(seen, forKey: key) }
     }
