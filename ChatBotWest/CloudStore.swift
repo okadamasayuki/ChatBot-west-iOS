@@ -873,13 +873,15 @@ final class CloudStore: ObservableObject {
         if currentBaTalkId == id { closeBaTalk() }
     }
 
-    /// トークの表示名(メモ=名前か「メモ」、1:1は相手の名前、グループは名前かメンバー列挙)
+    /// トークの表示名。グループ・メモは「名前 (参加人数)」で表示。1:1は相手の名前
     func baTalkName(_ t: BaTalk) -> String {
         if t.memberUids.count <= 1 {
-            return t.name.isEmpty ? "📝 メモ" : t.name
+            let base = t.name.isEmpty ? "📝 メモ" : t.name
+            return "\(base) (\(max(t.memberUids.count, 1)))"
         }
         if t.isGroup {
-            return t.name.isEmpty ? t.memberNames.joined(separator: "、") : t.name
+            let base = t.name.isEmpty ? t.memberNames.joined(separator: "、") : t.name
+            return "\(base) (\(t.memberUids.count))"
         }
         return t.memberNames.first { $0 != myName() } ?? t.memberNames.joined(separator: "、")
     }
