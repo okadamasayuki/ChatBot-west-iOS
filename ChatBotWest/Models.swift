@@ -75,6 +75,8 @@ struct Room: Identifiable, Equatable {
     var handlerRequestResultBy: String  // 承諾/辞退したBA
     var handlerRequestResultTo: String  // 依頼していたBA(通知の宛先)
     var handlerRequestResultTs: String
+    /// 安全モード: BAの確認待ちになっているAI回答の ts(空=確認待ちなし)
+    var pendingReviewTs: String
 
     init(id: String = newUid(), title: String = "新しい相談", createdAt: String = nowIso(),
          lastText: String = "", lastTs: String = nowIso(),
@@ -93,6 +95,7 @@ struct Room: Identifiable, Equatable {
         self.handlerRequestResultBy = ""
         self.handlerRequestResultTo = ""
         self.handlerRequestResultTs = ""
+        self.pendingReviewTs = ""
     }
 
     init?(dict: [String: Any]) {
@@ -114,6 +117,7 @@ struct Room: Identifiable, Equatable {
         handlerRequestResultBy = dict["handlerRequestResultBy"] as? String ?? ""
         handlerRequestResultTo = dict["handlerRequestResultTo"] as? String ?? ""
         handlerRequestResultTs = dict["handlerRequestResultTs"] as? String ?? ""
+        pendingReviewTs = dict["pendingReviewTs"] as? String ?? ""
     }
 
     var isDone: Bool { status == "done" }
@@ -129,6 +133,7 @@ struct Room: Identifiable, Equatable {
         if !handler.isEmpty { d["handler"] = handler }
         if !pendingHandler.isEmpty { d["pendingHandler"] = pendingHandler }
         if !pendingHandlerBy.isEmpty { d["pendingHandlerBy"] = pendingHandlerBy }
+        if !pendingReviewTs.isEmpty { d["pendingReviewTs"] = pendingReviewTs }
         return d
     }
 }
@@ -152,6 +157,8 @@ struct Message: Identifiable, Equatable {
     var senderName: String
     /// 財務(BA)のみに表示するメッセージ(対応依頼の記録など)
     var expertOnly: Bool
+    /// 安全モード: BAが確認して送信するまで質問者に表示しないAI回答
+    var pendingReview: Bool
     /// 添付("image" | "file")。データはbase64で埋め込む(600KBまで)
     var attachmentType: String?
     var attachmentName: String?
@@ -161,11 +168,13 @@ struct Message: Identifiable, Equatable {
 
     init(id: String = newUid(), role: MessageRole, text: String, ts: String = nowIso(),
          clarifyOptions: [String] = [], senderName: String = "", expertOnly: Bool = false,
+         pendingReview: Bool = false,
          attachmentType: String? = nil, attachmentName: String? = nil, attachmentData: String? = nil) {
         self.id = id; self.role = role; self.text = text; self.ts = ts; self.clarifyOptions = clarifyOptions
         self.deleted = false; self.deletedText = nil
         self.senderName = senderName
         self.expertOnly = expertOnly
+        self.pendingReview = pendingReview
         self.attachmentType = attachmentType
         self.attachmentName = attachmentName
         self.attachmentData = attachmentData
@@ -184,6 +193,7 @@ struct Message: Identifiable, Equatable {
         deletedText = dict["deletedText"] as? String
         senderName = dict["senderName"] as? String ?? ""
         expertOnly = dict["expertOnly"] as? Bool ?? false
+        pendingReview = dict["pendingReview"] as? Bool ?? false
         attachmentType = dict["attachmentType"] as? String
         attachmentName = dict["attachmentName"] as? String
         attachmentData = dict["attachmentData"] as? String
@@ -195,6 +205,7 @@ struct Message: Identifiable, Equatable {
         if !clarifyOptions.isEmpty { d["clarifyOptions"] = clarifyOptions }
         if !senderName.isEmpty { d["senderName"] = senderName }
         if expertOnly { d["expertOnly"] = true }
+        if pendingReview { d["pendingReview"] = true }
         if let attachmentType { d["attachmentType"] = attachmentType }
         if let attachmentName { d["attachmentName"] = attachmentName }
         if let attachmentData { d["attachmentData"] = attachmentData }

@@ -168,6 +168,10 @@ final class CloudStore: ObservableObject {
     @Published var sending = false
     var pendingRoom: Room? // 未送信の新規相談(最初のメッセージ送信まで保存しない)
 
+    /// 安全モード: AIが自動で回答せず、BAが内容を確認して送信するまで質問者に表示しない
+    /// (ワークスペース全体の設定。Firestore の workspaces/{wid}.safeMode と同期)
+    @Published var safeMode = false
+
     /// 開発モード: APIが担当者役(会計の素人)になり、聞き返しへの返答や回答への更問を自動で行う
     @Published var devMode: Bool = UserDefaults.standard.bool(forKey: "devMode") {
         didSet {
@@ -279,6 +283,7 @@ final class CloudStore: ObservableObject {
             detectTalkNotifications()
             detectHandlerRequestNotifications()
             detectHandlerResultNotifications()
+            detectPendingReviewNotifications()
             refreshTalkUnreadCounts()
             refreshRoomUnreadCounts()
             // メンバー情報(役割・ニックネーム・回答の癖)を常時同期する。
@@ -477,6 +482,8 @@ final class CloudStore: ObservableObject {
                         let role = d.data()["role"] as? String ?? ""
                         if d.data()["deleted"] as? Bool ?? false { return false }
                         if role == "system" { return false }
+                        // 安全モードの確認待ちAI回答はまだ送信されていないので数えない
+                        if d.data()["pendingReview"] as? Bool ?? false { return false }
                         if expert {
                             // 財務: 自分(BA)の回答以外を数える
                             let sender = d.data()["senderName"] as? String ?? ""
@@ -697,10 +704,11 @@ final class CloudStore: ObservableObject {
     private func subscribeAll() {
         unsubscribeAll()
 
-        // 社内ルール(ワークスペース直下の naiki フィールド)
+        // 社内ルール・安全モード(ワークスペース直下のフィールド)
         listeners.append(wsRef().addSnapshotListener { [weak self] snap, _ in
             guard let self else { return }
             Task { @MainActor in
+                self.safeMode = snap?.data()?["safeMode"] as? Bool ?? false
                 if let naiki = snap?.data()?["naiki"] as? String {
                     self.naiki = naiki
                 } else if snap != nil {
@@ -757,6 +765,7 @@ final class CloudStore: ObservableObject {
                 self?.detectRoomNotifications()
                 self?.detectHandlerRequestNotifications()
                 self?.detectHandlerResultNotifications()
+                self?.detectPendingReviewNotifications()
                 self?.refreshRoomUnreadCounts()
                 self?.backfillRoomHandlers()
             }
@@ -904,6 +913,13 @@ final class CloudStore: ObservableObject {
             return
         }
 
+        // 安全モードの確認待ちAI回答も質問者には見せない(BAが送信するまでプレビューを変えない)
+        if msg.pendingReview {
+            roomRef.collection("messages").document(msg.id).setData(msg.dict)
+            roomRef.updateData(["pendingReviewTs": msg.ts])
+            return
+        }
+
         if var room = pendingRoom, room.id == roomId {
             pendingRoom = nil
             room.lastText = lastText
@@ -929,7 +945,7 @@ final class CloudStore: ObservableObject {
         guard !text.isEmpty, text != msg.text else { return }
         let roomRef = wsRef().collection("rooms").document(roomId)
         roomRef.collection("messages").document(msg.id).updateData(["text": text])
-        if roomMessages.last?.id == msg.id {
+        if roomMessages.last?.id == msg.id, !msg.pendingReview {
             let lastText = msg.role == .expert ? "【BA】" + text : text
             roomRef.updateData(["lastText": lastText])
         }
@@ -944,7 +960,10 @@ final class CloudStore: ObservableObject {
             "deleted": true,
             "deletedText": msg.text,
         ])
-        if roomMessages.last?.id == msg.id {
+        if msg.pendingReview {
+            // 確認待ちのAI回答を破棄した → 確認待ちの印を更新(質問者のプレビューは変えない)
+            syncPendingReviewTs(roomId, excluding: msg.id)
+        } else if roomMessages.last?.id == msg.id {
             roomRef.updateData(["lastText": "削除されました"])
         }
     }
@@ -958,7 +977,10 @@ final class CloudStore: ObservableObject {
             "deleted": FieldValue.delete(),
             "deletedText": FieldValue.delete(),
         ])
-        if roomMessages.last?.id == msg.id {
+        if msg.pendingReview {
+            // 破棄した確認待ちのAI回答を元に戻した → 確認待ちの印も戻す
+            roomRef.updateData(["pendingReviewTs": msg.ts])
+        } else if roomMessages.last?.id == msg.id {
             let lastText = msg.role == .expert ? "【BA】" + original : original
             roomRef.updateData(["lastText": lastText])
         }
@@ -1242,7 +1264,7 @@ final class CloudStore: ObservableObject {
         Task { [weak self] in
             guard let self, !self.sending else { return }
             self.sending = true
-            self.pendingTyping = true
+            self.pendingTyping = !self.safeMode
             defer {
                 self.pendingTyping = false
                 self.sending = false
@@ -1736,7 +1758,8 @@ final class CloudStore: ObservableObject {
               simulated || canSendInCurrentRoom else { return }
 
         sending = true
-        pendingTyping = true
+        // 安全モードではAIの回答はBAの確認後に届くので「入力中…」は出さない
+        pendingTyping = !safeMode
         let roomId = currentRoomId!
         // 送信者名: 通常は自分、開発モードの担当者役は相談の本人の名前
         let senderName = simulated
@@ -1767,7 +1790,7 @@ final class CloudStore: ObservableObject {
         do {
             // このルーム内の直近の会話履歴をコンテキストとして渡す
             var history = roomMessages
-                .filter { $0.role == .user || $0.role == .ai || $0.role == .expert }
+                .filter { ($0.role == .user || $0.role == .ai || $0.role == .expert) && !$0.pendingReview }
                 .suffix(20)
                 .map { ClaudeService.ChatMessage(role: $0.role == .user ? "user" : "assistant", content: $0.text) }
             if history.last?.role != "user" {
@@ -1782,13 +1805,19 @@ final class CloudStore: ObservableObject {
             let result = try JSONDecoder().decode(TriageResult.self, from: Data(raw.utf8))
 
             if result.decision == "answer", !result.answer.isEmpty {
-                addMessage(Message(role: .ai, text: result.answer), roomId: roomId)
-                addQa(QaEntry(question: text, answeredBy: "AI", answer: result.answer,
-                              askedAt: nowIso(), answeredAt: nowIso()))
+                if safeMode {
+                    // 安全モード: BAが確認して送信するまで質問者に表示しない(Q&Aログも送信時に記録)
+                    addMessage(Message(role: .ai, text: result.answer, pendingReview: true), roomId: roomId)
+                } else {
+                    addMessage(Message(role: .ai, text: result.answer), roomId: roomId)
+                    addQa(QaEntry(question: text, answeredBy: "AI", answer: result.answer,
+                                  askedAt: nowIso(), answeredAt: nowIso()))
+                }
             } else if result.decision == "clarify", !result.clarify_question.isEmpty {
                 // 情報不足 → 短い質問+選択肢ボタンで聞き返す
                 addMessage(Message(role: .ai, text: result.clarify_question,
-                                   clarifyOptions: result.clarify_options), roomId: roomId)
+                                   clarifyOptions: result.clarify_options,
+                                   pendingReview: safeMode), roomId: roomId)
             } else {
                 // エスカレーション
                 // この相談で最初に対応した人(いなければ相談の担当BA)をデフォルトの対応者として引き継ぐ
@@ -1810,6 +1839,69 @@ final class CloudStore: ObservableObject {
         } catch {
             addMessage(Message(role: .system, text: "⚠ " + error.localizedDescription), roomId: roomId)
         }
+    }
+
+    // MARK: - 安全モード(AI回答をBAが確認してから送信)
+
+    /// 安全モードの切り替え(ワークスペース全体に反映)
+    func setSafeMode(_ on: Bool) {
+        guard isExpert else { return }
+        safeMode = on
+        wsRef().setData(["safeMode": on], merge: true)
+    }
+
+    /// 確認待ちのAI回答を(必要なら文言を修正して)質問者に送信する
+    func approvePendingMessage(_ msg: Message, finalText: String? = nil) {
+        guard isExpert, let roomId = currentRoomId, msg.pendingReview, !msg.deleted else { return }
+        let text = (finalText ?? msg.text).trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return }
+        let ts = nowIso() // 送信した時刻を新着として扱う(質問者の未読・通知の基準になる)
+        let roomRef = wsRef().collection("rooms").document(roomId)
+        roomRef.collection("messages").document(msg.id).updateData([
+            "text": text, "ts": ts,
+            "pendingReview": FieldValue.delete(),
+        ])
+        roomRef.updateData(["lastText": text, "lastTs": ts])
+        syncPendingReviewTs(roomId, excluding: msg.id)
+        // 聞き返しではなく回答の場合はQ&Aログに記録する
+        if msg.clarifyOptions.isEmpty {
+            let question = roomMessages.last(where: { $0.role == .user && $0.ts < msg.ts })
+            addQa(QaEntry(question: question?.text ?? "", answeredBy: "AI", answer: text,
+                          askedAt: question?.ts ?? msg.ts, answeredAt: ts))
+        }
+    }
+
+    /// 相談の「確認待ちあり」の印(pendingReviewTs)を、残っている確認待ちメッセージに合わせ直す
+    private func syncPendingReviewTs(_ roomId: String, excluding msgId: String) {
+        let remaining = roomMessages
+            .filter { $0.pendingReview && !$0.deleted && $0.id != msgId }
+            .map { $0.ts }.max()
+        wsRef().collection("rooms").document(roomId)
+            .updateData(["pendingReviewTs": remaining ?? ""])
+    }
+
+    /// 担当中の相談にAI回答の確認待ちができたら通知に積む。
+    /// 通知済みのtsを端末に記録して、スナップショットのたびに重複しないようにする
+    private func detectPendingReviewNotifications() {
+        guard isExpert else { return }
+        let me = myName()
+        guard !me.isEmpty else { return }
+        let key = "reviewNotified-\(myUid())"
+        var seen = UserDefaults.standard.dictionary(forKey: key) as? [String: String] ?? [:]
+        var changed = false
+        for r in rooms {
+            guard r.handler == me, !r.pendingReviewTs.isEmpty,
+                  seen[r.id] != r.pendingReviewTs else { continue }
+            seen[r.id] = r.pendingReviewTs; changed = true
+            // 古い確認待ち(3日以上前)は再インストール直後などのノイズなので通知しない
+            if let d = parseIso(r.pendingReviewTs), d < Date(timeIntervalSinceNow: -3 * 86400) { continue }
+            guard currentRoomId != r.id else { continue } // 開いている相談は通知不要
+            addNotification(kind: "room", targetId: r.id,
+                            title: "相談: \(r.title.isEmpty ? "相談" : r.title)",
+                            body: "AIが回答文を作成しました。(安全モード)",
+                            action: "AIの回答を確認して送信してください")
+        }
+        if changed { UserDefaults.standard.set(seen, forKey: key) }
     }
 
     // MARK: - BA(専門家)アクション
@@ -1879,7 +1971,7 @@ final class CloudStore: ObservableObject {
     /// 開いている相談のこれまでのやり取りを要約する
     func summarizeCurrentRoom() async throws -> String {
         let transcript = roomMessages
-            .filter { $0.role != .system && !$0.deleted }
+            .filter { $0.role != .system && !$0.deleted && !$0.pendingReview }
             .map { m -> String in
                 switch m.role {
                 case .user: return "質問者: \(m.text)"
@@ -1905,8 +1997,8 @@ final class CloudStore: ObservableObject {
     /// メッセージ・案件の更新のたびに呼ばれるため、既存の「担当者回答待ち」の相談を開いたときも動く。
     private func devMaybeReply() {
         guard devMode, let roomId = currentRoomId else { return }
-        // 削除済み・システムメッセージは無視して、最後の実質的なメッセージを見る
-        guard let last = roomMessages.last(where: { !$0.deleted && $0.role != .system }) else { return }
+        // 削除済み・システム・確認待ち(質問者には見えない)メッセージは無視して、最後の実質的なメッセージを見る
+        guard let last = roomMessages.last(where: { !$0.deleted && $0.role != .system && !$0.pendingReview }) else { return }
         guard last.role == .ai || last.role == .expert else { return }
         guard !devRepliedMsgIds.contains(last.id), !isDoneRoom(roomId) else { return }
         // 未回答の案件がある(=BA回答待ち)ときはBAの回答を待つ
@@ -1942,7 +2034,7 @@ final class CloudStore: ObservableObject {
             // 会話履歴を台本テキストとして1つのメッセージにまとめて渡す
             // (roleを反転して渡すと構造が不正になり、モデルがアーティファクトを出すため)
             let transcript = self.roomMessages
-                .filter { $0.role != .system && !$0.deleted }
+                .filter { $0.role != .system && !$0.deleted && !$0.pendingReview }
                 .suffix(20)
                 .map { m -> String in
                     switch m.role {

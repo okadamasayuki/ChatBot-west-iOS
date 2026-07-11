@@ -8,6 +8,7 @@ struct ChatRoomView: View {
     @State private var input = ""
     @FocusState private var inputFocused: Bool
     @State private var editingMessage: Message?
+    @State private var reviewingMessage: Message? // 安全モード: 修正して送信するAI回答
     @State private var showSummary = false
     @State private var showPhotoPicker = false
     @State private var showFileImporter = false
@@ -19,12 +20,13 @@ struct ChatRoomView: View {
     /// 開いた直後の最下部スクロールが済んだか(以降の新着はアニメーション付きでスクロール)
     @State private var didInitialScroll = false
 
-    /// 表示するメッセージ(財務のみ表示のメッセージは質問者には見せない)
+    /// 表示するメッセージ(財務のみ表示・安全モードの確認待ちは質問者には見せない)
     private var displayMessages: [Message] {
         store.isExpert
             ? store.roomMessages
             : store.roomMessages.filter {
-                !$0.expertOnly && !($0.role == .system && $0.text.contains("対応を依頼しました"))
+                !$0.expertOnly && !$0.pendingReview
+                    && !($0.role == .system && $0.text.contains("対応を依頼しました"))
             }
     }
 
@@ -75,7 +77,9 @@ struct ChatRoomView: View {
             case .user:
                 return ("\(questionerName)", false, Color(.systemBackground), nil)
             case .ai:
-                return ("AIアシスタント", true, Color(.systemBackground), nil)
+                // 安全モードの確認待ちはオレンジの枠で区別する
+                return ("AIアシスタント", true, Color(.systemBackground),
+                        msg.pendingReview ? Self.reviewOrange : nil)
             default:
                 return ("\(baName)", true, Theme.myBubble, nil)
             }
@@ -99,6 +103,7 @@ struct ChatRoomView: View {
     /// 担当者(質問者): 自分の質問に「AI/BAが読んだ・返信したか」を表示
     private func readStatus(for msg: Message) -> String? {
         guard let r = room else { return nil }
+        if msg.pendingReview { return nil } // 確認待ちは未送信なので既読/未読を出さない
         if store.isExpert {
             guard msg.role == .ai || msg.role == .expert else { return nil }
             let humanRead = r.ownerUid.isEmpty || r.ownerUid == store.myUid()
@@ -236,6 +241,10 @@ struct ChatRoomView: View {
                                 }
                             )
                             .id(msg.id)
+                            // 安全モード: 確認待ちのAI回答には送信/修正ボタンを付ける(財務のみ)
+                            if store.isExpert, msg.pendingReview, !msg.deleted {
+                                pendingReviewBar(msg)
+                            }
                         }
                         if store.pendingTyping {
                             // 財務視点ではAIは自分側(右)に表示
@@ -341,6 +350,12 @@ struct ChatRoomView: View {
                 store.updateMessageText(msg, newText: newText)
             }
         }
+        .sheet(item: $reviewingMessage) { msg in
+            // 安全モード: 文言を修正してから質問者に送信する
+            EditMessageSheet(initialText: msg.text, title: "回答を修正して送信", saveLabel: "送信") { newText in
+                store.approvePendingMessage(msg, finalText: newText)
+            }
+        }
         .photosPicker(isPresented: $showPhotoPicker, selection: $photosItem, matching: .images)
         .onChange(of: photosItem) { item in
             guard let item else { return }
@@ -384,6 +399,44 @@ struct ChatRoomView: View {
                 MemberProfilePopup(member: m) { profileMember = nil }
             }
         }
+    }
+
+    /// 安全モードの確認待ちの色(オレンジ)
+    static let reviewOrange = Color(red: 0xc2 / 255.0, green: 0x6a / 255.0, blue: 0x00 / 255.0)
+
+    /// 安全モード: 確認待ちのAI回答の下に出す確認バー(財務のみ)。
+    /// 「このまま送信」または「修正して送信」で初めて質問者に表示される
+    private func pendingReviewBar(_ msg: Message) -> some View {
+        VStack(alignment: .trailing, spacing: 6) {
+            Text("確認待ち: 質問者にはまだ表示されていません")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundColor(Self.reviewOrange)
+            HStack(spacing: 8) {
+                Button {
+                    reviewingMessage = msg
+                } label: {
+                    Text("修正して送信")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(Theme.accentDark)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 7)
+                        .background(Capsule().fill(Color(.systemBackground)))
+                        .overlay(Capsule().stroke(Theme.accentDark, lineWidth: 1))
+                }
+                Button {
+                    store.approvePendingMessage(msg)
+                } label: {
+                    Text("このまま送信")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 7)
+                        .background(Capsule().fill(Theme.accent))
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .trailing)
+        .padding(.trailing, 6)
     }
 
     /// ヘッダー1段: 左にタイトル、右に担当・リンク・要約・完了
@@ -656,6 +709,8 @@ struct SummarySheet: View {
 struct EditMessageSheet: View {
     @Environment(\.dismiss) private var dismiss
     let initialText: String
+    var title = "メッセージを編集"
+    var saveLabel = "保存"
     let onSave: (String) -> Void
     @State private var text = ""
 
@@ -668,14 +723,14 @@ struct EditMessageSheet: View {
                     .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color(.separator), lineWidth: 1))
             }
             .padding(14)
-            .navigationTitle("メッセージを編集")
+            .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("キャンセル") { dismiss() }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("保存") {
+                    Button(saveLabel) {
                         onSave(text)
                         dismiss()
                     }

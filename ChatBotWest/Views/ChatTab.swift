@@ -350,6 +350,11 @@ struct RoomRowView: View {
             TagView(text: "\(room.pendingHandler)さん承諾待ち",
                     bg: Color(red: 1.0, green: 0xf0 / 255.0, blue: 0xdd / 255.0),   // オレンジ系
                     fg: Color(red: 0xc2 / 255.0, green: 0x6a / 255.0, blue: 0x00 / 255.0))
+        } else if selectable && !room.pendingReviewTs.isEmpty {
+            // 安全モード: AI回答がBAの確認待ち(財務のみ表示)
+            TagView(text: "AI回答確認待ち",
+                    bg: Color(red: 1.0, green: 0xf0 / 255.0, blue: 0xdd / 255.0),   // オレンジ系
+                    fg: Color(red: 0xc2 / 255.0, green: 0x6a / 255.0, blue: 0x00 / 255.0))
         } else if let handler = openCaseHandler {
             if handler.isEmpty {
                 TagView(text: "対応者未決定",

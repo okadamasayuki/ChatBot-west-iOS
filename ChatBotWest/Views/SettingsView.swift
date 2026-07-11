@@ -738,6 +738,16 @@ struct SettingsView: View {
 
                 if store.isExpert {
                     Section {
+                        Toggle("🛡 安全モード", isOn: Binding(
+                            get: { store.safeMode },
+                            set: { store.setSafeMode($0) }
+                        ))
+                        .tint(Theme.accent)
+                    } footer: {
+                        Text("オンにすると、AIアシスタントは自動で回答しません。AIの回答文は、担当BAが内容を確認して送信するまで質問者に表示されず、確認時に文言を修正することもできます(ワークスペース全体に適用)。")
+                    }
+
+                    Section {
                         Toggle("🛠 開発モード", isOn: $store.devMode)
                             .tint(Theme.accent)
                     } footer: {
