@@ -1058,12 +1058,13 @@ struct BaMessageBubble: View {
                         store.updateBaMessageText(message, newText: newText)
                     }
                 }
-                if !message.reactions.isEmpty {
-                    ReactionChipsView(reactions: message.reactions, myUid: store.myUid()) { emoji in
-                        store.toggleBaReaction(message, emoji: emoji)
-                    }
-                }
+                // リアクションは既読・時刻と同じ行に表示する
                 HStack(spacing: 4) {
+                    if !isMine, !message.reactions.isEmpty {
+                        ReactionChipsView(reactions: message.reactions, myUid: store.myUid()) { emoji in
+                            store.toggleBaReaction(message, emoji: emoji)
+                        }
+                    }
                     if isMine, let readStatus {
                         Text(readStatus)
                             .font(.system(size: 10))
@@ -1072,6 +1073,11 @@ struct BaMessageBubble: View {
                     Text(fmtTime(message.ts))
                         .font(.system(size: 10))
                         .foregroundColor(Theme.header.opacity(0.6))
+                    if isMine, !message.reactions.isEmpty {
+                        ReactionChipsView(reactions: message.reactions, myUid: store.myUid()) { emoji in
+                            store.toggleBaReaction(message, emoji: emoji)
+                        }
+                    }
                 }
             }
             if !isMine { Spacer(minLength: 60) }

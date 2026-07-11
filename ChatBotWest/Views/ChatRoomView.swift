@@ -652,18 +652,22 @@ struct MessageBubble: View {
                             LineBubbleShape(isMine: alignRight)
                                 .stroke(borderColor ?? .clear, lineWidth: 1)
                         )
-                    if !message.reactions.isEmpty {
-                        ReactionChipsView(reactions: message.reactions, myUid: myUid, onToggle: onReaction)
-                    }
                     if showClarify {
                         // 聞き返しの選択肢ボタン
                         FlowChoices(options: message.clarifyOptions, onChoice: onChoice)
                     }
+                    // リアクションは既読・時刻と同じ行に表示する
                     HStack(spacing: 4) {
+                        if !alignRight, !message.reactions.isEmpty {
+                            ReactionChipsView(reactions: message.reactions, myUid: myUid, onToggle: onReaction)
+                        }
                         // LINEと同じく、自分側は「既読 → 時刻」の順
                         if alignRight { readStatusText }
                         timeText
                         if !alignRight { readStatusText }
+                        if alignRight, !message.reactions.isEmpty {
+                            ReactionChipsView(reactions: message.reactions, myUid: myUid, onToggle: onReaction)
+                        }
                     }
                 }
                 if !alignRight { Spacer(minLength: 60) }
