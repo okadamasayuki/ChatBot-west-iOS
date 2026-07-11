@@ -269,6 +269,7 @@ struct BaTalkView: View {
     @State private var photosItem: PhotosPickerItem?
     @State private var attachError: String?
     @State private var showAddMembers = false
+    @State private var showMembers = false
     @State private var showSearch = false
     @FocusState private var inputFocused: Bool
 
@@ -441,6 +442,12 @@ struct BaTalkView: View {
                 } label: {
                     Image(systemName: "magnifyingglass")
                 }
+                // メンバー一覧
+                Button {
+                    showMembers = true
+                } label: {
+                    Image(systemName: "person.3")
+                }
                 // メンバー追加
                 Button {
                     showAddMembers = true
@@ -452,6 +459,11 @@ struct BaTalkView: View {
         .sheet(isPresented: $showAddMembers) {
             if let t = talk {
                 AddBaMembersSheet(talk: t)
+            }
+        }
+        .sheet(isPresented: $showMembers) {
+            if let t = talk {
+                BaTalkMembersSheet(talk: t)
             }
         }
         .sheet(isPresented: $showSearch) {
@@ -512,6 +524,51 @@ struct BaTalkView: View {
 }
 
 // MARK: - メンバー追加(履歴を見せるか選択できる)
+
+/// トークの参加メンバー一覧。行をタップするとプロフィールが見られる
+struct BaTalkMembersSheet: View {
+    @EnvironmentObject var store: CloudStore
+    let talk: BaTalk
+    @Environment(\.dismiss) private var dismiss
+    @State private var profileMember: CloudStore.MemberInfo?
+
+    private var members: [CloudStore.MemberInfo] {
+        talk.memberUids.enumerated().map { i, uid in
+            store.member(uid) ?? CloudStore.MemberInfo(
+                id: uid,
+                name: i < talk.memberNames.count ? talk.memberNames[i] : "(退会済み)",
+                role: MemberRole.expert.rawValue)
+        }
+        .sorted { $0.name < $1.name }
+    }
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section("メンバー — \(members.count)人") {
+                    ForEach(members) { m in
+                        Button {
+                            profileMember = m
+                        } label: {
+                            MemberRow(member: m, isMe: m.id == store.myUid())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+            .navigationTitle("メンバー")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("閉じる") { dismiss() }
+                }
+            }
+            .sheet(item: $profileMember) { m in
+                MemberProfileSheet(member: m)
+            }
+        }
+    }
+}
 
 struct AddBaMembersSheet: View {
     @EnvironmentObject var store: CloudStore
