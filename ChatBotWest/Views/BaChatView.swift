@@ -231,18 +231,20 @@ struct NewBaTalkSheet: View {
         NavigationStack {
             VStack(spacing: 0) {
             Form {
-                if !selected.isEmpty {
-                    Section("選択中 — \(selected.count)人") {
+                Section("選択中 — \(selected.count)人") {
+                    if selected.isEmpty {
+                        Text("未選択(そのまま開始すると自分だけのメモになります)")
+                            .font(.footnote)
+                            .foregroundColor(.secondary)
+                    } else {
                         SelectedMembersRow(members: pool.filter { selected.contains($0.id) }) { uid in
                             selected.remove(uid)
                         }
                     }
                 }
 
-                if selected.count > 1 {
-                    Section("グループ名(任意)") {
-                        TextField("例: 決算チーム", text: $groupName)
-                    }
+                Section("ルーム名(任意)") {
+                    TextField("例: 決算チーム", text: $groupName)
                 }
 
                 // 検索・絞り込みはメンバー選択の真上に置く

@@ -1121,16 +1121,19 @@ final class CloudStore: ObservableObject {
         } else {
             talkId = newUid() // メモ・グループは複数作れる
         }
+        let name = selected.isEmpty
+            ? (groupName.isEmpty ? "メモ" : groupName)
+            : groupName.trimmingCharacters(in: .whitespaces)
         if !baTalks.contains(where: { $0.id == talkId }) {
-            let name = selected.isEmpty
-                ? (groupName.isEmpty ? "メモ" : groupName)
-                : (isGroup ? groupName.trimmingCharacters(in: .whitespaces) : "")
             let talk = BaTalk(id: talkId,
                               name: name,
                               memberUids: uids,
                               memberNames: all.map { $0.name },
                               isGroup: isGroup)
             wsRef().collection("baTalks").document(talkId).setData(talk.dict)
+        } else if !name.isEmpty {
+            // 既存の1:1トークでもルーム名の指定があれば反映する
+            renameBaTalk(talkId, name: name)
         }
         return talkId
     }
