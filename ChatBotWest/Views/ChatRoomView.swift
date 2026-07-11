@@ -647,15 +647,6 @@ struct MessageBubble: View {
         } else {
             HStack(alignment: .bottom, spacing: 6) {
                 if alignRight { Spacer(minLength: 60) }
-                if alignRight {
-                    // LINEと同じく、自分側はバブルの左横に既読・時刻(下揃え・2段)。
-                    // リアクションがある場合は行の高さぶん持ち上げて重ならないようにする
-                    VStack(alignment: .trailing, spacing: 1) {
-                        readStatusText
-                        timeText
-                    }
-                    .padding(.bottom, (!message.reactions.isEmpty && !message.deleted) ? 18 : 0)
-                }
                 if !alignRight {
                     // 相手側はアイコン付きで表示(タップでプロフィール)
                     AvatarCircleView(iconData: avatarIconData, icon: avatarIcon,
@@ -675,6 +666,14 @@ struct MessageBubble: View {
                             LineBubbleShape(isMine: alignRight)
                                 .stroke(borderColor ?? .clear, lineWidth: 1)
                         )
+                        // 既読・時刻はバブルの下端の真横に固定(リアクションの幅に影響されない)
+                        .overlay(alignment: alignRight ? .bottomLeading : .bottomTrailing) {
+                            if alignRight {
+                                sideMeta.alignmentGuide(.leading) { $0[.trailing] + 4 }
+                            } else {
+                                sideMeta.alignmentGuide(.trailing) { $0[.leading] - 4 }
+                            }
+                        }
                     if showClarify {
                         // 聞き返しの選択肢ボタン
                         FlowChoices(options: message.clarifyOptions, onChoice: onChoice)
@@ -688,18 +687,18 @@ struct MessageBubble: View {
                             .zIndex(1)
                     }
                 }
-                if !alignRight {
-                    // 相手側はバブルの右横に時刻・未読(下揃え・2段)。
-                    // リアクションがある場合は行の高さぶん持ち上げて重ならないようにする
-                    VStack(alignment: .leading, spacing: 1) {
-                        readStatusText
-                        timeText
-                    }
-                    .padding(.bottom, (!message.reactions.isEmpty && !message.deleted) ? 18 : 0)
-                }
                 if !alignRight { Spacer(minLength: 60) }
             }
         }
+    }
+
+    /// バブルの横に置く既読・時刻(下揃え・2段)
+    private var sideMeta: some View {
+        VStack(alignment: alignRight ? .trailing : .leading, spacing: 1) {
+            readStatusText
+            timeText
+        }
+        .fixedSize()
     }
 
     @ViewBuilder

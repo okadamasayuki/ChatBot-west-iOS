@@ -947,21 +947,6 @@ struct BaMessageBubble: View {
     private var bubbleBody: some View {
         HStack(alignment: .bottom, spacing: 6) {
             if isMine { Spacer(minLength: 60) }
-            if isMine {
-                // LINEと同じく、自分側はバブルの左横に既読・時刻(下揃え・2段)。
-                // リアクションがある場合は行の高さぶん持ち上げて重ならないようにする
-                VStack(alignment: .trailing, spacing: 1) {
-                    if let readStatus {
-                        Text(readStatus)
-                            .font(.system(size: 10))
-                            .foregroundColor(Theme.header.opacity(0.6))
-                    }
-                    Text(fmtTime(message.ts))
-                        .font(.system(size: 10))
-                        .foregroundColor(Theme.header.opacity(0.6))
-                }
-                .padding(.bottom, (!message.reactions.isEmpty && !message.deleted) ? 18 : 0)
-            }
             if !isMine {
                 // 相手のアイコン(タップでプロフィール)
                 let m = store.member(message.senderUid)
@@ -1017,6 +1002,14 @@ struct BaMessageBubble: View {
                 .padding(.horizontal, 12)
                 .padding(.vertical, 9)
                 .background(LineBubbleShape(isMine: isMine).fill(isMine ? Theme.myBubble : Color(.systemBackground)))
+                // 既読・時刻はバブルの下端の真横に固定(リアクションの幅に影響されない)
+                .overlay(alignment: isMine ? .bottomLeading : .bottomTrailing) {
+                    if isMine {
+                        sideMeta.alignmentGuide(.leading) { $0[.trailing] + 4 }
+                    } else {
+                        sideMeta.alignmentGuide(.trailing) { $0[.leading] - 4 }
+                    }
+                }
                 .contextMenu {
                     if !message.deleted {
                         // 1列目: リアクション絵文字を1行に横並び
@@ -1097,16 +1090,23 @@ struct BaMessageBubble: View {
                     .zIndex(1)
                 }
             }
-            if !isMine {
-                // 相手側はバブルの右横に時刻(下揃え)。
-                // リアクションがある場合は行の高さぶん持ち上げて重ならないようにする
-                Text(fmtTime(message.ts))
-                    .font(.system(size: 10))
-                    .foregroundColor(Theme.header.opacity(0.6))
-                    .padding(.bottom, (!message.reactions.isEmpty && !message.deleted) ? 18 : 0)
-            }
             if !isMine { Spacer(minLength: 60) }
         }
+    }
+
+    /// バブルの横に置く既読・時刻(下揃え・2段)
+    private var sideMeta: some View {
+        VStack(alignment: isMine ? .trailing : .leading, spacing: 1) {
+            if isMine, let readStatus {
+                Text(readStatus)
+                    .font(.system(size: 10))
+                    .foregroundColor(Theme.header.opacity(0.6))
+            }
+            Text(fmtTime(message.ts))
+                .font(.system(size: 10))
+                .foregroundColor(Theme.header.opacity(0.6))
+        }
+        .fixedSize()
     }
 
     /// 「@名前」をハイライトする
