@@ -203,6 +203,17 @@ struct ChatRoomView: View {
         }
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
+                if store.isExpert, let r = room, store.pendingRoom?.id != r.id {
+                    // 相談の担当BA(AIだけで完結した相談にも割り当てられる)
+                    Button {
+                        store.toggleRoomHandler(r.id)
+                    } label: {
+                        Text(r.handler.isEmpty ? "担当になる" : "担当: \(r.handler)")
+                            .font(.system(size: 13))
+                            .lineLimit(1)
+                            .foregroundColor(r.handler.isEmpty ? Theme.accentDark : Color(red: 0xc2 / 255.0, green: 0x6a / 255.0, blue: 0x00 / 255.0))
+                    }
+                }
                 if !store.roomMessages.isEmpty {
                     Button("要約") {
                         showSummary = true

@@ -64,16 +64,19 @@ struct Room: Identifiable, Equatable {
     var status: String
     /// 既読管理: uid → そのユーザーが読んだ最後のメッセージの ts
     var reads: [String: String]
+    /// この相談の担当BA(表示名)。AIだけで完結した相談にも割り当てられる
+    var handler: String
 
     init(id: String = newUid(), title: String = "新しい相談", createdAt: String = nowIso(),
          lastText: String = "", lastTs: String = nowIso(),
          ownerUid: String = "", ownerEmail: String = "", ownerName: String = "", status: String = "",
-         reads: [String: String] = [:]) {
+         reads: [String: String] = [:], handler: String = "") {
         self.id = id; self.title = title; self.createdAt = createdAt
         self.lastText = lastText; self.lastTs = lastTs
         self.ownerUid = ownerUid; self.ownerEmail = ownerEmail; self.ownerName = ownerName
         self.status = status
         self.reads = reads
+        self.handler = handler
     }
 
     init?(dict: [String: Any]) {
@@ -88,6 +91,7 @@ struct Room: Identifiable, Equatable {
         ownerName = dict["ownerName"] as? String ?? ""
         status = dict["status"] as? String ?? ""
         reads = dict["reads"] as? [String: String] ?? [:]
+        handler = dict["handler"] as? String ?? ""
     }
 
     var isDone: Bool { status == "done" }
@@ -100,6 +104,7 @@ struct Room: Identifiable, Equatable {
             "status": status,
         ]
         if !reads.isEmpty { d["reads"] = reads }
+        if !handler.isEmpty { d["handler"] = handler }
         return d
     }
 }

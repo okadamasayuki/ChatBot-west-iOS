@@ -465,11 +465,29 @@ final class CloudStore: ObservableObject {
         wsRef().collection("cases").document(id).updateData(patch)
     }
 
-    /// 対応者のトグル(自分が対応者なら外す、そうでなければ自分を設定)
+    /// 対応者のトグル(自分が対応者なら外す、そうでなければ自分を設定)。
+    /// 自分を設定したときは相談の担当BAも未設定なら自分にする
     func toggleHandler(_ c: CaseItem) {
         let me = myName()
         guard !me.isEmpty else { return }
-        updateCase(c.id, ["handledBy": c.handledBy == me ? "" : me])
+        let becoming = c.handledBy != me
+        updateCase(c.id, ["handledBy": becoming ? me : ""])
+        if becoming, let r = rooms.first(where: { $0.id == c.roomId }), r.handler.isEmpty {
+            setRoomHandler(c.roomId, handler: me)
+        }
+    }
+
+    /// 相談の担当BAを設定/解除する(AIだけで完結した相談にも割り当て可能)
+    func setRoomHandler(_ roomId: String, handler: String) {
+        wsRef().collection("rooms").document(roomId).updateData(["handler": handler])
+    }
+
+    /// 相談の担当BAのトグル(自分なら外す、そうでなければ自分に)
+    func toggleRoomHandler(_ roomId: String) {
+        let me = myName()
+        guard !me.isEmpty, isExpert,
+              let r = rooms.first(where: { $0.id == roomId }) else { return }
+        setRoomHandler(roomId, handler: r.handler == me ? "" : me)
     }
 
     func addQa(_ entry: QaEntry) {
@@ -632,10 +650,12 @@ final class CloudStore: ObservableObject {
                                    clarifyOptions: result.clarify_options), roomId: roomId)
             } else {
                 // エスカレーション
-                // この相談で最初に対応した人がいれば、デフォルトの対応者として引き継ぐ
+                // この相談で最初に対応した人(いなければ相談の担当BA)をデフォルトの対応者として引き継ぐ
                 let defaultHandler = cases
                     .filter { $0.roomId == roomId && !$0.handledBy.isEmpty }
-                    .first?.handledBy ?? ""
+                    .first?.handledBy
+                    ?? rooms.first { $0.id == roomId }?.handler
+                    ?? ""
                 let caseObj = CaseItem(
                     roomId: roomId,
                     question: text,
@@ -709,6 +729,10 @@ final class CloudStore: ObservableObject {
         ))
         updateCase(c.id, ["answer": text, "status": CaseStatus.answered.rawValue,
                           "answeredAt": nowIso(), "handledBy": handler])
+        // 回答したBAを相談の担当にする(未設定の場合)
+        if let r = rooms.first(where: { $0.id == c.roomId }), r.handler.isEmpty, !handler.isEmpty {
+            setRoomHandler(c.roomId, handler: handler)
+        }
     }
 
     /// 開いている相談のこれまでのやり取りを要約する

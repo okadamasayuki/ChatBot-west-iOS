@@ -65,6 +65,7 @@ struct RoomListView: View {
             }
             let openRoomIds = Set(store.cases.filter { $0.status != .answered }.map { $0.roomId })
             list = list.filter { room in
+                if room.handler == me, !room.isDone { return true } // 相談の担当BAが自分
                 if handlingRoomIds.contains(room.id) { return true }
                 return !room.isDone && !openRoomIds.contains(room.id) && (latest[room.id]?.mine ?? false)
             }
@@ -260,7 +261,15 @@ struct RoomRowView: View {
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(room.isDone ? Color(.tertiaryLabel) : .primary)
                     .lineLimit(1)
-                statusTag
+                HStack(spacing: 6) {
+                    statusTag
+                    if selectable, !room.handler.isEmpty {
+                        // 財務には相談の担当BAを表示
+                        Text("担当: \(room.handler)")
+                            .font(.system(size: 10))
+                            .foregroundColor(Color(.tertiaryLabel))
+                    }
+                }
             }
             Spacer()
             Text(fmtDate(room.lastTs))
