@@ -386,12 +386,8 @@ struct BaTalkView: View {
     /// 返答例(対応依頼のやりとりを想定。タップで入力欄に挿入)
     static let quickReplies = [
         "承知しました。対応します。",
-        "確認して折り返します。",
         "すみません、いま対応が難しいです。",
-        "明日以降なら対応できます。",
-        "詳細を教えてもらえますか?",
-        "対応ありがとうございます!",
-        "よろしくお願いします。",
+        "確認して折り返します。",
     ]
 
     /// 入力中の「@…」部分(空白が入るまでをクエリとする)
@@ -457,33 +453,33 @@ struct BaTalkView: View {
                 .onTapGesture { inputFocused = false }
             }
 
-            // 返答例(タップで入力欄に挿入するだけ。送信はしない)
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(Self.quickReplies, id: \.self) { reply in
-                        Button {
-                            if input.isEmpty {
-                                input = reply
-                            } else {
-                                input += reply
-                            }
-                            inputFocused = true
-                        } label: {
-                            Text(reply)
-                                .font(.system(size: 12))
-                                .lineLimit(1)
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 6)
-                                .background(Color(.systemBackground))
-                                .foregroundColor(.primary)
-                                .cornerRadius(14)
+            // 返答例(タップで入力欄に挿入するだけ。送信はしない)。
+            // スクロールせず、入り切らない分は折り返して全部見えるようにする
+            FlowLayout(spacing: 6) {
+                ForEach(Self.quickReplies, id: \.self) { reply in
+                    Button {
+                        if input.isEmpty {
+                            input = reply
+                        } else {
+                            input += reply
                         }
-                        .buttonStyle(.plain)
+                        inputFocused = true
+                    } label: {
+                        Text(reply)
+                            .font(.system(size: 12))
+                            .lineLimit(1)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(Color(.systemBackground))
+                            .foregroundColor(.primary)
+                            .cornerRadius(14)
                     }
+                    .buttonStyle(.plain)
                 }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 6)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
             .background(Color(.secondarySystemBackground))
 
             // @メンションの候補(入力中の「@…」に応じて表示。タップで挿入)
@@ -1188,6 +1184,43 @@ struct RoomLinkPickerSheet: View {
                     Button("キャンセル") { dismiss() }
                 }
             }
+        }
+    }
+}
+
+
+/// チップを左から並べ、入り切らないぶんは次の行に折り返すレイアウト
+struct FlowLayout: Layout {
+    var spacing: CGFloat = 8
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let maxWidth = proposal.width ?? .infinity
+        var x: CGFloat = 0, y: CGFloat = 0, rowHeight: CGFloat = 0
+        for view in subviews {
+            let size = view.sizeThatFits(.unspecified)
+            if x > 0, x + size.width > maxWidth {
+                x = 0
+                y += rowHeight + spacing
+                rowHeight = 0
+            }
+            x += size.width + spacing
+            rowHeight = max(rowHeight, size.height)
+        }
+        return CGSize(width: maxWidth == .infinity ? x : maxWidth, height: y + rowHeight)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var x = bounds.minX, y = bounds.minY, rowHeight: CGFloat = 0
+        for view in subviews {
+            let size = view.sizeThatFits(.unspecified)
+            if x > bounds.minX, x + size.width > bounds.maxX {
+                x = bounds.minX
+                y += rowHeight + spacing
+                rowHeight = 0
+            }
+            view.place(at: CGPoint(x: x, y: y), proposal: .unspecified)
+            x += size.width + spacing
+            rowHeight = max(rowHeight, size.height)
         }
     }
 }
