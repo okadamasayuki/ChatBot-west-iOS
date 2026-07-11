@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// Web版と同じ2ステップのログイン画面:
 /// ステップ1でログイン/新規登録を選び、ステップ2で入力する。
@@ -62,11 +63,19 @@ struct LoginView: View {
 
                 case .login, .signup:
                     Section {
-                        TextField("メールアドレス", text: $email)
-                            .keyboardType(.emailAddress)
-                            .textContentType(.username)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
+                        if mode == .login {
+                            // デフォルトの zaimu@gmail.com を入れ、カーソルを「u」の直後に置く
+                            CursorEmailField(text: $email,
+                                             placeholder: "メールアドレス",
+                                             cursorIndex: 5,
+                                             defaultText: "zaimu@gmail.com")
+                        } else {
+                            TextField("メールアドレス", text: $email)
+                                .keyboardType(.emailAddress)
+                                .textContentType(.username)
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                        }
                         SecureField("パスワード", text: $password)
                             .textContentType(.password)
                         if mode == .signup {
@@ -171,7 +180,8 @@ struct LoginView: View {
     private func switchMode(_ m: Mode) {
         mode = m
         errorMessage = nil
-        // ログインはデモ用の共通パスワードを初期入力、新規登録は空にする
+        // ログインはデモ用の共通アドレス・パスワードを初期入力、新規登録は空にする
+        email = (m == .login) ? "zaimu@gmail.com" : ""
         password = (m == .login) ? "00000000" : ""
     }
 
@@ -202,6 +212,57 @@ struct LoginView: View {
                 errorMessage = CloudStore.authErrorMessage(error)
             }
             busy = false
+        }
+    }
+}
+
+
+/// カーソル位置を指定できるメール入力欄(ログイン画面用)。
+/// 表示時に自動でフォーカスし、デフォルト文字列のときはカーソルを指定位置に置く
+struct CursorEmailField: UIViewRepresentable {
+    @Binding var text: String
+    var placeholder: String
+    var cursorIndex: Int
+    var defaultText: String
+
+    func makeUIView(context: Context) -> UITextField {
+        let tf = UITextField()
+        tf.placeholder = placeholder
+        tf.keyboardType = .emailAddress
+        tf.textContentType = .username
+        tf.autocapitalizationType = .none
+        tf.autocorrectionType = .no
+        tf.delegate = context.coordinator
+        tf.addTarget(context.coordinator, action: #selector(Coordinator.changed(_:)), for: .editingChanged)
+        tf.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        // 表示されたら自動でフォーカス(カーソルが置かれた状態にする)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak tf] in
+            tf?.becomeFirstResponder()
+        }
+        return tf
+    }
+
+    func updateUIView(_ tf: UITextField, context: Context) {
+        if tf.text != text { tf.text = text }
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+
+    class Coordinator: NSObject, UITextFieldDelegate {
+        var parent: CursorEmailField
+        init(_ parent: CursorEmailField) { self.parent = parent }
+
+        @objc func changed(_ tf: UITextField) {
+            parent.text = tf.text ?? ""
+        }
+
+        func textFieldDidBeginEditing(_ tf: UITextField) {
+            // デフォルト文字列のままなら「u」の直後にカーソルを置く
+            guard tf.text == parent.defaultText,
+                  let pos = tf.position(from: tf.beginningOfDocument, offset: parent.cursorIndex) else { return }
+            DispatchQueue.main.async {
+                tf.selectedTextRange = tf.textRange(from: pos, to: pos)
+            }
         }
     }
 }
