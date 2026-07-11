@@ -2,7 +2,7 @@ name: ChatBotWest
 options:
   bundleIdPrefix: com.okadamasayuki
   deploymentTarget:
-    iOS: "16.0"
+    iOS: "16.4"
   createIntermediateGroups: true
 packages:
   Firebase:
