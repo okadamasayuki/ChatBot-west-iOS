@@ -48,6 +48,11 @@ struct MainTabView: View {
                 BaChatView()
                     .tabItem { Label("BAチャット", systemImage: "person.2.fill") }
                     .tag(AppTab.baChat)
+
+                NotificationsView()
+                    .tabItem { Label("通知", systemImage: "bell.fill") }
+                    .badge(store.unreadNotificationCount)
+                    .tag(AppTab.notifications)
             }
 
             if store.isExpert {

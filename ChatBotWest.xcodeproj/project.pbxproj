@@ -11,6 +11,7 @@
 		0A787308EC339C808921169D /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B72B9642D45337FC24F45555 /* RootView.swift */; };
 		11C5343E61D8D03470B9CA85 /* NaikiManualViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFC9A7686B652F1C4AC14F06 /* NaikiManualViews.swift */; };
 		1C1EA9B58F886B8EC47594FC /* SampleData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F5EDB7F58EB8E330453F694 /* SampleData.swift */; };
+		2823F4BAB438E910824114F5 /* NotificationsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23C66D254024D0D2F0CBA5DA /* NotificationsView.swift */; };
 		2FF73F67CE937DE22801871B /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 759F791262A6BA2995B1A6A9 /* FirebaseFirestore */; };
 		3190AAFB4CAE4EE133DE7524 /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB9B5924DCCE96BCD4FD0E5E /* App.swift */; };
 		32AF223B7BBE2A19E51828B8 /* ChatTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D205E1B7CC1238F313389C3 /* ChatTab.swift */; };
@@ -35,6 +36,7 @@
 /* Begin PBXFileReference section */
 		0F5EDB7F58EB8E330453F694 /* SampleData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SampleData.swift; sourceTree = "<group>"; };
 		1608D4965DE3D082964935DF /* BaChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BaChatView.swift; sourceTree = "<group>"; };
+		23C66D254024D0D2F0CBA5DA /* NotificationsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationsView.swift; sourceTree = "<group>"; };
 		38CA1CCC43BAEAA7161F790E /* ExpertView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExpertView.swift; sourceTree = "<group>"; };
 		425BFB46E64065EA5A7712C9 /* MembersView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MembersView.swift; sourceTree = "<group>"; };
 		597C8E0105D2CA71FFBA2ED4 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
@@ -83,6 +85,7 @@
 				425BFB46E64065EA5A7712C9 /* MembersView.swift */,
 				CFC9A7686B652F1C4AC14F06 /* NaikiManualViews.swift */,
 				DD4C102D77C18B41516AFFCC /* NaikiUpdateSheet.swift */,
+				23C66D254024D0D2F0CBA5DA /* NotificationsView.swift */,
 				B72B9642D45337FC24F45555 /* RootView.swift */,
 				AED3154295D9CCCC87F60B1C /* SettingsView.swift */,
 				B878A783285F5A6B7F48B2A2 /* SpeechRecognizer.swift */,
@@ -214,6 +217,7 @@
 				7919DA4320C51D8910872E88 /* Models.swift in Sources */,
 				11C5343E61D8D03470B9CA85 /* NaikiManualViews.swift in Sources */,
 				CD63AFAB3A26DEF0CD7931CA /* NaikiUpdateSheet.swift in Sources */,
+				2823F4BAB438E910824114F5 /* NotificationsView.swift in Sources */,
 				D35CD70F666BE466E3B42FB3 /* Prompts.swift in Sources */,
 				0A787308EC339C808921169D /* RootView.swift in Sources */,
 				1C1EA9B58F886B8EC47594FC /* SampleData.swift in Sources */,

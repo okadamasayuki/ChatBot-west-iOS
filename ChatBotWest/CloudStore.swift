@@ -4,7 +4,7 @@ import FirebaseAuth
 import FirebaseFirestore
 
 enum AppTab: Hashable {
-    case chat, baChat, expert, naiki, manual, membersList, settings
+    case chat, baChat, notifications, expert, naiki, manual, membersList, settings
 }
 
 /// Firebase(Auth / Firestore)との同期と、アプリの状態を一元管理する。
@@ -120,6 +120,27 @@ final class CloudStore: ObservableObject {
     /// 送信せずに画面を離れたときの下書き(ルーム/トークごと。端末内のみ)
     var roomDrafts: [String: String] = [:]
     var baDrafts: [String: String] = [:]
+
+    /// 通知タブに貯めるアプリ内通知(端末内に保存)
+    struct AppNotification: Identifiable, Codable, Equatable {
+        var id: String
+        var ts: String
+        var kind: String        // "room" | "baTalk"
+        var targetId: String
+        var title: String
+        var body: String
+        var read: Bool
+    }
+    @Published var notifications: [AppNotification] = []
+    /// 新着検知用: 前回見た lastTs(初回スナップショットでは通知しない)
+    private var roomNotifyTs: [String: String] = [:]
+    private var talkNotifyTs: [String: String] = [:]
+    private var roomNotifyPrimed = false
+    private var talkNotifyPrimed = false
+
+    var unreadNotificationCount: Int {
+        notifications.filter { !$0.read }.count
+    }
     @Published var currentRoomId: String?
     @Published var roomMessages: [Message] = []
     @Published var pendingTyping = false
@@ -225,6 +246,12 @@ final class CloudStore: ObservableObject {
                 nickname = pendingNickname
             }
             pendingNickname = ""
+            // 通知(端末内)を読み込み、検知の基準をリセット
+            loadNotifications()
+            roomNotifyPrimed = false
+            talkNotifyPrimed = false
+            roomNotifyTs = [:]
+            talkNotifyTs = [:]
             // メンバー情報(役割・ニックネーム・回答の癖)を常時同期する。
             // Web版で「回答の癖」を編集した場合も、アプリを再起動せずに反映される。
             listeners.append(mref.addSnapshotListener { [weak self] snap, _ in
@@ -319,6 +346,105 @@ final class CloudStore: ObservableObject {
     static func cachedMap(_ key: String) -> [String: [String]]? {
         let v = UserDefaults.standard.dictionary(forKey: key) as? [String: [String]]
         return (v?.isEmpty ?? true) ? nil : v
+    }
+
+    // MARK: - 通知タブ(アプリ内通知)
+
+    /// 自分が担当中の相談に新しいメッセージ(質問者の返答など)が来たら通知に積む
+    private func detectRoomNotifications() {
+        guard isExpert else { return }
+        if !roomNotifyPrimed {
+            for r in rooms { roomNotifyTs[r.id] = r.lastTs }
+            roomNotifyPrimed = !rooms.isEmpty
+            return
+        }
+        for r in rooms {
+            let prev = roomNotifyTs[r.id]
+            roomNotifyTs[r.id] = r.lastTs
+            guard let prev, r.lastTs > prev else { continue }
+            guard !r.handler.isEmpty, r.handler == myName() else { continue }
+            guard currentRoomId != r.id else { continue }          // 開いている相談は通知不要
+            guard !r.lastText.hasPrefix("【BA】") else { continue } // 自分(BA)の回答は通知不要
+            addNotification(kind: "room", targetId: r.id,
+                            title: "相談: \(r.title.isEmpty ? "相談" : r.title)",
+                            body: snippet(r.lastText, 60))
+        }
+    }
+
+    /// BAトークに新着メッセージが来たら通知に積む
+    private func detectTalkNotifications() {
+        guard isExpert else { return }
+        if !talkNotifyPrimed {
+            for t in baTalks { talkNotifyTs[t.id] = t.lastTs }
+            talkNotifyPrimed = !baTalks.isEmpty
+            return
+        }
+        for t in baTalks {
+            let prev = talkNotifyTs[t.id]
+            talkNotifyTs[t.id] = t.lastTs
+            guard let prev, t.lastTs > prev else { continue }
+            guard t.memberUids.contains(myUid()), t.memberUids.count > 1 else { continue } // メモは対象外
+            guard currentBaTalkId != t.id else { continue } // 開いているトークは通知不要
+            addNotification(kind: "baTalk", targetId: t.id,
+                            title: "BAチャット: \(baTalkName(t))",
+                            body: snippet(t.lastText, 60))
+        }
+    }
+
+    private func addNotification(kind: String, targetId: String, title: String, body: String) {
+        let n = AppNotification(id: newUid(), ts: nowIso(), kind: kind,
+                                targetId: targetId, title: title, body: body, read: false)
+        notifications.insert(n, at: 0)
+        if notifications.count > 100 { notifications = Array(notifications.prefix(100)) }
+        saveNotifications()
+    }
+
+    /// 通知をタップして該当画面を開く(既読にする)
+    func openNotification(_ n: AppNotification) {
+        markNotificationRead(n.id)
+        if n.kind == "room" {
+            guard rooms.contains(where: { $0.id == n.targetId }) else { return }
+            activeTab = .chat
+            openRoom(n.targetId)
+        } else {
+            guard baTalks.contains(where: { $0.id == n.targetId }) else { return }
+            activeTab = .baChat
+            openBaTalk(n.targetId)
+        }
+    }
+
+    func markNotificationRead(_ id: String) {
+        if let i = notifications.firstIndex(where: { $0.id == id }) {
+            notifications[i].read = true
+            saveNotifications()
+        }
+    }
+
+    func markAllNotificationsRead() {
+        notifications = notifications.map { var n = $0; n.read = true; return n }
+        saveNotifications()
+    }
+
+    func deleteNotification(_ id: String) {
+        notifications.removeAll { $0.id == id }
+        saveNotifications()
+    }
+
+    private func notificationsKey() -> String { "appNotifications-\(myUid())" }
+
+    func loadNotifications() {
+        guard let data = UserDefaults.standard.data(forKey: notificationsKey()),
+              let list = try? JSONDecoder().decode([AppNotification].self, from: data) else {
+            notifications = []
+            return
+        }
+        notifications = list
+    }
+
+    private func saveNotifications() {
+        if let data = try? JSONEncoder().encode(notifications) {
+            UserDefaults.standard.set(data, forKey: notificationsKey())
+        }
     }
 
     /// ニックネームを保存(過去の担当記録・送信者名も新名に書き換える)
@@ -484,6 +610,7 @@ final class CloudStore: ObservableObject {
         listeners.append(wsRef().collection("rooms").addSnapshotListener { [weak self] snap, _ in
             Task { @MainActor in
                 self?.rooms = snap?.documents.compactMap { Room(dict: $0.data()) } ?? []
+                self?.detectRoomNotifications()
                 self?.backfillRoomHandlers()
             }
         })
@@ -508,6 +635,7 @@ final class CloudStore: ObservableObject {
         listeners.append(wsRef().collection("baTalks").addSnapshotListener { [weak self] snap, _ in
             Task { @MainActor in
                 self?.baTalks = snap?.documents.compactMap { BaTalk(dict: $0.data()) } ?? []
+                self?.detectTalkNotifications()
             }
         })
 
