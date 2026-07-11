@@ -276,7 +276,11 @@ struct NewBaTalkSheet: View {
                         dismiss()
                         store.openBaTalk(talkId)
                     } label: {
-                        Label("自分だけのメモを作成", systemImage: "note.text")
+                        HStack {
+                            Spacer()
+                            Label("自分だけのメモを作成", systemImage: "note.text")
+                            Spacer()
+                        }
                     }
                 }
             }
