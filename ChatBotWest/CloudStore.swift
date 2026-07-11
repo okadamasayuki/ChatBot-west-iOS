@@ -1061,6 +1061,8 @@ final class CloudStore: ObservableObject {
             let base = t.name.isEmpty ? t.memberNames.joined(separator: "、") : t.name
             return "\(base) (\(t.memberUids.count))"
         }
+        // 1:1でもルーム名を付けていればそれを表示
+        if !t.name.isEmpty { return t.name }
         return t.memberNames.first { $0 != myName() } ?? t.memberNames.joined(separator: "、")
     }
 
@@ -1133,11 +1135,9 @@ final class CloudStore: ObservableObject {
         return talkId
     }
 
-    /// グループトーク・メモのルーム名を変更する
+    /// トークのルーム名を変更する(グループ・メモ・1:1すべて)
     func renameBaTalk(_ id: String, name: String) {
-        guard isExpert,
-              let talk = baTalks.first(where: { $0.id == id }),
-              talk.isGroup || talk.memberUids.count <= 1 else { return }
+        guard isExpert, baTalks.contains(where: { $0.id == id }) else { return }
         wsRef().collection("baTalks").document(id)
             .updateData(["name": name.trimmingCharacters(in: .whitespacesAndNewlines)])
     }

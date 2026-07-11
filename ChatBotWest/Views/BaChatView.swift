@@ -496,9 +496,9 @@ struct BaTalkView: View {
         // 戻るボタンは出さない(BAチャットタブの再タップ・左端スワイプで戻る)
         .navigationBarBackButtonHidden(true)
         .toolbar {
-            // タイトル部分。グループトーク・メモはタップでルーム名を変更できる
+            // タイトル部分。どのトークもタップでルーム名を変更できる
             ToolbarItem(placement: .principal) {
-                if let t = talk, t.isGroup || t.memberUids.count <= 1 {
+                if let t = talk {
                     Button {
                         renameText = t.name
                         showRename = true
@@ -514,7 +514,7 @@ struct BaTalkView: View {
                         }
                     }
                 } else {
-                    Text(talk.map { store.baTalkName($0) } ?? "トーク")
+                    Text("トーク")
                         .font(.headline)
                         .lineLimit(1)
                 }
@@ -568,7 +568,7 @@ struct BaTalkView: View {
             }
             Button("キャンセル", role: .cancel) {}
         } message: {
-            Text("空にするとメンバー名の一覧が表示されます。")
+            Text("空にすると相手の名前・メンバー名が表示されます。")
         }
         .sheet(isPresented: $showRoomPicker) {
             RoomLinkPickerSheet { room in
