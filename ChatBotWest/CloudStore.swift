@@ -26,6 +26,7 @@ final class CloudStore: ObservableObject {
     var pendingCompanies: [String] = []
     var pendingDepartment: String = ""
     var pendingSection: String = ""
+    var pendingPosition: String = ""
 
     // MARK: - 共有データ
     @Published var naiki: String = Prompts.defaultNaiki
@@ -43,18 +44,20 @@ final class CloudStore: ObservableObject {
         var companies: [String] = [] // 所属会社(複数所属あり)
         var department: String = ""  // 所属部署
         var section: String = ""     // 所属担当
+        var position: String = ""    // 役職
 
         init(id: String, name: String, role: String, icon: String = "", iconData: String = "",
-             companies: [String] = [], department: String = "", section: String = "") {
+             companies: [String] = [], department: String = "", section: String = "", position: String = "") {
             self.id = id; self.name = name; self.role = role; self.icon = icon; self.iconData = iconData
             self.companies = companies
             self.department = department
             self.section = section
+            self.position = position
         }
 
-        /// 「ウエスト株式会社/ウエストアカウンティング株式会社・経理部・財務担当」のような所属表示
+        /// 「ウエスト株式会社・経理部・財務担当・課長」のような所属表示
         var affiliation: String {
-            ([companies.joined(separator: "/")] + [department, section])
+            ([companies.joined(separator: "/")] + [department, section, position])
                 .filter { !$0.isEmpty }.joined(separator: "・")
         }
     }
@@ -178,6 +181,7 @@ final class CloudStore: ObservableObject {
                         "companies": pendingCompanies,
                         "department": pendingDepartment,
                         "section": pendingSection,
+                        "position": pendingPosition,
                         "createdAt": nowIso(),
                     ])
                 }
@@ -219,12 +223,13 @@ final class CloudStore: ObservableObject {
     }
 
     func signup(email: String, password: String, role: MemberRole, nickname: String,
-                companies: [String], department: String, section: String) async throws {
+                companies: [String], department: String, section: String, position: String) async throws {
         pendingRole = role
         pendingNickname = nickname
         pendingCompanies = companies
         pendingDepartment = department
         pendingSection = section
+        pendingPosition = position
         try await Auth.auth().createUser(withEmail: email, password: password)
     }
 
@@ -428,7 +433,8 @@ final class CloudStore: ObservableObject {
                                       companies: data["companies"] as? [String]
                                           ?? [(data["company"] as? String ?? "")].filter { !$0.isEmpty },
                                       department: data["department"] as? String ?? "",
-                                      section: data["section"] as? String ?? "")
+                                      section: data["section"] as? String ?? "",
+                                      position: data["position"] as? String ?? "")
                 } ?? []
             }
         })

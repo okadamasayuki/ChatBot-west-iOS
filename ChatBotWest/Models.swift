@@ -480,6 +480,16 @@ enum Companies {
     ]
 }
 
+enum Positions {
+    static let all = [
+        "部長",
+        "課長",
+        "係長",
+        "主任",
+        "一般",
+    ]
+}
+
 enum Departments {
     static let all = [
         "営業部",

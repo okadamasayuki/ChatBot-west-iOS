@@ -7,11 +7,13 @@ struct MembersView: View {
     @State private var filterCompany = ""     // 空 = すべて
     @State private var filterDepartment = ""
     @State private var filterSection = ""
+    @State private var filterPosition = ""
 
     private func matches(_ member: CloudStore.MemberInfo) -> Bool {
         if !filterCompany.isEmpty, !member.companies.contains(filterCompany) { return false }
         if !filterDepartment.isEmpty, member.department != filterDepartment { return false }
         if !filterSection.isEmpty, member.section != filterSection { return false }
+        if !filterPosition.isEmpty, member.position != filterPosition { return false }
         let q = searchText.trimmingCharacters(in: .whitespaces)
         return q.isEmpty || member.name.localizedCaseInsensitiveContains(q)
             || member.affiliation.localizedCaseInsensitiveContains(q)
@@ -40,9 +42,19 @@ struct MembersView: View {
         }
         return Array(Set(pool.map(\.section).filter { !$0.isEmpty })).sorted()
     }
+    private var positionOptions: [String] {
+        let pool = allExperts.filter {
+            (filterCompany.isEmpty || $0.companies.contains(filterCompany))
+                && (filterDepartment.isEmpty || $0.department == filterDepartment)
+                && (filterSection.isEmpty || $0.section == filterSection)
+        }
+        let existing = Set(pool.map(\.position).filter { !$0.isEmpty })
+        // 役職は上位から順に表示
+        return Positions.all.filter { existing.contains($0) } + existing.subtracting(Positions.all).sorted()
+    }
 
     private var filterActive: Bool {
-        !filterCompany.isEmpty || !filterDepartment.isEmpty || !filterSection.isEmpty
+        !filterCompany.isEmpty || !filterDepartment.isEmpty || !filterSection.isEmpty || !filterPosition.isEmpty
     }
 
     var body: some View {
@@ -84,9 +96,10 @@ struct MembersView: View {
                     filterSection = ""
                 }
                 filterMenu(title: "担当", selection: $filterSection, options: sectionOptions) {}
+                filterMenu(title: "役職", selection: $filterPosition, options: positionOptions) {}
                 if filterActive {
                     Button {
-                        filterCompany = ""; filterDepartment = ""; filterSection = ""
+                        filterCompany = ""; filterDepartment = ""; filterSection = ""; filterPosition = ""
                     } label: {
                         Label("解除", systemImage: "xmark.circle.fill")
                             .font(.system(size: 12))
@@ -100,14 +113,20 @@ struct MembersView: View {
         .background(Color(.systemGroupedBackground))
     }
 
+    /// 絞り込みの変更はアニメーションなしで反映する(メニューを閉じる動きと重なって表示が崩れるため)
+    private func applyFilter(_ change: @escaping () -> Void) {
+        var t = Transaction()
+        t.disablesAnimations = true
+        withTransaction(t) { change() }
+    }
+
     private func filterMenu(title: String, selection: Binding<String>,
                             options: [String], onChange: @escaping () -> Void) -> some View {
         Menu {
-            Button("すべて") { selection.wrappedValue = ""; onChange() }
+            Button("すべて") { applyFilter { selection.wrappedValue = ""; onChange() } }
             ForEach(options, id: \.self) { opt in
                 Button {
-                    selection.wrappedValue = opt
-                    onChange()
+                    applyFilter { selection.wrappedValue = opt; onChange() }
                 } label: {
                     if selection.wrappedValue == opt {
                         Label(opt, systemImage: "checkmark")
@@ -120,6 +139,7 @@ struct MembersView: View {
             HStack(spacing: 4) {
                 Text(selection.wrappedValue.isEmpty ? title : selection.wrappedValue)
                     .lineLimit(1)
+                    .frame(maxWidth: 170)
                 Image(systemName: "chevron.down").font(.system(size: 9))
             }
             .font(.system(size: 12, weight: .medium))
@@ -169,6 +189,7 @@ struct MemberProfileSheet: View {
                 }
                 if !member.department.isEmpty { profileRow("部署", member.department) }
                 if !member.section.isEmpty { profileRow("担当", member.section) }
+                if !member.position.isEmpty { profileRow("役職", member.position) }
             }
             Spacer(minLength: 0)
         }

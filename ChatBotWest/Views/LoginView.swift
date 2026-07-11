@@ -15,6 +15,7 @@ struct LoginView: View {
     @State private var company = Companies.all[0]
     @State private var department = Departments.all[0]
     @State private var section = Departments.sections(for: Departments.all[0])[0]
+    @State private var position = Positions.all.last ?? "一般"
     @State private var errorMessage: String?
     @State private var busy = false
 
@@ -102,6 +103,12 @@ struct LoginView: View {
                                 }
                             }
                             .pickerStyle(.menu)
+                            Picker("役職", selection: $position) {
+                                ForEach(Positions.all, id: \.self) { p in
+                                    Text(p).tag(p)
+                                }
+                            }
+                            .pickerStyle(.menu)
                         }
                     }
 
@@ -175,7 +182,7 @@ struct LoginView: View {
                     try await store.signup(email: email, password: password, role: role,
                                            nickname: nickname,
                                            companies: [company],
-                                           department: department, section: section)
+                                           department: department, section: section, position: position)
                 } else {
                     try await store.login(email: email, password: password)
                 }
