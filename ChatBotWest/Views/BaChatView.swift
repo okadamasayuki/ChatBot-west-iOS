@@ -308,20 +308,6 @@ struct NewBaTalkSheet: View {
                     }
                 }
 
-                Section {
-                    // 自分しかいないトーク(メモとして利用)
-                    Button {
-                        let talkId = store.startBaTalk(with: [])
-                        dismiss()
-                        store.openBaTalk(talkId)
-                    } label: {
-                        HStack {
-                            Spacer()
-                            Label("自分だけのメモを作成", systemImage: "note.text")
-                            Spacer()
-                        }
-                    }
-                }
             }
             }
             .navigationTitle("新規トーク")
@@ -336,12 +322,12 @@ struct NewBaTalkSheet: View {
                         dismiss()
                         store.openBaTalk(talkId)
                     } label: {
+                        // 誰も選択していなければ自分だけのトーク(メモ)として開始できる
                         Text(selected.count > 1 ? "開始する(\(selected.count)人)" : "開始する")
                             .font(.system(size: 13, weight: .bold))
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(Theme.accent)
-                    .disabled(selected.isEmpty)
 
                     Button("キャンセル") { dismiss() }
                 }
