@@ -585,11 +585,13 @@ struct SettingsView: View {
                     }
                 }
 
-                Section {
-                    Toggle("🛠 開発モード", isOn: $store.devMode)
-                        .tint(Theme.accent)
-                } footer: {
-                    Text("オンにすると、APIが担当者役(会計の素人)になり、聞き返しへの返答や回答への更問(追加質問)を自動で行います。その他の挙動は変わりません。")
+                if store.isExpert {
+                    Section {
+                        Toggle("🛠 開発モード", isOn: $store.devMode)
+                            .tint(Theme.accent)
+                    } footer: {
+                        Text("オンにすると、APIが担当者役(会計の素人)になり、聞き返しへの返答や回答への更問(追加質問)を自動で行います。その他の挙動は変わりません。")
+                    }
                 }
 
                 Section("⬇ Q&A履歴のダウンロード") {
