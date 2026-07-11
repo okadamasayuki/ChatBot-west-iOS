@@ -187,15 +187,10 @@ struct RoomListView: View {
         }
     }
 
-    /// 相談の実質的な担当BA(ルームの担当 → 未回答案件の対応者 → 最新の回答済み案件の対応者)
+    /// 相談の担当BA(rooms.handler が唯一の真実。案件由来の担当はバックフィルで書き戻される。
+    /// 書き戻しの反映待ちの間だけ案件から推定した値で補完する)
     private func effectiveHandler(_ room: Room) -> String {
-        if !room.handler.isEmpty { return room.handler }
-        if let open = store.cases.first(where: { $0.roomId == room.id && $0.status != .answered && !$0.handledBy.isEmpty }) {
-            return open.handledBy
-        }
-        return store.cases
-            .filter { $0.roomId == room.id && $0.status == .answered && !$0.handledBy.isEmpty }
-            .last?.handledBy ?? ""
+        room.handler.isEmpty ? store.derivedHandler(roomId: room.id) : room.handler
     }
 
     /// すべての相談が選択済みか

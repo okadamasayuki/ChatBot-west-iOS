@@ -213,14 +213,15 @@ struct ChatRoomView: View {
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
                 if store.isExpert, let r = room, store.pendingRoom?.id != r.id {
-                    // 相談の担当BA(AIだけで完結した相談にも割り当てられる)
+                    // 相談の担当BA(一覧と同じロジック: rooms.handler、未反映の間は案件から補完)
+                    let handler = r.handler.isEmpty ? store.derivedHandler(roomId: r.id) : r.handler
                     Button {
                         store.toggleRoomHandler(r.id)
                     } label: {
-                        Text(r.handler.isEmpty ? "担当になる" : "担当: \(r.handler)")
+                        Text(handler.isEmpty ? "担当になる" : "担当: \(handler)")
                             .font(.system(size: 13))
                             .lineLimit(1)
-                            .foregroundColor(r.handler.isEmpty ? Theme.accentDark : Color(red: 0xc2 / 255.0, green: 0x6a / 255.0, blue: 0x00 / 255.0))
+                            .foregroundColor(handler.isEmpty ? Theme.accentDark : Color(red: 0xc2 / 255.0, green: 0x6a / 255.0, blue: 0x00 / 255.0))
                     }
                 }
                 if !store.roomMessages.isEmpty {

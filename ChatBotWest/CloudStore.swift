@@ -233,6 +233,7 @@ final class CloudStore: ObservableObject {
         listeners.append(wsRef().collection("rooms").addSnapshotListener { [weak self] snap, _ in
             Task { @MainActor in
                 self?.rooms = snap?.documents.compactMap { Room(dict: $0.data()) } ?? []
+                self?.backfillRoomHandlers()
             }
         })
 
@@ -240,6 +241,7 @@ final class CloudStore: ObservableObject {
         listeners.append(wsRef().collection("cases").order(by: "askedAt").addSnapshotListener { [weak self] snap, _ in
             Task { @MainActor in
                 self?.cases = snap?.documents.compactMap { CaseItem(dict: $0.data()) } ?? []
+                self?.backfillRoomHandlers()
                 self?.devMaybeReply() // 案件が回答済みになったタイミングでも担当者役の返信を判定
             }
         })
@@ -480,6 +482,31 @@ final class CloudStore: ObservableObject {
     /// 相談の担当BAを設定/解除する(AIだけで完結した相談にも割り当て可能)
     func setRoomHandler(_ roomId: String, handler: String) {
         wsRef().collection("rooms").document(roomId).updateData(["handler": handler])
+    }
+
+    /// 案件から推定できる担当(未回答案件の対応者 → 最新の回答済み案件の対応者)
+    func derivedHandler(roomId: String) -> String {
+        if let open = cases.first(where: { $0.roomId == roomId && $0.status != .answered && !$0.handledBy.isEmpty }) {
+            return open.handledBy
+        }
+        return cases
+            .filter { $0.roomId == roomId && $0.status == .answered && !$0.handledBy.isEmpty }
+            .last?.handledBy ?? ""
+    }
+
+    private var backfilledRoomIds: Set<String> = []
+
+    /// 担当BAが未設定の相談に、案件から推定した担当を書き戻す。
+    /// これにより一覧・チャットとも rooms.handler だけを見れば担当が一致する
+    func backfillRoomHandlers() {
+        guard isExpert else { return }
+        for r in rooms where r.handler.isEmpty && !backfilledRoomIds.contains(r.id) {
+            let derived = derivedHandler(roomId: r.id)
+            if !derived.isEmpty {
+                backfilledRoomIds.insert(r.id)
+                setRoomHandler(r.id, handler: derived)
+            }
+        }
     }
 
     /// 相談の担当BAのトグル(自分なら外す、そうでなければ自分に)
