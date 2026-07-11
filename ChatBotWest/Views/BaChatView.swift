@@ -961,6 +961,17 @@ struct BaMessageBubble: View {
                         .font(.system(size: 11))
                         .foregroundColor(Theme.header.opacity(0.8))
                 }
+                // 既読・時刻はメッセージの上に表示
+                HStack(spacing: 4) {
+                    if isMine, let readStatus {
+                        Text(readStatus)
+                            .font(.system(size: 10))
+                            .foregroundColor(Theme.header.opacity(0.6))
+                    }
+                    Text(fmtTime(message.ts))
+                        .font(.system(size: 10))
+                        .foregroundColor(Theme.header.opacity(0.6))
+                }
                 VStack(alignment: .leading, spacing: 6) {
                     if !message.text.isEmpty {
                         Text(message.deleted ? AttributedString(message.text) : Self.highlightMentions(message.text, names: mentionNames))
@@ -1068,16 +1079,6 @@ struct BaMessageBubble: View {
                     EditMessageSheet(initialText: message.text) { newText in
                         store.updateBaMessageText(message, newText: newText)
                     }
-                }
-                HStack(spacing: 4) {
-                    if isMine, let readStatus {
-                        Text(readStatus)
-                            .font(.system(size: 10))
-                            .foregroundColor(Theme.header.opacity(0.6))
-                    }
-                    Text(fmtTime(message.ts))
-                        .font(.system(size: 10))
-                        .foregroundColor(Theme.header.opacity(0.6))
                 }
             }
             if !isMine { Spacer(minLength: 60) }

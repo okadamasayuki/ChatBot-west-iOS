@@ -646,6 +646,12 @@ struct MessageBubble: View {
                             .font(.system(size: 11))
                             .foregroundColor(Theme.header.opacity(0.8))
                     }
+                    // 既読・時刻はメッセージの上に表示
+                    HStack(spacing: 4) {
+                        if alignRight { readStatusText }
+                        timeText
+                        if !alignRight { readStatusText }
+                    }
                     bubbleText
                         .background(LineBubbleShape(isMine: alignRight).fill(bubbleColor))
                         .overlay(
@@ -663,12 +669,6 @@ struct MessageBubble: View {
                     if showClarify {
                         // 聞き返しの選択肢ボタン
                         FlowChoices(options: message.clarifyOptions, onChoice: onChoice)
-                    }
-                    HStack(spacing: 4) {
-                        // LINEと同じく、自分側は「既読 → 時刻」の順
-                        if alignRight { readStatusText }
-                        timeText
-                        if !alignRight { readStatusText }
                     }
                 }
                 if !alignRight { Spacer(minLength: 60) }
