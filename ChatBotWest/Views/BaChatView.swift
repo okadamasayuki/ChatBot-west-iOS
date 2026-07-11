@@ -553,12 +553,6 @@ struct BaTalkView: View {
                 }
             }
             ToolbarItemGroup(placement: .topBarTrailing) {
-                // トーク内検索(意味検索対応)
-                Button {
-                    showSearch = true
-                } label: {
-                    Image(systemName: "magnifyingglass")
-                }
                 // メンバー一覧
                 Button {
                     showMembers = true
@@ -588,9 +582,6 @@ struct BaTalkView: View {
             if let m = profileMember {
                 MemberProfilePopup(member: m) { profileMember = nil }
             }
-        }
-        .sheet(isPresented: $showSearch) {
-            BaTalkSearchSheet(scopeTalkId: store.currentBaTalkId)
         }
         .alert("ルーム名を設定", isPresented: $showRename) {
             TextField("例: 決算チーム", text: $renameText)
