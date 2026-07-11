@@ -302,10 +302,10 @@ struct ChatRoomView: View {
                 .background(Color(.secondarySystemBackground))
             }
         }
-        .navigationTitle(room?.title ?? "相談")
-        .navigationBarTitleDisplayMode(.inline)
-        // 戻るボタンは出さない(相談一覧タブの再タップ・左端スワイプで戻る)
+        // ヘッダーはタイトル+ボタンの1段(actionBar)にまとめ、ナビゲーションバーは使わない。
+        // 戻るは相談一覧タブの再タップ・左端スワイプ
         .navigationBarBackButtonHidden(true)
+        .toolbar(.hidden, for: .navigationBar)
         .sheet(item: $editingMessage) { msg in
             EditMessageSheet(initialText: msg.text) { newText in
                 store.updateMessageText(msg, newText: newText)
@@ -356,10 +356,13 @@ struct ChatRoomView: View {
         }
     }
 
-    /// タイトルを隠さないよう、担当・リンク・要約・完了はナビゲーションバーの一段下に置く
+    /// ヘッダー1段: 左にタイトル、右に担当・リンク・要約・完了
     @ViewBuilder
     private var actionBar: some View {
         HStack(spacing: 14) {
+            Text(room?.title ?? "相談")
+                .font(.system(size: 15, weight: .semibold))
+                .lineLimit(1)
             Spacer()
             if store.isExpert, let r = room, store.pendingRoom?.id != r.id {
                 // 相談の担当BA(一覧と同じロジック: rooms.handler、未反映の間は案件から補完)。
@@ -430,7 +433,7 @@ struct ChatRoomView: View {
             }
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 6)
+        .padding(.vertical, 8)
         .background(Theme.panelBg)
         .sheet(isPresented: $showDelegatePicker) {
             if let r = room {
