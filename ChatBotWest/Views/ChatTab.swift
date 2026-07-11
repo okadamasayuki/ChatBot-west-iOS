@@ -234,7 +234,7 @@ struct RoomListView: View {
                 Button {
                     showBatchNaiki = true
                 } label: {
-                    Text("📋 社内ルールを更新")
+                    Text("ルール更新")
                         .font(.system(size: 12))
                 }
                 .buttonStyle(.bordered)
