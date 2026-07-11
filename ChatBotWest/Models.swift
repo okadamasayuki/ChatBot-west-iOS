@@ -128,13 +128,24 @@ struct Message: Identifiable, Equatable {
     var senderName: String
     /// 財務(BA)のみに表示するメッセージ(対応依頼の記録など)
     var expertOnly: Bool
+    /// 添付("image" | "file")。データはbase64で埋め込む(600KBまで)
+    var attachmentType: String?
+    var attachmentName: String?
+    var attachmentData: String?
+    /// リアクション: 絵文字 → 付けたユーザーのuid一覧
+    var reactions: [String: [String]]
 
     init(id: String = newUid(), role: MessageRole, text: String, ts: String = nowIso(),
-         clarifyOptions: [String] = [], senderName: String = "", expertOnly: Bool = false) {
+         clarifyOptions: [String] = [], senderName: String = "", expertOnly: Bool = false,
+         attachmentType: String? = nil, attachmentName: String? = nil, attachmentData: String? = nil) {
         self.id = id; self.role = role; self.text = text; self.ts = ts; self.clarifyOptions = clarifyOptions
         self.deleted = false; self.deletedText = nil
         self.senderName = senderName
         self.expertOnly = expertOnly
+        self.attachmentType = attachmentType
+        self.attachmentName = attachmentName
+        self.attachmentData = attachmentData
+        self.reactions = [:]
     }
 
     init?(dict: [String: Any]) {
@@ -149,6 +160,10 @@ struct Message: Identifiable, Equatable {
         deletedText = dict["deletedText"] as? String
         senderName = dict["senderName"] as? String ?? ""
         expertOnly = dict["expertOnly"] as? Bool ?? false
+        attachmentType = dict["attachmentType"] as? String
+        attachmentName = dict["attachmentName"] as? String
+        attachmentData = dict["attachmentData"] as? String
+        reactions = dict["reactions"] as? [String: [String]] ?? [:]
     }
 
     var dict: [String: Any] {
@@ -156,6 +171,9 @@ struct Message: Identifiable, Equatable {
         if !clarifyOptions.isEmpty { d["clarifyOptions"] = clarifyOptions }
         if !senderName.isEmpty { d["senderName"] = senderName }
         if expertOnly { d["expertOnly"] = true }
+        if let attachmentType { d["attachmentType"] = attachmentType }
+        if let attachmentName { d["attachmentName"] = attachmentName }
+        if let attachmentData { d["attachmentData"] = attachmentData }
         return d
     }
 }
@@ -336,16 +354,20 @@ struct BaTalk: Identifiable, Equatable {
     var reads: [String: String]
     /// 上部に固定しているユーザーのuid一覧(参加者ごとに固定できる)
     var pinnedBy: [String]
+    /// 後から追加されたメンバーの履歴開始点: uid → この時刻以降のメッセージだけ見える
+    /// (未設定のメンバーは全履歴が見える)
+    var historyFrom: [String: String]
 
     init(id: String, name: String = "", memberUids: [String] = [], memberNames: [String] = [],
          isGroup: Bool = false, lastText: String = "", lastTs: String = nowIso(), createdAt: String = nowIso(),
-         reads: [String: String] = [:], pinnedBy: [String] = []) {
+         reads: [String: String] = [:], pinnedBy: [String] = [], historyFrom: [String: String] = [:]) {
         self.id = id; self.name = name
         self.memberUids = memberUids; self.memberNames = memberNames
         self.isGroup = isGroup
         self.lastText = lastText; self.lastTs = lastTs; self.createdAt = createdAt
         self.reads = reads
         self.pinnedBy = pinnedBy
+        self.historyFrom = historyFrom
     }
 
     init?(dict: [String: Any]) {
@@ -360,6 +382,7 @@ struct BaTalk: Identifiable, Equatable {
         createdAt = dict["createdAt"] as? String ?? ""
         reads = dict["reads"] as? [String: String] ?? [:]
         pinnedBy = dict["pinnedBy"] as? [String] ?? []
+        historyFrom = dict["historyFrom"] as? [String: String] ?? [:]
     }
 
     var dict: [String: Any] {
@@ -367,6 +390,7 @@ struct BaTalk: Identifiable, Equatable {
                                 "isGroup": isGroup, "lastText": lastText, "lastTs": lastTs, "createdAt": createdAt]
         if !reads.isEmpty { d["reads"] = reads }
         if !pinnedBy.isEmpty { d["pinnedBy"] = pinnedBy }
+        if !historyFrom.isEmpty { d["historyFrom"] = historyFrom }
         return d
     }
 }
@@ -382,12 +406,28 @@ struct BaMessage: Identifiable, Equatable {
     /// 相談チャットへのリンク(貼られている場合)
     var roomId: String?
     var roomTitle: String?
+    /// 添付("image" | "file")。データはbase64で埋め込む(600KBまで)
+    var attachmentType: String?
+    var attachmentName: String?
+    var attachmentData: String?
+    /// リアクション: 絵文字 → 付けたユーザーのuid一覧
+    var reactions: [String: [String]]
+    /// 削除済みフラグ(本文は deletedText に退避され「削除されました」表示になる。復元可能)
+    var deleted: Bool
+    var deletedText: String?
 
     init(id: String = newUid(), text: String, ts: String = nowIso(),
-         senderUid: String, senderName: String, roomId: String? = nil, roomTitle: String? = nil) {
+         senderUid: String, senderName: String, roomId: String? = nil, roomTitle: String? = nil,
+         attachmentType: String? = nil, attachmentName: String? = nil, attachmentData: String? = nil) {
         self.id = id; self.text = text; self.ts = ts
         self.senderUid = senderUid; self.senderName = senderName
         self.roomId = roomId; self.roomTitle = roomTitle
+        self.attachmentType = attachmentType
+        self.attachmentName = attachmentName
+        self.attachmentData = attachmentData
+        self.reactions = [:]
+        self.deleted = false
+        self.deletedText = nil
     }
 
     init?(dict: [String: Any]) {
@@ -399,6 +439,12 @@ struct BaMessage: Identifiable, Equatable {
         senderName = dict["senderName"] as? String ?? ""
         roomId = dict["roomId"] as? String
         roomTitle = dict["roomTitle"] as? String
+        attachmentType = dict["attachmentType"] as? String
+        attachmentName = dict["attachmentName"] as? String
+        attachmentData = dict["attachmentData"] as? String
+        reactions = dict["reactions"] as? [String: [String]] ?? [:]
+        deleted = dict["deleted"] as? Bool ?? false
+        deletedText = dict["deletedText"] as? String
     }
 
     var dict: [String: Any] {
@@ -406,6 +452,9 @@ struct BaMessage: Identifiable, Equatable {
                                 "senderUid": senderUid, "senderName": senderName]
         if let roomId { d["roomId"] = roomId }
         if let roomTitle { d["roomTitle"] = roomTitle }
+        if let attachmentType { d["attachmentType"] = attachmentType }
+        if let attachmentName { d["attachmentName"] = attachmentName }
+        if let attachmentData { d["attachmentData"] = attachmentData }
         return d
     }
 }

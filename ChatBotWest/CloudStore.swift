@@ -18,6 +18,8 @@ final class CloudStore: ObservableObject {
     @Published var role: MemberRole?
     @Published var nickname: String = ""
     @Published var answerStyle: String = ""
+    @Published var myIcon: String = ""     // 自分のアイコン(絵文字)
+    @Published var myIconData: String = "" // 自分のアイコン画像(base64 JPEG。こちらを優先)
     @Published var authReady = false
     var pendingRole: MemberRole = .questioner   // 新規登録時に使う
     var pendingNickname: String = ""
@@ -33,6 +35,17 @@ final class CloudStore: ObservableObject {
         let id: String   // uid
         let name: String // ニックネーム(なければメール)
         let role: String
+        var icon: String = ""      // アイコン(絵文字)
+        var iconData: String = ""  // アイコン画像(base64 JPEG。こちらを優先表示)
+
+        init(id: String, name: String, role: String, icon: String = "", iconData: String = "") {
+            self.id = id; self.name = name; self.role = role; self.icon = icon; self.iconData = iconData
+        }
+    }
+
+    /// uid からメンバー情報を引く
+    func member(_ uid: String) -> MemberInfo? {
+        members.first { $0.id == uid }
     }
     @Published var members: [MemberInfo] = []
 
@@ -163,6 +176,8 @@ final class CloudStore: ObservableObject {
                     self.nickname = d["nickname"] as? String ?? ""
                     self.answerStyle = d["answerStyle"] as? String ?? ""
                     self.pinnedTalkOrder = d["pinnedTalkOrder"] as? [String] ?? []
+                    self.myIcon = d["icon"] as? String ?? ""
+                    self.myIconData = d["iconData"] as? String ?? ""
                 }
             })
         } else {
@@ -214,6 +229,40 @@ final class CloudStore: ObservableObject {
         default:
             return "認証に失敗しました: \(error.localizedDescription)"
         }
+    }
+
+    /// アイコン(絵文字)を保存(画像アイコンは解除)
+    func saveIcon(_ emoji: String) {
+        myIcon = emoji
+        myIconData = ""
+        guard let uid = user?.uid else { return }
+        wsRef().collection("members").document(uid)
+            .setData(["icon": emoji, "iconData": FieldValue.delete()], merge: true)
+    }
+
+    /// アイコン画像(JPEG)を保存
+    func saveIconImage(_ data: Data) {
+        guard data.count <= 100_000, let uid = user?.uid else { return }
+        myIconData = data.base64EncodedString()
+        wsRef().collection("members").document(uid)
+            .setData(["iconData": myIconData], merge: true)
+    }
+
+    private struct IconSpec: Decodable {
+        let emoji: String
+        let colorTop: String
+        let colorBottom: String
+    }
+
+    /// イメージの説明文からアイコンの構成(絵文字+背景グラデーション)をAIで生成する
+    func generateIconSpec(from description: String) async throws -> (emoji: String, top: String, bottom: String) {
+        let raw = try await ClaudeService.call(
+            system: Prompts.iconGenSystem,
+            messages: [.init(role: "user", content: "アイコンのイメージ: \(description)")],
+            schema: Prompts.iconGenSchema
+        )
+        let spec = try JSONDecoder().decode(IconSpec.self, from: Data(raw.utf8))
+        return (spec.emoji, spec.colorTop, spec.colorBottom)
     }
 
     /// 回答の癖(アカウントごと)を保存
@@ -290,7 +339,9 @@ final class CloudStore: ObservableObject {
                     let email = data["email"] as? String ?? ""
                     return MemberInfo(id: d.documentID,
                                       name: nickname.isEmpty ? email : nickname,
-                                      role: data["role"] as? String ?? "")
+                                      role: data["role"] as? String ?? "",
+                                      icon: data["icon"] as? String ?? "",
+                                      iconData: data["iconData"] as? String ?? "")
                 } ?? []
             }
         })
@@ -377,7 +428,10 @@ final class CloudStore: ObservableObject {
     /// メッセージ追加。未送信の新規相談(pendingRoom)は最初のメッセージで保存する(Web版 addMessage と同じ)
     func addMessage(_ msg: Message, roomId: String? = nil) {
         guard let roomId = roomId ?? currentRoomId else { return }
-        let lastText = msg.role == .expert ? "【BA】" + msg.text : msg.text
+        var lastText = msg.role == .expert ? "【BA】" + msg.text : msg.text
+        if msg.text.isEmpty, let type = msg.attachmentType {
+            lastText = type == "image" ? "📷 写真" : "📎 \(msg.attachmentName ?? "ファイル")"
+        }
         let roomRef = wsRef().collection("rooms").document(roomId)
 
         if var room = pendingRoom, room.id == roomId {
@@ -724,6 +778,43 @@ final class CloudStore: ObservableObject {
         return extracted.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    /// よく使うリアクション絵文字(Teams風)
+    static let reactionEmojis = ["👍", "❤️", "😂", "😮", "🙏", "👏"]
+
+    /// 相談チャットのメッセージへのリアクションをトグルする
+    func toggleReaction(_ msg: Message, emoji: String) {
+        guard let uid = user?.uid, let roomId = currentRoomId else { return }
+        let ref = wsRef().collection("rooms").document(roomId)
+            .collection("messages").document(msg.id)
+        if (msg.reactions[emoji] ?? []).contains(uid) {
+            ref.updateData(["reactions.\(emoji)": FieldValue.arrayRemove([uid])])
+        } else {
+            ref.updateData(["reactions.\(emoji)": FieldValue.arrayUnion([uid])])
+        }
+    }
+
+    /// BAトークのメッセージへのリアクションをトグルする
+    func toggleBaReaction(_ msg: BaMessage, emoji: String) {
+        guard let uid = user?.uid, let talkId = currentBaTalkId else { return }
+        let ref = wsRef().collection("baTalks").document(talkId)
+            .collection("messages").document(msg.id)
+        if (msg.reactions[emoji] ?? []).contains(uid) {
+            ref.updateData(["reactions.\(emoji)": FieldValue.arrayRemove([uid])])
+        } else {
+            ref.updateData(["reactions.\(emoji)": FieldValue.arrayUnion([uid])])
+        }
+    }
+
+    /// 相談チャットに添付(写真/ファイル)を送る。AIのトリアージは行わない
+    func sendRoomAttachment(data: Data, name: String, type: String) {
+        guard currentRoomId != nil, canSendInCurrentRoom, data.count <= 600_000 else { return }
+        addMessage(Message(role: .user, text: "",
+                           senderName: myName(),
+                           attachmentType: type,
+                           attachmentName: name,
+                           attachmentData: data.base64EncodedString()))
+    }
+
     // MARK: - BAトーク(財務同士のトークルーム)
 
     /// 自分が参加しているトーク(自分が固定したものを先頭に。固定分は保存した並び順)
@@ -776,8 +867,11 @@ final class CloudStore: ObservableObject {
         if currentBaTalkId == id { closeBaTalk() }
     }
 
-    /// トークの表示名(1:1は相手の名前、グループは名前かメンバー列挙)
+    /// トークの表示名(メモ=名前か「メモ」、1:1は相手の名前、グループは名前かメンバー列挙)
     func baTalkName(_ t: BaTalk) -> String {
+        if t.memberUids.count <= 1 {
+            return t.name.isEmpty ? "📝 メモ" : t.name
+        }
         if t.isGroup {
             return t.name.isEmpty ? t.memberNames.joined(separator: "、") : t.name
         }
@@ -824,15 +918,23 @@ final class CloudStore: ObservableObject {
         wsRef().collection("baTalks").document(talkId).updateData(["reads.\(uid)": lastTs])
     }
 
-    /// 1:1 / グループのトークを開始する(1:1は同じ相手との既存トークがあればそれを返す)
+    /// トークを開始する。selectedが空=自分だけのメモ / 1人=1:1(既存があれば再利用) / 2人以上=グループ
     func startBaTalk(with selected: [MemberInfo], groupName: String = "") -> String {
         let all = [MemberInfo(id: myUid(), name: myName(), role: MemberRole.expert.rawValue)] + selected
         let uids = all.map { $0.id }.sorted()
         let isGroup = selected.count > 1
-        let talkId = isGroup ? newUid() : "dm_" + uids.joined(separator: "_")
+        let talkId: String
+        if selected.count == 1 {
+            talkId = "dm_" + uids.joined(separator: "_") // 1:1は同じ相手と1つだけ
+        } else {
+            talkId = newUid() // メモ・グループは複数作れる
+        }
         if !baTalks.contains(where: { $0.id == talkId }) {
+            let name = selected.isEmpty
+                ? (groupName.isEmpty ? "メモ" : groupName)
+                : (isGroup ? groupName.trimmingCharacters(in: .whitespaces) : "")
             let talk = BaTalk(id: talkId,
-                              name: isGroup ? groupName.trimmingCharacters(in: .whitespaces) : "",
+                              name: name,
                               memberUids: uids,
                               memberNames: all.map { $0.name },
                               isGroup: isGroup)
@@ -841,24 +943,159 @@ final class CloudStore: ObservableObject {
         return talkId
     }
 
-    /// グループトークのルーム名を変更する
+    /// グループトーク・メモのルーム名を変更する
     func renameBaTalk(_ id: String, name: String) {
         guard isExpert,
-              let talk = baTalks.first(where: { $0.id == id }), talk.isGroup else { return }
+              let talk = baTalks.first(where: { $0.id == id }),
+              talk.isGroup || talk.memberUids.count <= 1 else { return }
         wsRef().collection("baTalks").document(id)
             .updateData(["name": name.trimmingCharacters(in: .whitespacesAndNewlines)])
     }
 
-    /// 開いているトークにメッセージを送る(roomId を渡すと相談チャットへのリンク付き)
-    func sendBaTalkMessage(_ text: String, roomId: String? = nil, roomTitle: String? = nil) {
+    /// 開いているトークにメッセージを送る(roomId=相談リンク / attachment=写真・ファイル添付)
+    func sendBaTalkMessage(_ text: String, roomId: String? = nil, roomTitle: String? = nil,
+                           attachmentData: Data? = nil, attachmentName: String? = nil, attachmentType: String? = nil) {
         let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard isExpert, let talkId = currentBaTalkId, !t.isEmpty || roomId != nil else { return }
+        guard isExpert, let talkId = currentBaTalkId,
+              !t.isEmpty || roomId != nil || attachmentData != nil else { return }
+        if let d = attachmentData, d.count > 600_000 { return }
         let msg = BaMessage(text: t, senderUid: myUid(), senderName: myName(),
-                            roomId: roomId, roomTitle: roomTitle)
+                            roomId: roomId, roomTitle: roomTitle,
+                            attachmentType: attachmentData != nil ? attachmentType : nil,
+                            attachmentName: attachmentName,
+                            attachmentData: attachmentData?.base64EncodedString())
         let talkRef = wsRef().collection("baTalks").document(talkId)
         talkRef.collection("messages").document(msg.id).setData(msg.dict)
-        let preview = t.isEmpty ? "🔗 \(roomTitle?.isEmpty == false ? roomTitle! : "相談")" : t
+        var preview = t
+        if preview.isEmpty {
+            if roomId != nil { preview = "🔗 \(roomTitle?.isEmpty == false ? roomTitle! : "相談")" }
+            else if attachmentType == "image" { preview = "📷 写真" }
+            else if attachmentData != nil { preview = "📎 \(attachmentName ?? "ファイル")" }
+        }
         talkRef.setData(["lastText": preview, "lastTs": msg.ts], merge: true)
+    }
+
+    /// トークにメンバーを追加する。showHistory=false なら追加メンバーには追加時点以降の履歴だけ見せる
+    func addBaTalkMembers(_ talkId: String, members newMembers: [MemberInfo], showHistory: Bool) {
+        guard isExpert, !newMembers.isEmpty,
+              let talk = baTalks.first(where: { $0.id == talkId }) else { return }
+        let ref = wsRef().collection("baTalks").document(talkId)
+        var updates: [String: Any] = [
+            "memberUids": FieldValue.arrayUnion(newMembers.map { $0.id }),
+            "memberNames": FieldValue.arrayUnion(newMembers.map { $0.name }),
+        ]
+        if talk.memberUids.count + newMembers.count > 2 {
+            updates["isGroup"] = true // 1:1に追加したらグループになる
+        }
+        if !showHistory {
+            for m in newMembers { updates["historyFrom.\(m.id)"] = nowIso() }
+        }
+        ref.updateData(updates)
+        // 追加をトーク内に記録
+        let names = newMembers.map { $0.name }.joined(separator: "、")
+        let notice = BaMessage(text: "\(myName())さんが\(names)さんを追加しました。",
+                               senderUid: "system", senderName: "")
+        ref.collection("messages").document(notice.id).setData(notice.dict)
+        ref.setData(["lastText": notice.text, "lastTs": notice.ts], merge: true)
+    }
+
+    /// BAトークのメッセージ本文を編集する(自分のメッセージのみ)
+    func updateBaMessageText(_ msg: BaMessage, newText: String) {
+        guard let talkId = currentBaTalkId, msg.senderUid == myUid() else { return }
+        let text = newText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty, text != msg.text else { return }
+        let talkRef = wsRef().collection("baTalks").document(talkId)
+        talkRef.collection("messages").document(msg.id).updateData(["text": text])
+        if baTalkMessages.last?.id == msg.id {
+            talkRef.setData(["lastText": text], merge: true)
+        }
+    }
+
+    /// BAトークのメッセージを削除する(ソフトデリート・復元可能)
+    func deleteBaMessage(_ msg: BaMessage) {
+        guard let talkId = currentBaTalkId, msg.senderUid == myUid(), !msg.deleted else { return }
+        let talkRef = wsRef().collection("baTalks").document(talkId)
+        talkRef.collection("messages").document(msg.id).updateData([
+            "text": "削除されました",
+            "deleted": true,
+            "deletedText": msg.text,
+        ])
+        if baTalkMessages.last?.id == msg.id {
+            talkRef.setData(["lastText": "削除されました"], merge: true)
+        }
+    }
+
+    /// 削除したBAトークのメッセージを元に戻す
+    func restoreBaMessage(_ msg: BaMessage) {
+        guard let talkId = currentBaTalkId, msg.senderUid == myUid(),
+              msg.deleted, let original = msg.deletedText else { return }
+        let talkRef = wsRef().collection("baTalks").document(talkId)
+        talkRef.collection("messages").document(msg.id).updateData([
+            "text": original,
+            "deleted": FieldValue.delete(),
+            "deletedText": FieldValue.delete(),
+        ])
+        if baTalkMessages.last?.id == msg.id {
+            talkRef.setData(["lastText": original], merge: true)
+        }
+    }
+
+    // MARK: - BAチャット全体の検索(キーワード+意味検索)
+
+    struct BaSearchResult: Identifiable {
+        let id: String
+        let talkId: String
+        let talkName: String
+        let senderName: String
+        let text: String
+        let ts: String
+    }
+
+    private struct BaSearchMatches: Decodable {
+        let matches: [String]
+    }
+
+    /// トークを検索する(talkId指定でそのトーク内のみ、省略で自分の全トーク)。
+    /// 部分一致に加え、AIによる意味の近いメッセージも返す
+    func searchBaTalks(query: String, in talkId: String? = nil) async throws -> [BaSearchResult] {
+        let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !q.isEmpty else { return [] }
+        var corpus: [BaSearchResult] = []
+        let targets = talkId == nil ? myBaTalks : myBaTalks.filter { $0.id == talkId }
+        for talk in targets {
+            let snap = try await wsRef().collection("baTalks").document(talk.id)
+                .collection("messages").order(by: "ts", descending: true).limit(to: 100).getDocuments()
+            let from = talk.historyFrom[myUid()]
+            for d in snap.documents {
+                guard let m = BaMessage(dict: d.data()), !m.text.isEmpty, !m.deleted else { continue }
+                if let from, m.ts < from { continue } // 自分に見せない履歴は検索にも出さない
+                corpus.append(BaSearchResult(id: m.id, talkId: talk.id, talkName: baTalkName(talk),
+                                             senderName: m.senderName, text: m.text, ts: m.ts))
+            }
+        }
+        guard !corpus.isEmpty else { return [] }
+        // 1) キーワードの部分一致
+        let local = corpus.filter { $0.text.localizedCaseInsensitiveContains(q) }
+        // 2) AIによる意味検索
+        var semanticIds: [String] = []
+        let numbered = corpus.prefix(300)
+            .map { "\($0.id): \(String($0.text.prefix(80)))" }
+            .joined(separator: "\n")
+        if let raw = try? await ClaudeService.call(
+            system: Prompts.baSearchSystem,
+            messages: [.init(role: "user", content: "検索ワード: \(q)\n\nメッセージ一覧(ID: 本文):\n\(numbered)")],
+            schema: Prompts.baSearchSchema
+        ), let decoded = try? JSONDecoder().decode(BaSearchMatches.self, from: Data(raw.utf8)) {
+            semanticIds = decoded.matches
+        }
+        let semantic = corpus.filter { semanticIds.contains($0.id) }
+        var seen = Set<String>()
+        var results: [BaSearchResult] = []
+        for r in local + semantic where !seen.contains(r.id) {
+            seen.insert(r.id)
+            results.append(r)
+        }
+        return results.sorted { $0.ts > $1.ts }
     }
 
     /// トークの相談リンクから相談チャットを開く

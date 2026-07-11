@@ -1,4 +1,6 @@
 import SwiftUI
+import PhotosUI
+import UniformTypeIdentifiers
 
 /// BAチャット: 財務(BA)同士のトーク。LINEのようにトーク履歴一覧 → 個別トークの構造。
 /// 財務アカウント一覧から相手を選んで1:1トーク、複数選択でグループトークを開始できる
@@ -23,6 +25,7 @@ struct BaChatView: View {
 struct BaTalkListView: View {
     @EnvironmentObject var store: CloudStore
     @State private var showNewTalk = false
+    @State private var showSearch = false
     @State private var deleteTarget: BaTalk?
 
     private var pinnedTalks: [BaTalk] {
@@ -59,7 +62,13 @@ struct BaTalkListView: View {
         .navigationTitle("BAチャット")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
+            ToolbarItemGroup(placement: .topBarTrailing) {
+                // 全トーク横断の検索(意味検索対応)
+                Button {
+                    showSearch = true
+                } label: {
+                    Image(systemName: "magnifyingglass")
+                }
                 Button {
                     showNewTalk = true
                 } label: {
@@ -70,17 +79,19 @@ struct BaTalkListView: View {
         .sheet(isPresented: $showNewTalk) {
             NewBaTalkSheet()
         }
-        .confirmationDialog("このトークを削除しますか?メッセージも消え、元に戻せません。",
-                            isPresented: Binding(get: { deleteTarget != nil },
-                                                 set: { if !$0 { deleteTarget = nil } }),
-                            titleVisibility: .visible) {
+        .sheet(isPresented: $showSearch) {
+            BaTalkSearchSheet(scopeTalkId: nil)
+        }
+        .alert("このトークルームを削除します。\nよろしいですか?",
+               isPresented: Binding(get: { deleteTarget != nil },
+                                    set: { if !$0 { deleteTarget = nil } })) {
+            Button("キャンセル", role: .cancel) { deleteTarget = nil }
             Button("削除", role: .destructive) {
                 if let talk = deleteTarget {
                     Task { await store.deleteBaTalk(talk.id) }
                 }
                 deleteTarget = nil
             }
-            Button("キャンセル", role: .cancel) { deleteTarget = nil }
         }
     }
 
@@ -91,13 +102,20 @@ struct BaTalkListView: View {
             store.openBaTalk(talk.id)
         } label: {
             HStack(spacing: 10) {
-                ZStack {
-                    Circle().fill(Theme.chatBg)
-                    Image(systemName: talk.isGroup ? "person.3.fill" : "person.fill")
-                        .font(.system(size: talk.isGroup ? 12 : 15))
-                        .foregroundColor(.white)
+                // 1:1は相手のアイコン、メモはノート、グループは人型
+                if !talk.isGroup, talk.memberUids.count == 2,
+                   let partnerUid = talk.memberUids.first(where: { $0 != store.myUid() }),
+                   let partner = store.member(partnerUid) {
+                    AvatarCircleView(iconData: partner.iconData, icon: partner.icon, size: 38)
+                } else {
+                    ZStack {
+                        Circle().fill(Theme.chatBg)
+                        Image(systemName: talk.memberUids.count <= 1 ? "note.text" : (talk.isGroup ? "person.3.fill" : "person.fill"))
+                            .font(.system(size: talk.isGroup ? 12 : 15))
+                            .foregroundColor(.white)
+                    }
+                    .frame(width: 38, height: 38)
                 }
-                .frame(width: 38, height: 38)
 
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 4) {
@@ -166,6 +184,19 @@ struct NewBaTalkSheet: View {
     var body: some View {
         NavigationStack {
             Form {
+                Section {
+                    // 自分しかいないトーク(メモとして利用)
+                    Button {
+                        let talkId = store.startBaTalk(with: [])
+                        dismiss()
+                        store.openBaTalk(talkId)
+                    } label: {
+                        Label("自分だけのメモを作成", systemImage: "note.text")
+                    }
+                } footer: {
+                    Text("自分にしか見えないトークです。メモとして使えます。")
+                }
+
                 Section("財務アカウント一覧 — トークする相手を選択") {
                     if candidates.isEmpty {
                         Text("他の財務アカウントがまだありません。")
@@ -231,6 +262,12 @@ struct BaTalkView: View {
     @State private var showRoomPicker = false
     @State private var showRename = false
     @State private var renameText = ""
+    @State private var showPhotoPicker = false
+    @State private var showFileImporter = false
+    @State private var photosItem: PhotosPickerItem?
+    @State private var attachError: String?
+    @State private var showAddMembers = false
+    @State private var showSearch = false
     @FocusState private var inputFocused: Bool
 
     private var talk: BaTalk? {
@@ -258,9 +295,15 @@ struct BaTalkView: View {
         input = String(input[..<atIdx]) + "@\(name) "
     }
 
-    /// 自分のメッセージの既読状況(1:1は既読/未読、グループは既読数)
+    /// 表示するメッセージ(後から追加されたメンバーには追加時点以降だけ見せる)
+    private var visibleMessages: [BaMessage] {
+        guard let t = talk, let from = t.historyFrom[store.myUid()] else { return store.baTalkMessages }
+        return store.baTalkMessages.filter { $0.ts >= from }
+    }
+
+    /// 自分のメッセージの既読状況(1:1は既読/未読、グループは既読数。メモでは表示しない)
     private func readStatus(for msg: BaMessage) -> String? {
-        guard let t = talk, msg.senderUid == store.myUid() else { return nil }
+        guard let t = talk, t.memberUids.count > 1, msg.senderUid == store.myUid() else { return nil }
         let readers = t.reads.filter { $0.key != store.myUid() && $0.value >= msg.ts }.count
         if t.isGroup {
             return readers > 0 ? "既読\(readers)" : "未読"
@@ -273,7 +316,7 @@ struct BaTalkView: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(spacing: 10) {
-                        ForEach(store.baTalkMessages) { msg in
+                        ForEach(visibleMessages) { msg in
                             BaMessageBubble(message: msg,
                                             isMine: msg.senderUid == store.myUid(),
                                             readStatus: readStatus(for: msg),
@@ -285,7 +328,7 @@ struct BaTalkView: View {
                     .padding(.vertical, 12)
                 }
                 .background(Theme.chatBg)
-                .onChange(of: store.baTalkMessages.last?.id) { id in
+                .onChange(of: visibleMessages.last?.id) { id in
                     if let id {
                         withAnimation { proxy.scrollTo(id, anchor: .bottom) }
                     }
@@ -316,14 +359,28 @@ struct BaTalkView: View {
             }
 
             HStack(alignment: .bottom, spacing: 8) {
-                // 相談チャットのリンクを貼る
-                Button {
-                    showRoomPicker = true
+                // 添付(相談リンク・写真・ファイル)
+                Menu {
+                    Button {
+                        showRoomPicker = true
+                    } label: {
+                        Label("相談チャットのリンク", systemImage: "link")
+                    }
+                    Button {
+                        showPhotoPicker = true
+                    } label: {
+                        Label("写真を選択", systemImage: "photo")
+                    }
+                    Button {
+                        showFileImporter = true
+                    } label: {
+                        Label("ファイルを選択", systemImage: "folder")
+                    }
                 } label: {
-                    Image(systemName: "paperclip")
+                    Image(systemName: "plus")
                         .font(.system(size: 18))
                         .foregroundColor(Theme.accentDark)
-                        .frame(width: 36, height: 42)
+                        .frame(width: 32, height: 42)
                 }
 
                 TextField("メッセージを入力...", text: $input, axis: .vertical)
@@ -352,9 +409,9 @@ struct BaTalkView: View {
         }
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            // タイトル部分。グループトークはタップでルーム名を変更できる
+            // タイトル部分。グループトーク・メモはタップでルーム名を変更できる
             ToolbarItem(placement: .principal) {
-                if let t = talk, t.isGroup {
+                if let t = talk, t.isGroup || t.memberUids.count <= 1 {
                     Button {
                         renameText = t.name
                         showRename = true
@@ -375,6 +432,28 @@ struct BaTalkView: View {
                         .lineLimit(1)
                 }
             }
+            ToolbarItemGroup(placement: .topBarTrailing) {
+                // トーク内検索(意味検索対応)
+                Button {
+                    showSearch = true
+                } label: {
+                    Image(systemName: "magnifyingglass")
+                }
+                // メンバー追加
+                Button {
+                    showAddMembers = true
+                } label: {
+                    Image(systemName: "person.badge.plus")
+                }
+            }
+        }
+        .sheet(isPresented: $showAddMembers) {
+            if let t = talk {
+                AddBaMembersSheet(talk: t)
+            }
+        }
+        .sheet(isPresented: $showSearch) {
+            BaTalkSearchSheet(scopeTalkId: store.currentBaTalkId)
         }
         .alert("ルーム名を設定", isPresented: $showRename) {
             TextField("例: 決算チーム", text: $renameText)
@@ -393,6 +472,203 @@ struct BaTalkView: View {
                 input = ""
             }
         }
+        .photosPicker(isPresented: $showPhotoPicker, selection: $photosItem, matching: .images)
+        .onChange(of: photosItem) { item in
+            guard let item else { return }
+            Task {
+                if let data = try? await item.loadTransferable(type: Data.self) {
+                    if let jpeg = AttachmentUtils.compressImage(data) {
+                        store.sendBaTalkMessage("", attachmentData: jpeg, attachmentName: "photo.jpg", attachmentType: "image")
+                    } else {
+                        attachError = "写真を圧縮できませんでした。"
+                    }
+                }
+                photosItem = nil
+            }
+        }
+        .fileImporter(isPresented: $showFileImporter, allowedContentTypes: [.item]) { result in
+            guard case .success(let url) = result else { return }
+            let accessing = url.startAccessingSecurityScopedResource()
+            defer { if accessing { url.stopAccessingSecurityScopedResource() } }
+            guard let data = try? Data(contentsOf: url) else {
+                attachError = "ファイルを読み込めませんでした。"
+                return
+            }
+            guard data.count <= AttachmentUtils.maxBytes else {
+                attachError = "ファイルが大きすぎます(600KBまで)。"
+                return
+            }
+            store.sendBaTalkMessage("", attachmentData: data, attachmentName: url.lastPathComponent, attachmentType: "file")
+        }
+        .alert("添付エラー", isPresented: Binding(get: { attachError != nil },
+                                              set: { if !$0 { attachError = nil } })) {
+            Button("OK") { attachError = nil }
+        } message: {
+            Text(attachError ?? "")
+        }
+    }
+}
+
+// MARK: - メンバー追加(履歴を見せるか選択できる)
+
+struct AddBaMembersSheet: View {
+    @EnvironmentObject var store: CloudStore
+    @Environment(\.dismiss) private var dismiss
+    let talk: BaTalk
+    @State private var selected: Set<String> = []
+    @State private var showHistory = true
+    @State private var searchText = ""
+
+    private var candidates: [CloudStore.MemberInfo] {
+        let all = store.members
+            .filter { $0.role == MemberRole.expert.rawValue && !talk.memberUids.contains($0.id) && !$0.name.isEmpty }
+            .sorted { $0.name < $1.name }
+        let q = searchText.trimmingCharacters(in: .whitespaces)
+        guard !q.isEmpty else { return all }
+        return all.filter { $0.name.localizedCaseInsensitiveContains(q) }
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("追加するメンバーを選択") {
+                    if candidates.isEmpty {
+                        Text("追加できるメンバーがいません。")
+                            .font(.footnote)
+                            .foregroundColor(.secondary)
+                    }
+                    ForEach(candidates) { member in
+                        Button {
+                            if selected.contains(member.id) { selected.remove(member.id) }
+                            else { selected.insert(member.id) }
+                        } label: {
+                            HStack {
+                                Image(systemName: selected.contains(member.id) ? "checkmark.circle.fill" : "circle")
+                                    .foregroundColor(selected.contains(member.id) ? Theme.accent : .secondary)
+                                Text(member.name)
+                                    .foregroundColor(.primary)
+                                Spacer()
+                            }
+                        }
+                    }
+                }
+
+                Section {
+                    Toggle("過去の履歴も見せる", isOn: $showHistory)
+                        .tint(Theme.accent)
+                } footer: {
+                    Text("オフにすると、追加したメンバーには追加した時点より後のメッセージだけが表示されます。")
+                }
+
+                Section {
+                    Button {
+                        let picked = candidates.filter { selected.contains($0.id) }
+                        store.addBaTalkMembers(talk.id, members: picked, showHistory: showHistory)
+                        dismiss()
+                    } label: {
+                        HStack { Spacer(); Text("追加する").bold(); Spacer() }
+                    }
+                    .disabled(selected.isEmpty)
+                }
+            }
+            .navigationTitle("メンバーを追加")
+            .navigationBarTitleDisplayMode(.inline)
+            .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always),
+                        prompt: "ユーザー名で検索")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("キャンセル") { dismiss() }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - トーク検索(キーワード+意味検索)
+
+struct BaTalkSearchSheet: View {
+    @EnvironmentObject var store: CloudStore
+    @Environment(\.dismiss) private var dismiss
+    /// nil = 全トーク横断 / 指定 = そのトーク内のみ
+    let scopeTalkId: String?
+    @State private var query = ""
+    @State private var busy = false
+    @State private var searched = false
+    @State private var results: [CloudStore.BaSearchResult] = []
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 0) {
+                HStack(spacing: 8) {
+                    TextField("検索ワード(意味が近いものも見つかります)", text: $query)
+                        .textFieldStyle(.roundedBorder)
+                        .submitLabel(.search)
+                        .onSubmit { search() }
+                    Button("検索") { search() }
+                        .buttonStyle(.borderedProminent)
+                        .tint(Theme.accent)
+                        .disabled(busy || query.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+                .padding(12)
+
+                if busy {
+                    Spacer()
+                    ProgressView("検索中…(AIが意味の近いメッセージも探しています)")
+                        .font(.footnote)
+                    Spacer()
+                } else if searched && results.isEmpty {
+                    Spacer()
+                    Text("見つかりませんでした。")
+                        .font(.footnote)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                } else {
+                    List(results) { r in
+                        Button {
+                            dismiss()
+                            if scopeTalkId == nil {
+                                store.openBaTalk(r.talkId)
+                            }
+                        } label: {
+                            VStack(alignment: .leading, spacing: 3) {
+                                HStack {
+                                    Text(r.talkName)
+                                        .font(.system(size: 11))
+                                        .foregroundColor(.secondary)
+                                    Spacer()
+                                    Text(fmtDate(r.ts))
+                                        .font(.system(size: 10))
+                                        .foregroundColor(Color(.tertiaryLabel))
+                                }
+                                Text("\(r.senderName): \(r.text)")
+                                    .font(.system(size: 13))
+                                    .foregroundColor(.primary)
+                                    .lineLimit(3)
+                            }
+                        }
+                    }
+                    .listStyle(.plain)
+                }
+            }
+            .navigationTitle(scopeTalkId == nil ? "BAチャットを検索" : "このトークを検索")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("閉じる") { dismiss() }
+                }
+            }
+        }
+    }
+
+    private func search() {
+        let q = query.trimmingCharacters(in: .whitespaces)
+        guard !q.isEmpty, !busy else { return }
+        busy = true
+        Task {
+            results = (try? await store.searchBaTalks(query: q, in: scopeTalkId)) ?? []
+            searched = true
+            busy = false
+        }
     }
 }
 
@@ -403,8 +679,26 @@ struct BaMessageBubble: View {
     let isMine: Bool
     var readStatus: String? = nil
     var mentionNames: [String] = []
+    @State private var showEdit = false
 
     var body: some View {
+        // メンバー追加などのシステム通知は中央に表示
+        if message.senderUid == "system" {
+            Text(message.text)
+                .font(.system(size: 12))
+                .foregroundColor(.white)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(Theme.header.opacity(0.55))
+                .cornerRadius(10)
+                .frame(maxWidth: .infinity)
+        } else {
+            bubbleBody
+        }
+    }
+
+    private var bubbleBody: some View {
         HStack {
             if isMine { Spacer(minLength: 60) }
             VStack(alignment: isMine ? .trailing : .leading, spacing: 3) {
@@ -415,11 +709,16 @@ struct BaMessageBubble: View {
                 }
                 VStack(alignment: .leading, spacing: 6) {
                     if !message.text.isEmpty {
-                        Text(Self.highlightMentions(message.text, names: mentionNames))
+                        Text(message.deleted ? AttributedString(message.text) : Self.highlightMentions(message.text, names: mentionNames))
                             .font(.system(size: 14))
+                            .italic(message.deleted)
+                            .foregroundColor(message.deleted ? .secondary : .primary)
                             .lineSpacing(4)
                     }
-                    if let roomId = message.roomId {
+                    if !message.deleted, let type = message.attachmentType, let data = message.attachmentData {
+                        AttachmentContentView(type: type, name: message.attachmentName ?? "", dataB64: data)
+                    }
+                    if !message.deleted, let roomId = message.roomId {
                         // 相談チャットへのリンクカード(タップで開く)
                         Button {
                             store.openRoomFromBaChat(roomId)
@@ -447,15 +746,57 @@ struct BaMessageBubble: View {
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 9)
-                .background(isMine ? Theme.myBubble : Color(.systemBackground))
-                .cornerRadius(14)
+                .background(LineBubbleShape(isMine: isMine).fill(isMine ? Theme.myBubble : Color(.systemBackground)))
                 .contextMenu {
-                    if !message.text.isEmpty {
-                        Button {
-                            UIPasteboard.general.string = message.text
+                    if !message.deleted {
+                        Menu {
+                            ForEach(CloudStore.reactionEmojis, id: \.self) { emoji in
+                                Button(emoji) {
+                                    store.toggleBaReaction(message, emoji: emoji)
+                                }
+                            }
                         } label: {
-                            Label("コピー", systemImage: "doc.on.doc")
+                            Label("リアクション", systemImage: "face.smiling")
                         }
+                        if !message.text.isEmpty {
+                            Button {
+                                UIPasteboard.general.string = message.text
+                            } label: {
+                                Label("コピー", systemImage: "doc.on.doc")
+                            }
+                        }
+                    }
+                    if isMine {
+                        if message.deleted {
+                            Button {
+                                store.restoreBaMessage(message)
+                            } label: {
+                                Label("元に戻す", systemImage: "arrow.uturn.backward")
+                            }
+                        } else {
+                            if !message.text.isEmpty {
+                                Button {
+                                    showEdit = true
+                                } label: {
+                                    Label("編集", systemImage: "pencil")
+                                }
+                            }
+                            Button(role: .destructive) {
+                                store.deleteBaMessage(message)
+                            } label: {
+                                Label("削除", systemImage: "trash")
+                            }
+                        }
+                    }
+                }
+                .sheet(isPresented: $showEdit) {
+                    EditMessageSheet(initialText: message.text) { newText in
+                        store.updateBaMessageText(message, newText: newText)
+                    }
+                }
+                if !message.reactions.isEmpty {
+                    ReactionChipsView(reactions: message.reactions, myUid: store.myUid()) { emoji in
+                        store.toggleBaReaction(message, emoji: emoji)
                     }
                 }
                 HStack(spacing: 4) {

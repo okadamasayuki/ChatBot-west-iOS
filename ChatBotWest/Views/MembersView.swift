@@ -27,18 +27,14 @@ struct MembersView: View {
             List {
                 Section("財務(BA) — \(experts.count)人") {
                     ForEach(experts) { member in
-                        if store.isExpert, member.id != store.myUid() {
-                            // 財務同士はタップでトークを開始できる
-                            Button {
-                                let talkId = store.startBaTalk(with: [member])
-                                store.activeTab = .baChat
-                                store.openBaTalk(talkId)
-                            } label: {
-                                MemberRow(member: member, isMe: false, showsTalkIcon: true)
-                            }
-                        } else {
-                            MemberRow(member: member, isMe: member.id == store.myUid())
-                        }
+                        // 財務同士は右のトークアイコンをタップするとトークを開始できる
+                        MemberRow(member: member,
+                                  isMe: member.id == store.myUid(),
+                                  onTalk: (store.isExpert && member.id != store.myUid()) ? {
+                                      let talkId = store.startBaTalk(with: [member])
+                                      store.activeTab = .baChat
+                                      store.openBaTalk(talkId)
+                                  } : nil)
                     }
                 }
                 Section("担当者(質問者) — \(questioners.count)人") {
@@ -58,17 +54,15 @@ struct MembersView: View {
 struct MemberRow: View {
     let member: CloudStore.MemberInfo
     let isMe: Bool
-    var showsTalkIcon = false
+    /// 右のトークアイコンをタップしたときの動作(nilならアイコン非表示)
+    var onTalk: (() -> Void)? = nil
 
     var body: some View {
         HStack(spacing: 10) {
-            ZStack {
-                Circle().fill(member.role == MemberRole.expert.rawValue ? Theme.accent.opacity(0.8) : Theme.chatBg)
-                Image(systemName: "person.fill")
-                    .font(.system(size: 14))
-                    .foregroundColor(.white)
-            }
-            .frame(width: 34, height: 34)
+            AvatarCircleView(iconData: member.iconData,
+                             icon: member.icon,
+                             fallbackBg: member.role == MemberRole.expert.rawValue ? Theme.accent.opacity(0.8) : Theme.chatBg,
+                             size: 34)
 
             VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: 6) {
@@ -87,11 +81,15 @@ struct MemberRow: View {
                 }
             }
             Spacer()
-            if showsTalkIcon {
-                // タップでトーク開始できることを示す
-                Image(systemName: "bubble.left.fill")
-                    .font(.system(size: 14))
-                    .foregroundColor(Theme.accentDark.opacity(0.7))
+            if let onTalk {
+                // トーク開始はこのアイコンのタップのみ(行全体では開始しない)
+                Button(action: onTalk) {
+                    Image(systemName: "bubble.left.fill")
+                        .font(.system(size: 16))
+                        .foregroundColor(Theme.accentDark.opacity(0.8))
+                        .frame(width: 36, height: 36)
+                }
+                .buttonStyle(.borderless)
             }
         }
         .padding(.vertical, 2)

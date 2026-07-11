@@ -109,15 +109,14 @@ struct ManualView: View {
                 guard case .success(let urls) = result, let url = urls.first else { return }
                 importFile(url)
             }
-            .confirmationDialog("このマニュアルを削除しますか?",
-                                isPresented: Binding(get: { deleteTarget != nil },
-                                                     set: { if !$0 { deleteTarget = nil } }),
-                                titleVisibility: .visible) {
+            .alert("このマニュアルを削除します。\nよろしいですか?",
+                   isPresented: Binding(get: { deleteTarget != nil },
+                                        set: { if !$0 { deleteTarget = nil } })) {
+                Button("キャンセル", role: .cancel) { deleteTarget = nil }
                 Button("削除", role: .destructive) {
                     if let m = deleteTarget { store.deleteManual(m.id) }
                     deleteTarget = nil
                 }
-                Button("キャンセル", role: .cancel) { deleteTarget = nil }
             }
             .sheet(item: $previewTarget) { m in
                 ManualPreviewSheet(manual: m)

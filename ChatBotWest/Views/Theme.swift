@@ -1,6 +1,33 @@
 import SwiftUI
 
 /// Web版のLINE風配色
+/// LINE風の吹き出し(角丸+上端のしっぽ)。isMine=true で右上、false で左上にしっぽ
+struct LineBubbleShape: Shape {
+    var isMine: Bool
+
+    func path(in rect: CGRect) -> Path {
+        let r: CGFloat = 14
+        var p = Path(roundedRect: rect, cornerRadius: r)
+        var tail = Path()
+        if isMine {
+            tail.move(to: CGPoint(x: rect.maxX - r, y: rect.minY))
+            tail.addQuadCurve(to: CGPoint(x: rect.maxX + 7, y: rect.minY - 1),
+                              control: CGPoint(x: rect.maxX + 1, y: rect.minY - 2))
+            tail.addQuadCurve(to: CGPoint(x: rect.maxX, y: rect.minY + r),
+                              control: CGPoint(x: rect.maxX, y: rect.minY + 3))
+        } else {
+            tail.move(to: CGPoint(x: rect.minX + r, y: rect.minY))
+            tail.addQuadCurve(to: CGPoint(x: rect.minX - 7, y: rect.minY - 1),
+                              control: CGPoint(x: rect.minX - 1, y: rect.minY - 2))
+            tail.addQuadCurve(to: CGPoint(x: rect.minX, y: rect.minY + r),
+                              control: CGPoint(x: rect.minX, y: rect.minY + 3))
+        }
+        tail.closeSubpath()
+        p.addPath(tail)
+        return p
+    }
+}
+
 enum Theme {
     static let header = Color(red: 0x27 / 255, green: 0x32 / 255, blue: 0x46 / 255)      // #273246
     static let chatBg = Color(red: 0x8c / 255, green: 0xab / 255, blue: 0xd8 / 255)      // #8cabd8

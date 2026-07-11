@@ -160,17 +160,16 @@ struct RoomListView: View {
                 }
             }
         }
-        .confirmationDialog("この相談を削除しますか?元に戻せません。",
-                            isPresented: Binding(get: { deleteTarget != nil },
-                                                 set: { if !$0 { deleteTarget = nil } }),
-                            titleVisibility: .visible) {
+        .alert("この相談を削除します。\nよろしいですか?",
+               isPresented: Binding(get: { deleteTarget != nil },
+                                    set: { if !$0 { deleteTarget = nil } })) {
+            Button("キャンセル", role: .cancel) { deleteTarget = nil }
             Button("削除", role: .destructive) {
                 if let room = deleteTarget {
                     Task { await store.deleteRoom(room.id) }
                 }
                 deleteTarget = nil
             }
-            Button("キャンセル", role: .cancel) { deleteTarget = nil }
         }
         .sheet(isPresented: $showBatchNaiki) {
             NaikiUpdateSheet(

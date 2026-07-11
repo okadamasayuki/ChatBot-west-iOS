@@ -85,9 +85,9 @@ struct NaikiUpdateSheet: View {
                     Button("閉じる") { dismiss() }
                 }
             }
-            .confirmationDialog(confirmBeforeApply ?? "", isPresented: $confirmApply, titleVisibility: .visible) {
-                Button("反映する") { doApply() }
+            .alert(confirmBeforeApply ?? "", isPresented: $confirmApply) {
                 Button("キャンセル", role: .cancel) {}
+                Button("反映する") { doApply() }
             }
         }
         .task { runExtract() }

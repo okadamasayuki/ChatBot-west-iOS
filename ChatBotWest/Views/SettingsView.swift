@@ -1,5 +1,141 @@
 import SwiftUI
 import UIKit
+import PhotosUI
+
+/// アイコン設定: 絵文字から選ぶ / 写真から選ぶ / AIで自動生成
+struct IconSettingView: View {
+    @EnvironmentObject var store: CloudStore
+    @State private var photosItem: PhotosPickerItem?
+    @State private var aiPrompt = ""
+    @State private var aiBusy = false
+    @State private var aiPreview: UIImage?
+    @State private var errorMessage: String?
+
+    private static let emojis = ["😀", "😎", "🤓", "🥸", "😺", "🐶", "🐱", "🐰", "🦊", "🐻",
+                                 "🐼", "🐨", "🦁", "🐯", "🐸", "🐥", "🦉", "🐢", "🐬", "🦄",
+                                 "🌻", "🌸", "🍀", "⭐️", "🔥", "⚡️", "🍎", "☕️", "⚽️", "🎸"]
+
+    var body: some View {
+        Form {
+            Section {
+                HStack {
+                    Spacer()
+                    AvatarCircleView(iconData: store.myIconData, icon: store.myIcon, size: 88)
+                    Spacer()
+                }
+                .listRowBackground(Color.clear)
+            }
+
+            Section("絵文字から選ぶ") {
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 6), spacing: 10) {
+                    ForEach(Self.emojis, id: \.self) { emoji in
+                        Button {
+                            store.saveIcon(emoji)
+                        } label: {
+                            Text(emoji)
+                                .font(.system(size: 26))
+                                .frame(width: 44, height: 44)
+                                .background(store.myIcon == emoji && store.myIconData.isEmpty
+                                            ? Theme.accent.opacity(0.2) : Color.clear)
+                                .cornerRadius(8)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+
+            Section("写真から選ぶ") {
+                PhotosPicker(selection: $photosItem, matching: .images) {
+                    Label("写真を選択", systemImage: "photo")
+                }
+            }
+
+            Section {
+                TextField("例: 海が好きな猫、山とコーヒー", text: $aiPrompt)
+                if let aiPreview {
+                    HStack {
+                        Spacer()
+                        Image(uiImage: aiPreview)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 72, height: 72)
+                            .clipShape(Circle())
+                        Spacer()
+                    }
+                }
+                HStack {
+                    Button {
+                        generate()
+                    } label: {
+                        if aiBusy {
+                            HStack(spacing: 6) { ProgressView().controlSize(.small); Text("生成中…") }
+                        } else {
+                            Label(aiPreview == nil ? "AIで生成" : "作り直す", systemImage: "sparkles")
+                        }
+                    }
+                    .disabled(aiBusy || aiPrompt.trimmingCharacters(in: .whitespaces).isEmpty)
+                    Spacer()
+                    if let aiPreview {
+                        Button("これに設定") {
+                            if let data = aiPreview.jpegData(compressionQuality: 0.8) {
+                                store.saveIconImage(data)
+                            }
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(Theme.accent)
+                    }
+                }
+                if let errorMessage {
+                    Text("⚠ \(errorMessage)").font(.footnote).foregroundColor(.red)
+                }
+            } header: {
+                Text("AIで自動生成")
+            } footer: {
+                Text("イメージを入力すると、AIが絵文字と配色を選んでアイコンを生成します。")
+            }
+        }
+        .navigationTitle("アイコンを設定")
+        .navigationBarTitleDisplayMode(.inline)
+        .onChange(of: photosItem) { item in
+            guard let item else { return }
+            Task {
+                if let data = try? await item.loadTransferable(type: Data.self),
+                   let image = UIImage(data: data) {
+                    // 正方形に切り出して縮小(メンバー情報に収まるサイズへ)
+                    let side = min(image.size.width, image.size.height)
+                    let crop = CGRect(x: (image.size.width - side) / 2,
+                                      y: (image.size.height - side) / 2,
+                                      width: side, height: side)
+                    if let cg = image.cgImage?.cropping(to: crop) {
+                        let square = UIImage(cgImage: cg, scale: image.scale, orientation: image.imageOrientation)
+                        let renderer = UIGraphicsImageRenderer(size: CGSize(width: 256, height: 256))
+                        let resized = renderer.image { _ in
+                            square.draw(in: CGRect(x: 0, y: 0, width: 256, height: 256))
+                        }
+                        if let jpeg = resized.jpegData(compressionQuality: 0.8) {
+                            store.saveIconImage(jpeg)
+                        }
+                    }
+                }
+                photosItem = nil
+            }
+        }
+    }
+
+    private func generate() {
+        aiBusy = true
+        errorMessage = nil
+        Task {
+            do {
+                let spec = try await store.generateIconSpec(from: aiPrompt)
+                aiPreview = AvatarRenderer.render(emoji: spec.emoji, topHex: spec.top, bottomHex: spec.bottom)
+            } catch {
+                errorMessage = "生成に失敗しました: \(error.localizedDescription)"
+            }
+            aiBusy = false
+        }
+    }
+}
 
 /// 設定タブ: アカウント / サンプルデータ / 財務向け管理 / 回答の癖 / Q&A履歴ダウンロード
 struct SettingsView: View {
@@ -34,8 +170,16 @@ struct SettingsView: View {
             Form {
                 Section("☁ アカウント") {
                     if store.user != nil {
-                        LabeledContent("ログイン中", value: store.myName())
-                        LabeledContent("役割", value: store.role?.label ?? "-")
+                        HStack {
+                            AvatarCircleView(iconData: store.myIconData, icon: store.myIcon, size: 44)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(store.myName()).font(.system(size: 15, weight: .semibold))
+                                Text(store.role?.label ?? "-").font(.footnote).foregroundColor(.secondary)
+                            }
+                        }
+                        NavigationLink("アイコンを設定") {
+                            IconSettingView()
+                        }
                     }
                     Button("ログアウト", role: .destructive) {
                         store.logout()
@@ -86,20 +230,20 @@ struct SettingsView: View {
                         }
                         .disabled(deleteAllBusy)
                         // 確認ダイアログはボタンごとに付ける(同じビューに複数まとめると動かないため)
-                        .confirmationDialog("すべての相談・BAの案件・回答履歴を削除しますか?\n全員の画面から消え、元に戻せません。",
-                                            isPresented: $confirmDeleteAll, titleVisibility: .visible) {
-                            Button("削除する", role: .destructive) {
-                                // 1つ目のダイアログが閉じ切ってから最終確認を出す
+                        .alert("すべての相談・BAの案件・回答履歴を削除します。\nよろしいですか?",
+                               isPresented: $confirmDeleteAll) {
+                            Button("キャンセル", role: .cancel) {}
+                            Button("削除", role: .destructive) {
+                                // 1つ目のアラートが閉じ切ってから最終確認を出す
                                 Task { @MainActor in
                                     try? await Task.sleep(nanoseconds: 500_000_000)
                                     confirmDeleteAllFinal = true
                                 }
                             }
-                            Button("キャンセル", role: .cancel) {}
                         }
                         .alert("本当に削除しますか?(最終確認)", isPresented: $confirmDeleteAllFinal) {
-                            Button("すべて削除", role: .destructive) { deleteAllRooms() }
                             Button("キャンセル", role: .cancel) {}
+                            Button("すべて削除", role: .destructive) { deleteAllRooms() }
                         }
                     }
 
@@ -110,10 +254,10 @@ struct SettingsView: View {
                         Button("🗑 社内ルールを空にする", role: .destructive) {
                             confirmClearNaiki = true
                         }
-                        .confirmationDialog("社内ルールをすべて削除して空にしますか?\n(全員の回答に反映されます。元に戻せません)",
-                                            isPresented: $confirmClearNaiki, titleVisibility: .visible) {
-                            Button("空にする", role: .destructive) { store.saveNaiki("") }
+                        .alert("社内ルールをすべて削除して空にします。\nよろしいですか?",
+                               isPresented: $confirmClearNaiki) {
                             Button("キャンセル", role: .cancel) {}
+                            Button("削除", role: .destructive) { store.saveNaiki("") }
                         }
                     }
 

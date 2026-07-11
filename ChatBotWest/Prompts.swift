@@ -115,6 +115,49 @@ enum Prompts {
     全体で300字程度まで。前置きや説明は不要で、要約本文だけを返してください。
     """
 
+    /// アイコンの自動生成(絵文字+背景グラデーションの構成をAIが決める)
+    static let iconGenSystem = """
+    あなたはアバターアイコンのデザイナーです。ユーザーが入力したイメージの説明から、
+    アイコンの構成を決めてください。
+
+    - emoji: イメージに最も合う絵文字を1つ
+    - colorTop / colorBottom: 背景グラデーションの色(#RRGGBB形式)。イメージに合う、
+      明るく親しみやすい配色にする(上が明るく下が濃いと綺麗に見える)
+    """
+
+    static let iconGenSchema: [String: Any] = [
+        "type": "object",
+        "properties": [
+            "emoji": ["type": "string", "description": "アイコンに使う絵文字1つ"],
+            "colorTop": ["type": "string", "description": "背景グラデーション上部の色(#RRGGBB)"],
+            "colorBottom": ["type": "string", "description": "背景グラデーション下部の色(#RRGGBB)"],
+        ],
+        "required": ["emoji", "colorTop", "colorBottom"],
+        "additionalProperties": false,
+    ]
+
+    /// BAチャット全体の意味検索
+    static let baSearchSystem = """
+    あなたはチャット検索アシスタントです。検索ワードに意味的に関連するメッセージを探します。
+
+    - 完全一致でなくても、意味が同じ・強く関連するメッセージのIDを matches に含めてください
+    - 関連が薄いものは含めない(多くても10件程度)
+    - 該当がなければ空配列を返す
+    """
+
+    static let baSearchSchema: [String: Any] = [
+        "type": "object",
+        "properties": [
+            "matches": [
+                "type": "array",
+                "items": ["type": "string"],
+                "description": "検索ワードに意味的に関連するメッセージのID",
+            ],
+        ],
+        "required": ["matches"],
+        "additionalProperties": false,
+    ]
+
     static let triageSchema: [String: Any] = [
         "type": "object",
         "properties": [

@@ -1,4 +1,6 @@
 import SwiftUI
+import PhotosUI
+import UniformTypeIdentifiers
 
 /// LINE風チャット画面
 struct ChatRoomView: View {
@@ -7,6 +9,10 @@ struct ChatRoomView: View {
     @FocusState private var inputFocused: Bool
     @State private var editingMessage: Message?
     @State private var showSummary = false
+    @State private var showPhotoPicker = false
+    @State private var showFileImporter = false
+    @State private var photosItem: PhotosPickerItem?
+    @State private var attachError: String?
 
     /// 表示するメッセージ(財務のみ表示のメッセージは質問者には見せない)
     private var displayMessages: [Message] {
@@ -130,15 +136,26 @@ struct ChatRoomView: View {
                                 bubbleColor: style.color,
                                 borderColor: style.border,
                                 readStatus: msg.deleted ? nil : readStatus(for: msg),
+                                myUid: store.myUid(),
+                                onReaction: { emoji in store.toggleReaction(msg, emoji: emoji) },
                                 showClarify: idx == lastIdx && msg.role == .ai && !msg.clarifyOptions.isEmpty && !viewOnly && !msg.deleted,
                                 onChoice: { choice in
                                     Task { await store.submitQuestion(choice) }
                                 }
                             )
                             .id(msg.id)
-                            // 長押しでコピー(全メッセージ)・編集・削除・復元(財務: AI・BAのメッセージ / 担当者: 自分の質問)
+                            // 長押しでリアクション・コピー(全メッセージ)・編集・削除・復元
                             bubble.contextMenu {
                                 if !msg.deleted {
+                                    Menu {
+                                        ForEach(CloudStore.reactionEmojis, id: \.self) { emoji in
+                                            Button(emoji) {
+                                                store.toggleReaction(msg, emoji: emoji)
+                                            }
+                                        }
+                                    } label: {
+                                        Label("リアクション", systemImage: "face.smiling")
+                                    }
                                     Button {
                                         UIPasteboard.general.string = msg.text
                                     } label: {
@@ -196,6 +213,25 @@ struct ChatRoomView: View {
 
             if !viewOnly {
                 HStack(alignment: .bottom, spacing: 8) {
+                    // 写真・ファイルの添付
+                    Menu {
+                        Button {
+                            showPhotoPicker = true
+                        } label: {
+                            Label("写真を選択", systemImage: "photo")
+                        }
+                        Button {
+                            showFileImporter = true
+                        } label: {
+                            Label("ファイルを選択", systemImage: "folder")
+                        }
+                    } label: {
+                        Image(systemName: "plus")
+                            .font(.system(size: 18))
+                            .foregroundColor(Theme.accentDark)
+                            .frame(width: 32, height: 42)
+                    }
+
                     TextField("会計に関する質問を入力...", text: $input, axis: .vertical)
                         .lineLimit(1...4)
                         .padding(.horizontal, 14)
@@ -225,9 +261,43 @@ struct ChatRoomView: View {
         .navigationTitle(room?.title ?? "相談")
         .navigationBarTitleDisplayMode(.inline)
         .sheet(item: $editingMessage) { msg in
-            EditMessageSheet(message: msg) { newText in
+            EditMessageSheet(initialText: msg.text) { newText in
                 store.updateMessageText(msg, newText: newText)
             }
+        }
+        .photosPicker(isPresented: $showPhotoPicker, selection: $photosItem, matching: .images)
+        .onChange(of: photosItem) { item in
+            guard let item else { return }
+            Task {
+                if let data = try? await item.loadTransferable(type: Data.self) {
+                    if let jpeg = AttachmentUtils.compressImage(data) {
+                        store.sendRoomAttachment(data: jpeg, name: "photo.jpg", type: "image")
+                    } else {
+                        attachError = "写真を圧縮できませんでした。"
+                    }
+                }
+                photosItem = nil
+            }
+        }
+        .fileImporter(isPresented: $showFileImporter, allowedContentTypes: [.item]) { result in
+            guard case .success(let url) = result else { return }
+            let accessing = url.startAccessingSecurityScopedResource()
+            defer { if accessing { url.stopAccessingSecurityScopedResource() } }
+            guard let data = try? Data(contentsOf: url) else {
+                attachError = "ファイルを読み込めませんでした。"
+                return
+            }
+            guard data.count <= AttachmentUtils.maxBytes else {
+                attachError = "ファイルが大きすぎます(600KBまで)。"
+                return
+            }
+            store.sendRoomAttachment(data: data, name: url.lastPathComponent, type: "file")
+        }
+        .alert("添付エラー", isPresented: Binding(get: { attachError != nil },
+                                              set: { if !$0 { attachError = nil } })) {
+            Button("OK") { attachError = nil }
+        } message: {
+            Text(attachError ?? "")
         }
         .sheet(isPresented: $showSummary) {
             SummarySheet { try await store.summarizeCurrentRoom() }
@@ -374,7 +444,7 @@ struct SummarySheet: View {
 
 struct EditMessageSheet: View {
     @Environment(\.dismiss) private var dismiss
-    let message: Message
+    let initialText: String
     let onSave: (String) -> Void
     @State private var text = ""
 
@@ -402,7 +472,7 @@ struct EditMessageSheet: View {
                     .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
             }
-            .onAppear { text = message.text }
+            .onAppear { text = initialText }
         }
     }
 }
@@ -416,6 +486,8 @@ struct MessageBubble: View {
     var bubbleColor: Color = Color(.systemBackground)
     var borderColor: Color? = nil
     var readStatus: String? = nil
+    var myUid: String = ""
+    var onReaction: (String) -> Void = { _ in }
     let showClarify: Bool
     var onChoice: (String) -> Void = { _ in }
 
@@ -432,12 +504,14 @@ struct MessageBubble: View {
                             .foregroundColor(Theme.header.opacity(0.8))
                     }
                     bubbleText
-                        .background(bubbleColor)
+                        .background(LineBubbleShape(isMine: alignRight).fill(bubbleColor))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 14)
+                            LineBubbleShape(isMine: alignRight)
                                 .stroke(borderColor ?? .clear, lineWidth: 1)
                         )
-                        .cornerRadius(14)
+                    if !message.reactions.isEmpty {
+                        ReactionChipsView(reactions: message.reactions, myUid: myUid, onToggle: onReaction)
+                    }
                     if showClarify {
                         // 聞き返しの選択肢ボタン
                         FlowChoices(options: message.clarifyOptions, onChoice: onChoice)
@@ -464,13 +538,20 @@ struct MessageBubble: View {
     }
 
     private var bubbleText: some View {
-        Text(message.text)
-            .font(.system(size: 14))
-            .italic(message.deleted)
-            .foregroundColor(message.deleted ? .secondary : .primary)
-            .lineSpacing(4)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 9)
+        VStack(alignment: .leading, spacing: 6) {
+            if !message.text.isEmpty || message.attachmentType == nil {
+                Text(message.text)
+                    .font(.system(size: 14))
+                    .italic(message.deleted)
+                    .foregroundColor(message.deleted ? .secondary : .primary)
+                    .lineSpacing(4)
+            }
+            if !message.deleted, let type = message.attachmentType, let data = message.attachmentData {
+                AttachmentContentView(type: type, name: message.attachmentName ?? "", dataB64: data)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
     }
 
     private var timeText: some View {
