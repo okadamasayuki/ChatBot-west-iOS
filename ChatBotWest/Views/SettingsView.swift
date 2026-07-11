@@ -326,7 +326,7 @@ struct SwipeDeleteRow<Content: View>: View {
     @State private var width: CGFloat = 0   // 削除ボタンの見えている幅(ドラッグに追従)
     @State private var opened = false
 
-    private let full: CGFloat = 52
+    private let full: CGFloat = 84
 
     var body: some View {
         HStack(spacing: 0) {
