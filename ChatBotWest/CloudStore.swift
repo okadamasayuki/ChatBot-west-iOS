@@ -24,6 +24,7 @@ final class CloudStore: ObservableObject {
     var pendingRole: MemberRole = .questioner   // 新規登録時に使う
     var pendingNickname: String = ""
     var pendingDepartment: String = ""
+    var pendingSection: String = ""
 
     // MARK: - 共有データ
     @Published var naiki: String = Prompts.defaultNaiki
@@ -39,10 +40,18 @@ final class CloudStore: ObservableObject {
         var icon: String = ""      // アイコン(絵文字)
         var iconData: String = ""  // アイコン画像(base64 JPEG。こちらを優先表示)
         var department: String = "" // 所属部署
+        var section: String = ""    // 所属担当
 
-        init(id: String, name: String, role: String, icon: String = "", iconData: String = "", department: String = "") {
+        init(id: String, name: String, role: String, icon: String = "", iconData: String = "",
+             department: String = "", section: String = "") {
             self.id = id; self.name = name; self.role = role; self.icon = icon; self.iconData = iconData
             self.department = department
+            self.section = section
+        }
+
+        /// 「経理部・財務担当」のような所属表示
+        var affiliation: String {
+            [department, section].filter { !$0.isEmpty }.joined(separator: "・")
         }
     }
 
@@ -163,6 +172,7 @@ final class CloudStore: ObservableObject {
                         "role": pendingRole.rawValue,
                         "nickname": pendingNickname,
                         "department": pendingDepartment,
+                        "section": pendingSection,
                         "createdAt": nowIso(),
                     ])
                 }
@@ -203,10 +213,12 @@ final class CloudStore: ObservableObject {
         try await Auth.auth().signIn(withEmail: email, password: password)
     }
 
-    func signup(email: String, password: String, role: MemberRole, nickname: String, department: String) async throws {
+    func signup(email: String, password: String, role: MemberRole, nickname: String,
+                department: String, section: String) async throws {
         pendingRole = role
         pendingNickname = nickname
         pendingDepartment = department
+        pendingSection = section
         try await Auth.auth().createUser(withEmail: email, password: password)
     }
 
@@ -407,7 +419,8 @@ final class CloudStore: ObservableObject {
                                       role: data["role"] as? String ?? "",
                                       icon: data["icon"] as? String ?? "",
                                       iconData: data["iconData"] as? String ?? "",
-                                      department: data["department"] as? String ?? "")
+                                      department: data["department"] as? String ?? "",
+                                      section: data["section"] as? String ?? "")
                 } ?? []
             }
         })

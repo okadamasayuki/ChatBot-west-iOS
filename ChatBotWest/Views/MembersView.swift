@@ -8,17 +8,12 @@ struct MembersView: View {
     private func matches(_ member: CloudStore.MemberInfo) -> Bool {
         let q = searchText.trimmingCharacters(in: .whitespaces)
         return q.isEmpty || member.name.localizedCaseInsensitiveContains(q)
+            || member.affiliation.localizedCaseInsensitiveContains(q)
     }
 
     private var experts: [CloudStore.MemberInfo] {
         store.members
             .filter { $0.role == MemberRole.expert.rawValue && matches($0) }
-            .sorted { $0.name < $1.name }
-    }
-
-    private var questioners: [CloudStore.MemberInfo] {
-        store.members
-            .filter { $0.role == MemberRole.questioner.rawValue && matches($0) }
             .sorted { $0.name < $1.name }
     }
 
@@ -35,11 +30,6 @@ struct MembersView: View {
                                       store.activeTab = .baChat
                                       store.openBaTalk(talkId)
                                   } : nil)
-                    }
-                }
-                Section("担当者(質問者) — \(questioners.count)人") {
-                    ForEach(questioners) { member in
-                        MemberRow(member: member, isMe: member.id == store.myUid())
                     }
                 }
             }
@@ -79,8 +69,8 @@ struct MemberRow: View {
                             .cornerRadius(6)
                     }
                 }
-                if !member.department.isEmpty {
-                    Text(member.department)
+                if !member.affiliation.isEmpty {
+                    Text(member.affiliation)
                         .font(.system(size: 11))
                         .foregroundColor(.secondary)
                 }
