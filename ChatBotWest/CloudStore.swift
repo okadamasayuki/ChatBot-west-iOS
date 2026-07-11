@@ -724,11 +724,37 @@ final class CloudStore: ObservableObject {
 
     // MARK: - BAトーク(財務同士のトークルーム)
 
-    /// 自分が参加しているトーク
+    /// 自分が参加しているトーク(自分が固定したものを先頭に)
     var myBaTalks: [BaTalk] {
-        baTalks
-            .filter { $0.memberUids.contains(myUid()) }
-            .sorted { $0.lastTs > $1.lastTs }
+        let uid = myUid()
+        return baTalks
+            .filter { $0.memberUids.contains(uid) }
+            .sorted { a, b in
+                let ap = a.pinnedBy.contains(uid), bp = b.pinnedBy.contains(uid)
+                if ap != bp { return ap }
+                return a.lastTs > b.lastTs
+            }
+    }
+
+    /// トークの上部固定のトグル(自分の表示にのみ影響)
+    func toggleBaTalkPin(_ id: String) {
+        guard let uid = user?.uid, let t = baTalks.first(where: { $0.id == id }) else { return }
+        let ref = wsRef().collection("baTalks").document(id)
+        if t.pinnedBy.contains(uid) {
+            ref.updateData(["pinnedBy": FieldValue.arrayRemove([uid])])
+        } else {
+            ref.updateData(["pinnedBy": FieldValue.arrayUnion([uid])])
+        }
+    }
+
+    /// トークを削除する(メッセージごと。全員の一覧から消える)
+    func deleteBaTalk(_ id: String) async {
+        let ref = wsRef().collection("baTalks").document(id)
+        if let msgs = try? await ref.collection("messages").getDocuments() {
+            for d in msgs.documents { try? await d.reference.delete() }
+        }
+        try? await ref.delete()
+        if currentBaTalkId == id { closeBaTalk() }
     }
 
     /// トークの表示名(1:1は相手の名前、グループは名前かメンバー列挙)

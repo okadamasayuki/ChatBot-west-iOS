@@ -23,6 +23,7 @@ struct BaChatView: View {
 struct BaTalkListView: View {
     @EnvironmentObject var store: CloudStore
     @State private var showNewTalk = false
+    @State private var deleteTarget: BaTalk?
 
     var body: some View {
         List {
@@ -49,10 +50,17 @@ struct BaTalkListView: View {
                     .frame(width: 38, height: 38)
 
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(store.baTalkName(talk))
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(.primary)
-                            .lineLimit(1)
+                        HStack(spacing: 4) {
+                            Text(store.baTalkName(talk))
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(.primary)
+                                .lineLimit(1)
+                            if talk.pinnedBy.contains(store.myUid()) {
+                                Image(systemName: "pin.fill")
+                                    .font(.system(size: 9))
+                                    .foregroundColor(Color(.tertiaryLabel))
+                            }
+                        }
                         Text(snippet(talk.lastText, 40).isEmpty ? "(メッセージなし)" : snippet(talk.lastText, 40))
                             .font(.system(size: 12))
                             .foregroundColor(.secondary)
@@ -66,6 +74,23 @@ struct BaTalkListView: View {
                     }
                 }
                 .padding(.vertical, 2)
+            }
+            // 左スワイプ: 削除 / 右スワイプ: 上部に固定
+            .swipeActions(edge: .trailing) {
+                Button(role: .destructive) {
+                    deleteTarget = talk
+                } label: {
+                    Text("削除")
+                }
+            }
+            .swipeActions(edge: .leading) {
+                Button {
+                    store.toggleBaTalkPin(talk.id)
+                } label: {
+                    Label(talk.pinnedBy.contains(store.myUid()) ? "固定解除" : "固定",
+                          systemImage: talk.pinnedBy.contains(store.myUid()) ? "pin.slash" : "pin")
+                }
+                .tint(.orange)
             }
             }
         }
@@ -83,6 +108,18 @@ struct BaTalkListView: View {
         }
         .sheet(isPresented: $showNewTalk) {
             NewBaTalkSheet()
+        }
+        .confirmationDialog("このトークを削除しますか?メッセージも消え、元に戻せません。",
+                            isPresented: Binding(get: { deleteTarget != nil },
+                                                 set: { if !$0 { deleteTarget = nil } }),
+                            titleVisibility: .visible) {
+            Button("削除", role: .destructive) {
+                if let talk = deleteTarget {
+                    Task { await store.deleteBaTalk(talk.id) }
+                }
+                deleteTarget = nil
+            }
+            Button("キャンセル", role: .cancel) { deleteTarget = nil }
         }
     }
 }
@@ -215,16 +252,6 @@ struct BaTalkView: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(spacing: 10) {
-                        if store.baTalkMessages.isEmpty {
-                            Text("BA同士の連絡用トークです。\n📎 から相談チャットのリンクを貼れます。")
-                                .font(.system(size: 12))
-                                .foregroundColor(.white)
-                                .multilineTextAlignment(.center)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 8)
-                                .background(Theme.header.opacity(0.55))
-                                .cornerRadius(10)
-                        }
                         ForEach(store.baTalkMessages) { msg in
                             BaMessageBubble(message: msg,
                                             isMine: msg.senderUid == store.myUid(),
@@ -302,17 +329,29 @@ struct BaTalkView: View {
             .padding(8)
             .background(Color(.secondarySystemBackground))
         }
-        .navigationTitle(talk.map { store.baTalkName($0) } ?? "トーク")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            // グループトークはルーム名を変更できる
-            if let t = talk, t.isGroup {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("ルーム名") {
-                        renameText = t.name.isEmpty ? "" : t.name
+            // タイトル部分。グループトークはタップでルーム名を変更できる
+            ToolbarItem(placement: .principal) {
+                if let t = talk, t.isGroup {
+                    Button {
+                        renameText = t.name
                         showRename = true
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text(store.baTalkName(t))
+                                .font(.headline)
+                                .foregroundColor(.primary)
+                                .lineLimit(1)
+                            Image(systemName: "pencil")
+                                .font(.system(size: 11))
+                                .foregroundColor(.secondary)
+                        }
                     }
-                    .font(.system(size: 13))
+                } else {
+                    Text(talk.map { store.baTalkName($0) } ?? "トーク")
+                        .font(.headline)
+                        .lineLimit(1)
                 }
             }
         }
