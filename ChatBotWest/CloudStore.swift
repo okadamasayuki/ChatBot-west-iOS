@@ -1211,7 +1211,9 @@ final class CloudStore: ObservableObject {
             let accepted = r.handlerRequestResult == "accepted"
             addNotification(kind: "room", targetId: r.id,
                             title: "対応依頼: \(r.title.isEmpty ? "相談" : r.title)",
-                            body: "\(r.handlerRequestResultBy)さんが対応依頼を\(accepted ? "承諾しました。" : "辞退しました。")",
+                            body: accepted
+                                ? "\(r.handlerRequestResultBy)さんが対応承諾しました。"
+                                : "\(r.handlerRequestResultBy)さんが対応依頼を辞退しました。",
                             action: accepted
                                 ? "\(r.handlerRequestResultBy)さんが担当します。あなたの対応は不要です"
                                 : "別のBAに依頼し直すか、担当を決めてください")
