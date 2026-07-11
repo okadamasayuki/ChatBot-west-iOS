@@ -102,9 +102,8 @@ struct BaTalkListView: View {
                        leadingIcon: talk.pinnedBy.contains(store.myUid()) ? "pin.slash.fill" : "pin.fill",
                        onLeading: { store.toggleBaTalkPin(talk.id) },
                        contentInsets: EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16)) {
-        Button {
-            store.openBaTalk(talk.id)
-        } label: {
+        // タップで開く(スライド中は開かないよう、ButtonではなくonTapGestureにする)
+        Group {
             HStack(spacing: 10) {
                 // 1:1は相手のアイコン、メモはノート、グループは人型
                 if !talk.isGroup, talk.memberUids.count == 2,
@@ -147,7 +146,8 @@ struct BaTalkListView: View {
             }
             .padding(.vertical, 2)
         }
-        .buttonStyle(.plain)
+        .contentShape(Rectangle())
+        .onTapGesture { store.openBaTalk(talk.id) }
         }
         // 区切り線を全行とも左端から表示(行によって途切れて見えないように)
         .alignmentGuide(.listRowSeparatorLeading) { _ in 0 }
