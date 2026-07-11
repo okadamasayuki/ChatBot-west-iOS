@@ -184,19 +184,11 @@ struct OrgSettingsView: View {
         Form {
             Section {
                 ForEach(store.orgCompanies, id: \.self) { c in
-                    Text(c)
-                }
-                .onDelete { idx in
-                    // 会社を消したらその会社の部署リストも消す
-                    for i in idx { store.orgDepartments[store.orgCompanies[i]] = nil }
-                    store.orgCompanies.remove(atOffsets: idx)
-                    if !store.orgCompanies.contains(deptCompany) {
-                        deptCompany = store.orgCompanies.first ?? ""
+                    HStack {
+                        Text(c)
+                        Spacer()
+                        deleteButton { deleteCompany(c) }
                     }
-                    if !store.allDepartments.contains(sectionDept) {
-                        sectionDept = store.allDepartments.first ?? ""
-                    }
-                    store.saveOrgConfig()
                 }
                 .onMove { from, to in
                     // 並び順は新規登録の会社選択肢にもそのまま反映される
@@ -214,7 +206,7 @@ struct OrgSettingsView: View {
             } header: {
                 Text("会社")
             } footer: {
-                Text("左にスワイプで削除、長押しして上下に動かすと並び替えできます。並び順は新規登録の選択肢にも反映されます。削除しても登録済みユーザーの所属は変わりません。")
+                Text("長押しして上下に動かすと並び替えできます。並び順は新規登録の選択肢にも反映されます。削除しても登録済みユーザーの所属は変わりません。")
             }
 
             Section("部署(会社ごと)") {
@@ -225,24 +217,11 @@ struct OrgSettingsView: View {
                 }
                 .pickerStyle(.menu)
                 ForEach(store.departments(for: deptCompany), id: \.self) { d in
-                    Text(d)
-                }
-                .onDelete { idx in
-                    var list = store.departments(for: deptCompany)
-                    // 他の会社で使われていない部署なら担当リストも消す
-                    for i in idx {
-                        let dept = list[i]
-                        let usedElsewhere = store.orgCompanies.contains {
-                            $0 != deptCompany && (store.orgDepartments[$0] ?? []).contains(dept)
-                        }
-                        if !usedElsewhere { store.orgSections[dept] = nil }
+                    HStack {
+                        Text(d)
+                        Spacer()
+                        deleteButton { deleteDepartment(d) }
                     }
-                    list.remove(atOffsets: idx)
-                    store.orgDepartments[deptCompany] = list
-                    if !store.allDepartments.contains(sectionDept) {
-                        sectionDept = store.allDepartments.first ?? ""
-                    }
-                    store.saveOrgConfig()
                 }
                 addRow(placeholder: "部署を追加", text: $newDepartment) {
                     let name = newDepartment.trimmingCharacters(in: .whitespaces)
@@ -264,13 +243,11 @@ struct OrgSettingsView: View {
                 }
                 .pickerStyle(.menu)
                 ForEach(store.orgSections[sectionDept] ?? [], id: \.self) { s in
-                    Text(s)
-                }
-                .onDelete { idx in
-                    var list = store.orgSections[sectionDept] ?? []
-                    list.remove(atOffsets: idx)
-                    store.orgSections[sectionDept] = list
-                    store.saveOrgConfig()
+                    HStack {
+                        Text(s)
+                        Spacer()
+                        deleteButton { deleteSection(s) }
+                    }
                 }
                 addRow(placeholder: "担当を追加", text: $newSection) {
                     let name = newSection.trimmingCharacters(in: .whitespaces)
@@ -290,6 +267,52 @@ struct OrgSettingsView: View {
             if deptCompany.isEmpty { deptCompany = store.orgCompanies.first ?? "" }
             if sectionDept.isEmpty { sectionDept = store.allDepartments.first ?? "" }
         }
+    }
+
+    /// 四角い削除ボタン(行の右端)
+    private func deleteButton(_ action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: "trash")
+                .font(.system(size: 12))
+                .foregroundColor(.red)
+                .frame(width: 28, height: 28)
+                .background(
+                    RoundedRectangle(cornerRadius: 6)
+                        .stroke(Color.red.opacity(0.4), lineWidth: 1)
+                )
+        }
+        .buttonStyle(.borderless)
+    }
+
+    private func deleteCompany(_ c: String) {
+        // 会社を消したらその会社の部署リストも消す
+        store.orgDepartments[c] = nil
+        store.orgCompanies.removeAll { $0 == c }
+        if !store.orgCompanies.contains(deptCompany) {
+            deptCompany = store.orgCompanies.first ?? ""
+        }
+        if !store.allDepartments.contains(sectionDept) {
+            sectionDept = store.allDepartments.first ?? ""
+        }
+        store.saveOrgConfig()
+    }
+
+    private func deleteDepartment(_ d: String) {
+        // 他の会社で使われていない部署なら担当リストも消す
+        let usedElsewhere = store.orgCompanies.contains {
+            $0 != deptCompany && (store.orgDepartments[$0] ?? []).contains(d)
+        }
+        if !usedElsewhere { store.orgSections[d] = nil }
+        store.orgDepartments[deptCompany] = store.departments(for: deptCompany).filter { $0 != d }
+        if !store.allDepartments.contains(sectionDept) {
+            sectionDept = store.allDepartments.first ?? ""
+        }
+        store.saveOrgConfig()
+    }
+
+    private func deleteSection(_ s: String) {
+        store.orgSections[sectionDept] = (store.orgSections[sectionDept] ?? []).filter { $0 != s }
+        store.saveOrgConfig()
     }
 
     private func addRow(placeholder: String, text: Binding<String>, onAdd: @escaping () -> Void) -> some View {
