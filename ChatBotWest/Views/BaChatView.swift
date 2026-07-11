@@ -553,13 +553,7 @@ struct BaTalkView: View {
                 }
             }
             ToolbarItemGroup(placement: .topBarTrailing) {
-                // メンバー一覧
-                Button {
-                    showMembers = true
-                } label: {
-                    Image(systemName: "person.3")
-                }
-                // メンバー追加
+                // メンバー追加(メンバー一覧はタイトルのタップで表示)
                 Button {
                     showAddMembers = true
                 } label: {
