@@ -153,6 +153,8 @@ struct MembersView: View {
             .foregroundColor(selection.wrappedValue.isEmpty ? .primary : Theme.accentDark)
             .cornerRadius(14)
         }
+        // ラベルの文字数が変わってもMenuが幅を再計算しないため、選択値が変わったら作り直す
+        .id("\(title)-\(selection.wrappedValue)")
     }
 }
 
