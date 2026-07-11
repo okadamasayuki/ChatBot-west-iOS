@@ -452,30 +452,38 @@ struct DelegatePickerSheet: View {
     let excludeNames: [String]
     let onPick: (String) -> Void
     @State private var searchText = ""
+    @State private var filter = MemberFilter()
+
+    private var pool: [CloudStore.MemberInfo] {
+        store.members
+            .filter { $0.role == MemberRole.expert.rawValue && !$0.name.isEmpty && !excludeNames.contains($0.name) }
+    }
 
     private var candidates: [CloudStore.MemberInfo] {
-        let all = store.members
-            .filter { $0.role == MemberRole.expert.rawValue && !$0.name.isEmpty && !excludeNames.contains($0.name) }
-            .sorted { $0.name < $1.name }
         let q = searchText.trimmingCharacters(in: .whitespaces)
-        guard !q.isEmpty else { return all }
-        return all.filter {
-            $0.name.localizedCaseInsensitiveContains(q) || $0.affiliation.localizedCaseInsensitiveContains(q)
-        }
+        return pool
+            .filter {
+                filter.matches($0) && (q.isEmpty || $0.name.localizedCaseInsensitiveContains(q)
+                    || $0.affiliation.localizedCaseInsensitiveContains(q))
+            }
+            .sorted { $0.name < $1.name }
     }
 
     var body: some View {
         NavigationStack {
-            List(candidates) { m in
-                Button {
-                    onPick(m.name)
-                    dismiss()
-                } label: {
-                    MemberRow(member: m, isMe: false)
+            VStack(spacing: 0) {
+                MemberFilterBar(filter: $filter, pool: pool)
+                List(candidates) { m in
+                    Button {
+                        onPick(m.name)
+                        dismiss()
+                    } label: {
+                        MemberRow(member: m, isMe: false)
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
+                .listStyle(.plain)
             }
-            .listStyle(.plain)
             .navigationTitle("対応を依頼する相手")
             .navigationBarTitleDisplayMode(.inline)
             .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always),

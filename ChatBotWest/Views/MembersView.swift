@@ -1,105 +1,71 @@
 import SwiftUI
 
-/// ユーザー一覧: 財務(BA)のアカウントを表示(どちらの役割からも見られる)
-struct MembersView: View {
-    @EnvironmentObject var store: CloudStore
-    @State private var searchText = ""
-    @State private var filterCompany = ""     // 空 = すべて
-    @State private var filterDepartment = ""
-    @State private var filterSection = ""
-    @State private var filterPosition = ""
+/// 会社・部署・担当・役職の絞り込み条件(ユーザー一覧・対応依頼などで共通)
+struct MemberFilter: Equatable {
+    var company = ""     // 空 = すべて
+    var department = ""
+    var section = ""
+    var position = ""
 
-    private func matches(_ member: CloudStore.MemberInfo) -> Bool {
-        if !filterCompany.isEmpty, !member.companies.contains(filterCompany) { return false }
-        if !filterDepartment.isEmpty, member.department != filterDepartment { return false }
-        if !filterSection.isEmpty, member.section != filterSection { return false }
-        if !filterPosition.isEmpty, member.position != filterPosition { return false }
-        let q = searchText.trimmingCharacters(in: .whitespaces)
-        return q.isEmpty || member.name.localizedCaseInsensitiveContains(q)
-            || member.affiliation.localizedCaseInsensitiveContains(q)
+    var isActive: Bool {
+        !company.isEmpty || !department.isEmpty || !section.isEmpty || !position.isEmpty
     }
 
-    private var allExperts: [CloudStore.MemberInfo] {
-        store.members.filter { $0.role == MemberRole.expert.rawValue }
+    func matches(_ m: CloudStore.MemberInfo) -> Bool {
+        if !company.isEmpty, !m.companies.contains(company) { return false }
+        if !department.isEmpty, m.department != department { return false }
+        if !section.isEmpty, m.section != section { return false }
+        if !position.isEmpty, m.position != position { return false }
+        return true
     }
+}
 
-    private var experts: [CloudStore.MemberInfo] {
-        allExperts.filter { matches($0) }.sorted { $0.name < $1.name }
-    }
+/// 会社・部署・担当・役職の絞り込みチップ(横スクロール)。選択肢は pool の実在値から作る
+struct MemberFilterBar: View {
+    @Binding var filter: MemberFilter
+    let pool: [CloudStore.MemberInfo]
 
-    /// 実在するメンバーの値だけを選択肢に出す(会社→部署→担当と上位の絞り込みを反映)
     private var companyOptions: [String] {
-        Array(Set(allExperts.flatMap(\.companies).filter { !$0.isEmpty })).sorted()
+        Array(Set(pool.flatMap(\.companies).filter { !$0.isEmpty })).sorted()
     }
     private var departmentOptions: [String] {
-        let pool = allExperts.filter { filterCompany.isEmpty || $0.companies.contains(filterCompany) }
-        return Array(Set(pool.map(\.department).filter { !$0.isEmpty })).sorted()
+        let p = pool.filter { filter.company.isEmpty || $0.companies.contains(filter.company) }
+        return Array(Set(p.map(\.department).filter { !$0.isEmpty })).sorted()
     }
     private var sectionOptions: [String] {
-        let pool = allExperts.filter {
-            (filterCompany.isEmpty || $0.companies.contains(filterCompany))
-                && (filterDepartment.isEmpty || $0.department == filterDepartment)
+        let p = pool.filter {
+            (filter.company.isEmpty || $0.companies.contains(filter.company))
+                && (filter.department.isEmpty || $0.department == filter.department)
         }
-        return Array(Set(pool.map(\.section).filter { !$0.isEmpty })).sorted()
+        return Array(Set(p.map(\.section).filter { !$0.isEmpty })).sorted()
     }
     private var positionOptions: [String] {
-        let pool = allExperts.filter {
-            (filterCompany.isEmpty || $0.companies.contains(filterCompany))
-                && (filterDepartment.isEmpty || $0.department == filterDepartment)
-                && (filterSection.isEmpty || $0.section == filterSection)
+        let p = pool.filter {
+            (filter.company.isEmpty || $0.companies.contains(filter.company))
+                && (filter.department.isEmpty || $0.department == filter.department)
+                && (filter.section.isEmpty || $0.section == filter.section)
         }
-        let existing = Set(pool.map(\.position).filter { !$0.isEmpty })
+        let existing = Set(p.map(\.position).filter { !$0.isEmpty })
         // 役職は上位から順に表示
         return Positions.all.filter { existing.contains($0) } + existing.subtracting(Positions.all).sorted()
     }
 
-    private var filterActive: Bool {
-        !filterCompany.isEmpty || !filterDepartment.isEmpty || !filterSection.isEmpty || !filterPosition.isEmpty
-    }
-
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
-                filterBar
-                List {
-                    Section("財務(BA) — \(experts.count)人") {
-                        ForEach(experts) { member in
-                            // 財務同士は右のトークアイコンをタップするとトークを開始できる
-                            MemberRow(member: member,
-                                      isMe: member.id == store.myUid(),
-                                      onTalk: (store.isExpert && member.id != store.myUid()) ? {
-                                          let talkId = store.startBaTalk(with: [member])
-                                          store.activeTab = .baChat
-                                          store.openBaTalk(talkId)
-                                      } : nil)
-                        }
-                    }
-                }
-            }
-            .navigationTitle("ユーザー一覧")
-            .navigationBarTitleDisplayMode(.inline)
-            .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always),
-                        prompt: "ユーザー名で検索")
-        }
-    }
-
-    /// 会社・部署・担当の絞り込みチップ
-    private var filterBar: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
-                filterMenu(title: "会社", selection: $filterCompany, options: companyOptions) {
+                filterMenu(title: "会社", selection: $filter.company, options: companyOptions) {
                     // 会社を変えたら下位の絞り込みはリセット
-                    filterDepartment = ""
-                    filterSection = ""
+                    filter.department = ""
+                    filter.section = ""
                 }
-                filterMenu(title: "部署", selection: $filterDepartment, options: departmentOptions) {
-                    filterSection = ""
+                filterMenu(title: "部署", selection: $filter.department, options: departmentOptions) {
+                    filter.section = ""
                 }
-                filterMenu(title: "担当", selection: $filterSection, options: sectionOptions) {}
-                filterMenu(title: "役職", selection: $filterPosition, options: positionOptions) {}
-                if filterActive {
+                filterMenu(title: "担当", selection: $filter.section, options: sectionOptions) {}
+                filterMenu(title: "役職", selection: $filter.position, options: positionOptions) {}
+                if filter.isActive {
                     Button {
-                        filterCompany = ""; filterDepartment = ""; filterSection = ""; filterPosition = ""
+                        filter = MemberFilter()
                     } label: {
                         Label("解除", systemImage: "xmark.circle.fill")
                             .font(.system(size: 12))
@@ -155,6 +121,53 @@ struct MembersView: View {
         }
         // ラベルの文字数が変わってもMenuが幅を再計算しないため、選択値が変わったら作り直す
         .id("\(title)-\(selection.wrappedValue)")
+    }
+}
+
+/// ユーザー一覧: 財務(BA)のアカウントを表示(どちらの役割からも見られる)
+struct MembersView: View {
+    @EnvironmentObject var store: CloudStore
+    @State private var searchText = ""
+    @State private var filter = MemberFilter()
+
+    private var allExperts: [CloudStore.MemberInfo] {
+        store.members.filter { $0.role == MemberRole.expert.rawValue }
+    }
+
+    private var experts: [CloudStore.MemberInfo] {
+        let q = searchText.trimmingCharacters(in: .whitespaces)
+        return allExperts
+            .filter {
+                filter.matches($0) && (q.isEmpty || $0.name.localizedCaseInsensitiveContains(q)
+                    || $0.affiliation.localizedCaseInsensitiveContains(q))
+            }
+            .sorted { $0.name < $1.name }
+    }
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 0) {
+                MemberFilterBar(filter: $filter, pool: allExperts)
+                List {
+                    Section("財務(BA) — \(experts.count)人") {
+                        ForEach(experts) { member in
+                            // 財務同士は右のトークアイコンをタップするとトークを開始できる
+                            MemberRow(member: member,
+                                      isMe: member.id == store.myUid(),
+                                      onTalk: (store.isExpert && member.id != store.myUid()) ? {
+                                          let talkId = store.startBaTalk(with: [member])
+                                          store.activeTab = .baChat
+                                          store.openBaTalk(talkId)
+                                      } : nil)
+                        }
+                    }
+                }
+            }
+            .navigationTitle("ユーザー一覧")
+            .navigationBarTitleDisplayMode(.inline)
+            .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always),
+                        prompt: "ユーザー名で検索")
+        }
     }
 }
 
