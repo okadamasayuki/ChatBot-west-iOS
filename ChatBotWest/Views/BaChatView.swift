@@ -101,7 +101,7 @@ struct BaTalkListView: View {
         SwipeDeleteRow(onDelete: { deleteTarget = talk },
                        leadingIcon: talk.pinnedBy.contains(store.myUid()) ? "pin.slash.fill" : "pin.fill",
                        onLeading: { store.toggleBaTalkPin(talk.id) },
-                       contentInsets: EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16)) {
+                       contentInsets: EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16)) {
         // タップで開く(スライド中は開かないよう、ButtonではなくonTapGestureにする)
         Group {
             HStack(spacing: 10) {
