@@ -956,13 +956,8 @@ struct BaMessageBubble: View {
                     .onTapGesture { if let m { onAvatarTap?(m) } }
             }
             VStack(alignment: isMine ? .trailing : .leading, spacing: 3) {
-                // 名前ラベルの横に既読・時刻を表示
+                // 名前ラベルの横に時刻を表示
                 HStack(spacing: 6) {
-                    if isMine, let readStatus {
-                        Text(readStatus)
-                            .font(.system(size: 10))
-                            .foregroundColor(Theme.header.opacity(0.6))
-                    }
                     if !isMine {
                         Text(message.senderName)
                             .font(.system(size: 11))
@@ -1079,6 +1074,12 @@ struct BaMessageBubble: View {
                     EditMessageSheet(initialText: message.text) { newText in
                         store.updateBaMessageText(message, newText: newText)
                     }
+                }
+                // 未読・既読はメッセージの下に表示
+                if isMine, let readStatus {
+                    Text(readStatus)
+                        .font(.system(size: 10))
+                        .foregroundColor(Theme.header.opacity(0.6))
                 }
             }
             if !isMine { Spacer(minLength: 60) }
