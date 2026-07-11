@@ -70,7 +70,7 @@ struct LoginView: View {
                         SecureField("パスワード", text: $password)
                             .textContentType(.password)
                         if mode == .signup {
-                            TextField("ニックネーム", text: $nicknameInput)
+                            TextField("氏名", text: $nicknameInput)
                                 .textContentType(.nickname)
                         }
                     }
@@ -183,7 +183,7 @@ struct LoginView: View {
         }
         let nickname = nicknameInput.trimmingCharacters(in: .whitespacesAndNewlines)
         if mode == .signup, nickname.isEmpty {
-            errorMessage = "ニックネームを入力してください。"
+            errorMessage = "氏名を入力してください。"
             return
         }
         errorMessage = nil
