@@ -749,15 +749,15 @@ struct BaMessageBubble: View {
                 .background(LineBubbleShape(isMine: isMine).fill(isMine ? Theme.myBubble : Color(.systemBackground)))
                 .contextMenu {
                     if !message.deleted {
-                        Menu {
+                        // 1列目: リアクション絵文字の横並び
+                        ControlGroup {
                             ForEach(CloudStore.reactionEmojis, id: \.self) { emoji in
                                 Button(emoji) {
                                     store.toggleBaReaction(message, emoji: emoji)
                                 }
                             }
-                        } label: {
-                            Label("リアクション", systemImage: "face.smiling")
                         }
+                        .controlGroupStyle(.compactMenu)
                         if !message.text.isEmpty {
                             Button {
                                 UIPasteboard.general.string = message.text
