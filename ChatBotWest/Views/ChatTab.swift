@@ -241,14 +241,29 @@ struct RoomListView: View {
                 .controlSize(.small)
             }
             Spacer()
-            ForEach([("new", "新しい順"), ("status", "ステータス順")], id: \.0) { key, label in
-                Button {
-                    sort = key
-                } label: {
-                    sortChip(label, active: sort == key)
+            // 並び順はメニューから選択(絞り込みチップと同じ操作感)
+            Menu {
+                ForEach([("new", "新しい順"), ("status", "ステータス順")], id: \.0) { key, label in
+                    Button {
+                        sort = key
+                    } label: {
+                        if sort == key {
+                            Label(label, systemImage: "checkmark")
+                        } else {
+                            Text(label)
+                        }
+                    }
                 }
-                .buttonStyle(.plain)
+            } label: {
+                HStack(spacing: 4) {
+                    sortChip(sort == "status" ? "ステータス順" : "新しい順", active: true)
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 9))
+                        .foregroundColor(.secondary)
+                }
             }
+            // ラベルの文字数が変わってもMenuが幅を再計算しないため、選択が変わったら作り直す
+            .id("sort-\(sort)")
             Button {
                 hideDone.toggle()
             } label: {
