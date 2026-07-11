@@ -57,13 +57,13 @@ struct NotificationsView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(n.title)
                     .font(.system(size: 13, weight: n.read ? .regular : .semibold))
-                    .foregroundColor(.primary)
+                    .foregroundColor(n.read ? .primary : Theme.accentDark) // 未読は全部緑
                     .lineLimit(1)
                 // どんな対応が必要か
                 if let action = n.action, !action.isEmpty {
                     Text(action)
                         .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(Theme.accentDark) // 既読でも緑の太文字のまま
+                        .foregroundColor(n.read ? Color(.secondaryLabel) : Theme.accentDark)
                         .lineLimit(2)
                 }
                 Text(fmtTime(n.ts)) // "M/d H:mm"

@@ -319,6 +319,37 @@ struct OrgSettingsView: View {
     }
 }
 
+/// 画面のどこかに触れたら、開いているスワイプ行を閉じる合図を送る(アプリ全体で1つ)。
+/// 行の外(背景・ヘッダー・他の行など)のタップはSwiftUIのジェスチャでは拾えないため、
+/// ウィンドウにUIKitのタップ認識を仕込んで全タッチを検知する
+final class SwipeRowCloseOnTouch: NSObject, UIGestureRecognizerDelegate {
+    static let shared = SwipeRowCloseOnTouch()
+    /// 開いているスワイプ行を閉じる合図。object が UUID ならその行自身は閉じない
+    static let closeNotification = Notification.Name("SwipeDeleteRowCloseAll")
+    private var installed = false
+
+    func installIfNeeded() {
+        guard !installed,
+              let window = UIApplication.shared.connectedScenes
+                  .compactMap({ ($0 as? UIWindowScene)?.windows.first(where: { $0.isKeyWindow }) })
+                  .first else { return }
+        installed = true
+        let tap = UITapGestureRecognizer(target: self, action: #selector(onTap))
+        tap.cancelsTouchesInView = false // 通常のタップ動作(行を開く等)はそのまま通す
+        tap.delegate = self
+        window.addGestureRecognizer(tap)
+    }
+
+    @objc private func onTap() {
+        NotificationCenter.default.post(name: Self.closeNotification, object: nil)
+    }
+
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
+                           shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+        true
+    }
+}
+
 /// 左にスライドすると赤い四角形の削除ボタンが指に追従して滑らかに出てくる行
 /// (OS標準のスワイプ削除はボタンが丸く表示されるため自作)
 /// leadingIcon を指定すると、右スライドで左側のアクション(ピン留めなど)も出せる
@@ -338,8 +369,6 @@ struct SwipeDeleteRow<Content: View>: View {
     @State private var postedOpenSignal = false
 
     private let full: CGFloat = 72
-    /// どこかの行に触れたら、他の行の開いているスライドを閉じるための合図
-    private static var closeAllNotification: Notification.Name { Notification.Name("SwipeDeleteRowCloseAll") }
 
     var body: some View {
         // 行本体は幅を変えずに横へスライドさせる(圧縮すると折り返しが増えて行が高くなるため)。
@@ -397,17 +426,15 @@ struct SwipeDeleteRow<Content: View>: View {
             }
         .listRowInsets(EdgeInsets())
         .contentShape(Rectangle())
-        .simultaneousGesture(TapGesture().onEnded {
-            // 行のどこかに触れたら、他の行の開いているスライドを閉じる
-            NotificationCenter.default.post(name: Self.closeAllNotification, object: rowId)
-        })
+        .onAppear { SwipeRowCloseOnTouch.shared.installIfNeeded() }
         .simultaneousGesture(
             DragGesture(minimumDistance: 10)
                 .onChanged { v in
                     guard abs(v.translation.width) > abs(v.translation.height) else { return }
                     if !postedOpenSignal {
                         postedOpenSignal = true
-                        NotificationCenter.default.post(name: Self.closeAllNotification, object: rowId)
+                        // スライドを始めたら、他の行の開いているスライドを閉じる
+                        NotificationCenter.default.post(name: SwipeRowCloseOnTouch.closeNotification, object: rowId)
                     }
                     if leadOpened || (v.translation.width > 0 && !opened) {
                         guard leadingIcon != nil, onLeading != nil else { return }
@@ -428,9 +455,10 @@ struct SwipeDeleteRow<Content: View>: View {
                     }
                 }
         )
-        .onReceive(NotificationCenter.default.publisher(for: Self.closeAllNotification)) { note in
-            // 他の行がスライド・タップされたら自分は閉じる
-            guard note.object as? UUID != rowId, opened || leadOpened || width > 0 || leadWidth > 0 else { return }
+        .onReceive(NotificationCenter.default.publisher(for: SwipeRowCloseOnTouch.closeNotification)) { note in
+            // 画面のどこかが触られた/他の行がスライドを始めたら、開いている自分は閉じる
+            if let id = note.object as? UUID, id == rowId { return }
+            guard opened || leadOpened || width > 0 || leadWidth > 0 else { return }
             closeAll()
         }
     }
