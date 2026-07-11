@@ -156,28 +156,27 @@ struct MembersView: View {
                     Section("財務(BA) — \(experts.count)人") {
                         ForEach(experts) { member in
                             if selecting {
-                                // 選択モード: タップで選択/解除(自分は選べない)
-                                Button {
+                                // 選択モード: タップで選択/解除(自分は選べない)。
+                                // Buttonだと押下時にグレーになるため、onTapGestureで即時反映する
+                                HStack(spacing: 8) {
+                                    Image(systemName: selected.contains(member.id) ? "checkmark.circle.fill" : "circle")
+                                        .font(.system(size: 22))
+                                        .contentTransition(.identity)
+                                        .animation(nil, value: selected)
+                                        .foregroundColor(member.id == store.myUid() ? Color(.quaternaryLabel)
+                                                         : (selected.contains(member.id) ? Theme.accent : .secondary))
+                                    MemberRow(member: member, isMe: member.id == store.myUid())
+                                }
+                                .contentShape(Rectangle())
+                                .onTapGesture {
                                     guard member.id != store.myUid() else { return }
-                                    // チェックは即時反映(途中のアニメーションなし)
                                     var t = Transaction()
                                     t.disablesAnimations = true
                                     withTransaction(t) {
                                         if selected.contains(member.id) { selected.remove(member.id) }
                                         else { selected.insert(member.id) }
                                     }
-                                } label: {
-                                    HStack(spacing: 8) {
-                                        Image(systemName: selected.contains(member.id) ? "checkmark.circle.fill" : "circle")
-                                            .font(.system(size: 22))
-                                            .contentTransition(.identity)
-                                            .animation(nil, value: selected)
-                                            .foregroundColor(member.id == store.myUid() ? Color(.quaternaryLabel)
-                                                             : (selected.contains(member.id) ? Theme.accent : .secondary))
-                                        MemberRow(member: member, isMe: member.id == store.myUid())
-                                    }
                                 }
-                                .buttonStyle(.plain)
                             } else {
                                 // 財務同士は右のトークアイコンをタップするとトークを開始できる
                                 MemberRow(member: member,
