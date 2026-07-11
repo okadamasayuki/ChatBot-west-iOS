@@ -38,6 +38,7 @@ final class CloudStore: ObservableObject {
 
     // BAトーク(財務同士のトークルーム)
     @Published var baTalks: [BaTalk] = []
+    @Published var pinnedTalkOrder: [String] = []  // ピン留めトークの並び順(アカウントごとにmembersへ保存)
     @Published var baTalkPath: [String] = []       // NavigationStack のパス
     @Published var currentBaTalkId: String?
     @Published var baTalkMessages: [BaMessage] = []
@@ -161,6 +162,7 @@ final class CloudStore: ObservableObject {
                     if let r = d["role"] as? String, let mr = MemberRole(rawValue: r) { self.role = mr }
                     self.nickname = d["nickname"] as? String ?? ""
                     self.answerStyle = d["answerStyle"] as? String ?? ""
+                    self.pinnedTalkOrder = d["pinnedTalkOrder"] as? [String] ?? []
                 }
             })
         } else {
@@ -724,16 +726,33 @@ final class CloudStore: ObservableObject {
 
     // MARK: - BAトーク(財務同士のトークルーム)
 
-    /// 自分が参加しているトーク(自分が固定したものを先頭に)
+    /// 自分が参加しているトーク(自分が固定したものを先頭に。固定分は保存した並び順)
     var myBaTalks: [BaTalk] {
         let uid = myUid()
+        func pinIndex(_ t: BaTalk) -> Int {
+            pinnedTalkOrder.firstIndex(of: t.id) ?? Int.max
+        }
         return baTalks
             .filter { $0.memberUids.contains(uid) }
             .sorted { a, b in
                 let ap = a.pinnedBy.contains(uid), bp = b.pinnedBy.contains(uid)
                 if ap != bp { return ap }
+                if ap && bp {
+                    let ia = pinIndex(a), ib = pinIndex(b)
+                    if ia != ib { return ia < ib }
+                }
                 return a.lastTs > b.lastTs
             }
+    }
+
+    /// ピン留めトークの並び替え(長押しドラッグ)。並び順はアカウントごとに保存
+    func movePinnedTalks(current: [BaTalk], from: IndexSet, to: Int) {
+        var ids = current.map { $0.id }
+        ids.move(fromOffsets: from, toOffset: to)
+        pinnedTalkOrder = ids
+        guard let uid = user?.uid else { return }
+        wsRef().collection("members").document(uid)
+            .setData(["pinnedTalkOrder": ids], merge: true)
     }
 
     /// トークの上部固定のトグル(自分の表示にのみ影響)

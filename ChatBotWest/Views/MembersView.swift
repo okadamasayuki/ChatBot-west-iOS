@@ -3,16 +3,22 @@ import SwiftUI
 /// ユーザー一覧: 財務・質問者の全アカウントを表示(どちらの役割からも見られる)
 struct MembersView: View {
     @EnvironmentObject var store: CloudStore
+    @State private var searchText = ""
+
+    private func matches(_ member: CloudStore.MemberInfo) -> Bool {
+        let q = searchText.trimmingCharacters(in: .whitespaces)
+        return q.isEmpty || member.name.localizedCaseInsensitiveContains(q)
+    }
 
     private var experts: [CloudStore.MemberInfo] {
         store.members
-            .filter { $0.role == MemberRole.expert.rawValue }
+            .filter { $0.role == MemberRole.expert.rawValue && matches($0) }
             .sorted { $0.name < $1.name }
     }
 
     private var questioners: [CloudStore.MemberInfo] {
         store.members
-            .filter { $0.role == MemberRole.questioner.rawValue }
+            .filter { $0.role == MemberRole.questioner.rawValue && matches($0) }
             .sorted { $0.name < $1.name }
     }
 
@@ -21,7 +27,18 @@ struct MembersView: View {
             List {
                 Section("財務(BA) — \(experts.count)人") {
                     ForEach(experts) { member in
-                        MemberRow(member: member, isMe: member.id == store.myUid())
+                        if store.isExpert, member.id != store.myUid() {
+                            // 財務同士はタップでトークを開始できる
+                            Button {
+                                let talkId = store.startBaTalk(with: [member])
+                                store.activeTab = .baChat
+                                store.openBaTalk(talkId)
+                            } label: {
+                                MemberRow(member: member, isMe: false, showsTalkIcon: true)
+                            }
+                        } else {
+                            MemberRow(member: member, isMe: member.id == store.myUid())
+                        }
                     }
                 }
                 Section("担当者(質問者) — \(questioners.count)人") {
@@ -32,6 +49,8 @@ struct MembersView: View {
             }
             .navigationTitle("ユーザー一覧")
             .navigationBarTitleDisplayMode(.inline)
+            .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always),
+                        prompt: "ユーザー名で検索")
         }
     }
 }
@@ -39,6 +58,7 @@ struct MembersView: View {
 struct MemberRow: View {
     let member: CloudStore.MemberInfo
     let isMe: Bool
+    var showsTalkIcon = false
 
     var body: some View {
         HStack(spacing: 10) {
@@ -54,6 +74,7 @@ struct MemberRow: View {
                 HStack(spacing: 6) {
                     Text(member.name.isEmpty ? "(名前未設定)" : member.name)
                         .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(.primary)
                     if isMe {
                         Text("自分")
                             .font(.system(size: 10))
@@ -66,6 +87,12 @@ struct MemberRow: View {
                 }
             }
             Spacer()
+            if showsTalkIcon {
+                // タップでトーク開始できることを示す
+                Image(systemName: "bubble.left.fill")
+                    .font(.system(size: 14))
+                    .foregroundColor(Theme.accentDark.opacity(0.7))
+            }
         }
         .padding(.vertical, 2)
     }

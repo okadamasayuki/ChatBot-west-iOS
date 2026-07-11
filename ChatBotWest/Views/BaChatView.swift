@@ -25,6 +25,14 @@ struct BaTalkListView: View {
     @State private var showNewTalk = false
     @State private var deleteTarget: BaTalk?
 
+    private var pinnedTalks: [BaTalk] {
+        store.myBaTalks.filter { $0.pinnedBy.contains(store.myUid()) }
+    }
+
+    private var unpinnedTalks: [BaTalk] {
+        store.myBaTalks.filter { !$0.pinnedBy.contains(store.myUid()) }
+    }
+
     var body: some View {
         List {
             if store.myBaTalks.isEmpty {
@@ -36,62 +44,15 @@ struct BaTalkListView: View {
                     .padding(.vertical, 40)
                     .listRowSeparator(.hidden)
             }
-            ForEach(store.myBaTalks) { talk in
-            Button {
-                store.openBaTalk(talk.id)
-            } label: {
-                HStack(spacing: 10) {
-                    ZStack {
-                        Circle().fill(Theme.chatBg)
-                        Image(systemName: talk.isGroup ? "person.3.fill" : "person.fill")
-                            .font(.system(size: talk.isGroup ? 12 : 15))
-                            .foregroundColor(.white)
-                    }
-                    .frame(width: 38, height: 38)
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        HStack(spacing: 4) {
-                            Text(store.baTalkName(talk))
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundColor(.primary)
-                                .lineLimit(1)
-                            if talk.pinnedBy.contains(store.myUid()) {
-                                Image(systemName: "pin.fill")
-                                    .font(.system(size: 9))
-                                    .foregroundColor(Color(.tertiaryLabel))
-                            }
-                        }
-                        Text(snippet(talk.lastText, 40).isEmpty ? "(メッセージなし)" : snippet(talk.lastText, 40))
-                            .font(.system(size: 12))
-                            .foregroundColor(.secondary)
-                            .lineLimit(1)
-                    }
-                    Spacer()
-                    if !talk.lastTs.isEmpty {
-                        Text(fmtDate(talk.lastTs))
-                            .font(.system(size: 10))
-                            .foregroundColor(Color(.tertiaryLabel))
-                    }
-                }
-                .padding(.vertical, 2)
+            // ピン留めしたトーク: 長押しドラッグで並び替えできる
+            ForEach(pinnedTalks) { talk in
+                talkRow(talk)
             }
-            // LINE風: 左スワイプ=削除(赤・ゴミ箱) / 右スワイプ=ピン留め(青・フルスワイプ可)
-            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                Button(role: .destructive) {
-                    deleteTarget = talk
-                } label: {
-                    Label("削除", systemImage: "trash.fill")
-                }
+            .onMove { from, to in
+                store.movePinnedTalks(current: pinnedTalks, from: from, to: to)
             }
-            .swipeActions(edge: .leading, allowsFullSwipe: true) {
-                Button {
-                    store.toggleBaTalkPin(talk.id)
-                } label: {
-                    Label(talk.pinnedBy.contains(store.myUid()) ? "ピン解除" : "ピン留め",
-                          systemImage: talk.pinnedBy.contains(store.myUid()) ? "pin.slash.fill" : "pin.fill")
-                }
-                .tint(Color(red: 0x33 / 255.0, green: 0xa1 / 255.0, blue: 0xde / 255.0)) // LINE風の青
-            }
+            ForEach(unpinnedTalks) { talk in
+                talkRow(talk)
             }
         }
         .listStyle(.plain)
@@ -120,6 +81,66 @@ struct BaTalkListView: View {
                 deleteTarget = nil
             }
             Button("キャンセル", role: .cancel) { deleteTarget = nil }
+        }
+    }
+
+    /// トーク一覧の1行(タップで開く。LINE風のスワイプ操作付き)
+    @ViewBuilder
+    private func talkRow(_ talk: BaTalk) -> some View {
+        Button {
+            store.openBaTalk(talk.id)
+        } label: {
+            HStack(spacing: 10) {
+                ZStack {
+                    Circle().fill(Theme.chatBg)
+                    Image(systemName: talk.isGroup ? "person.3.fill" : "person.fill")
+                        .font(.system(size: talk.isGroup ? 12 : 15))
+                        .foregroundColor(.white)
+                }
+                .frame(width: 38, height: 38)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 4) {
+                        Text(store.baTalkName(talk))
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(.primary)
+                            .lineLimit(1)
+                        if talk.pinnedBy.contains(store.myUid()) {
+                            Image(systemName: "pin.fill")
+                                .font(.system(size: 9))
+                                .foregroundColor(Color(.tertiaryLabel))
+                        }
+                    }
+                    Text(snippet(talk.lastText, 40).isEmpty ? "(メッセージなし)" : snippet(talk.lastText, 40))
+                        .font(.system(size: 12))
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                }
+                Spacer()
+                if !talk.lastTs.isEmpty {
+                    Text(fmtDate(talk.lastTs))
+                        .font(.system(size: 10))
+                        .foregroundColor(Color(.tertiaryLabel))
+                }
+            }
+            .padding(.vertical, 2)
+        }
+        // LINE風: 左スワイプ=削除(赤・ゴミ箱) / 右スワイプ=ピン留め(青・フルスワイプ可)
+        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+            Button(role: .destructive) {
+                deleteTarget = talk
+            } label: {
+                Label("削除", systemImage: "trash.fill")
+            }
+        }
+        .swipeActions(edge: .leading, allowsFullSwipe: true) {
+            Button {
+                store.toggleBaTalkPin(talk.id)
+            } label: {
+                Label(talk.pinnedBy.contains(store.myUid()) ? "ピン解除" : "ピン留め",
+                      systemImage: talk.pinnedBy.contains(store.myUid()) ? "pin.slash.fill" : "pin.fill")
+            }
+            .tint(Color(red: 0x33 / 255.0, green: 0xa1 / 255.0, blue: 0xde / 255.0)) // LINE風の青
         }
     }
 }
