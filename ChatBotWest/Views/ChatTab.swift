@@ -255,12 +255,19 @@ struct RoomListView: View {
                     }
                 }
             } label: {
+                // 選択式なのでオン/オフの緑塗りにはせず、一般的なドロップダウン表示にする
                 HStack(spacing: 4) {
-                    sortChip(sort == "status" ? "ステータス順" : "新しい順", active: true)
+                    Text(sort == "status" ? "ステータス順" : "新しい順")
                     Image(systemName: "chevron.down")
                         .font(.system(size: 9))
                         .foregroundColor(.secondary)
                 }
+                .font(.system(size: 12, weight: .medium))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(Color(.secondarySystemBackground))
+                .foregroundColor(.primary)
+                .cornerRadius(14)
             }
             // ラベルの文字数が変わってもMenuが幅を再計算しないため、選択が変わったら作り直す
             .id("sort-\(sort)")
