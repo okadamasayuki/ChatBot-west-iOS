@@ -7,7 +7,6 @@ struct ChatRoomView: View {
     @FocusState private var inputFocused: Bool
     @State private var editingMessage: Message?
     @State private var showSummary = false
-    @State private var delegateTarget: String? // 対応依頼の確認中の相手
 
     /// 表示するメッセージ(財務のみ表示のメッセージは質問者には見せない)
     private var displayMessages: [Message] {
@@ -233,18 +232,6 @@ struct ChatRoomView: View {
         .sheet(isPresented: $showSummary) {
             SummarySheet { try await store.summarizeCurrentRoom() }
         }
-        .confirmationDialog("\(delegateTarget ?? "")さんにこの相談の対応を依頼しますか?",
-                            isPresented: Binding(get: { delegateTarget != nil },
-                                                 set: { if !$0 { delegateTarget = nil } }),
-                            titleVisibility: .visible) {
-            Button("依頼する") {
-                if let name = delegateTarget, let id = store.currentRoomId {
-                    store.assignRoomHandler(id, to: name)
-                }
-                delegateTarget = nil
-            }
-            Button("キャンセル", role: .cancel) { delegateTarget = nil }
-        }
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
                 if store.isExpert, let r = room, store.pendingRoom?.id != r.id {
@@ -261,11 +248,11 @@ struct ChatRoomView: View {
                         }
                         let others = store.expertNames.filter { $0 != store.myName() && $0 != handler }
                         if !others.isEmpty {
-                            // 「対応を依頼する」→ 対応者を選択 → 確認ダイアログ
+                            // 「対応を依頼する」→ 対応者を選択
                             Menu {
                                 ForEach(others, id: \.self) { name in
                                     Button(name) {
-                                        delegateTarget = name
+                                        store.assignRoomHandler(r.id, to: name)
                                     }
                                 }
                             } label: {
