@@ -701,11 +701,18 @@ struct BaMessageBubble: View {
     }
 
     private var bubbleBody: some View {
-        HStack {
+        HStack(alignment: .top, spacing: 8) {
             if isMine { Spacer(minLength: 60) }
+            if !isMine {
+                // 相手のアイコン(設定済みアイコン → イニシャル)
+                let m = store.member(message.senderUid)
+                AvatarCircleView(iconData: m?.iconData ?? "",
+                                 icon: m?.icon ?? "",
+                                 size: 34)
+            }
             VStack(alignment: isMine ? .trailing : .leading, spacing: 3) {
                 if !isMine {
-                    Text("👤 \(message.senderName)")
+                    Text(message.senderName)
                         .font(.system(size: 11))
                         .foregroundColor(Theme.header.opacity(0.8))
                 }

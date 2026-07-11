@@ -7,17 +7,17 @@ struct LineBubbleShape: Shape {
     var isMine: Bool
 
     func path(in rect: CGRect) -> Path {
-        let r = min(16, rect.height / 2)          // 角の丸み(1行ならカプセルに近い)
+        let r = min(20, rect.height / 2)          // 角の丸み(1行ならカプセルに近い)
         let drop = min(16, rect.height * 0.55)    // しっぽが辺に合流する位置
         var p = Path()
         if isMine {
             p.move(to: CGPoint(x: rect.minX + r, y: rect.minY))
-            p.addLine(to: CGPoint(x: rect.maxX - 8, y: rect.minY))
+            p.addLine(to: CGPoint(x: rect.maxX - 6, y: rect.minY))
             // 右上のしっぽ: 外へ跳ねて右辺に合流
-            p.addQuadCurve(to: CGPoint(x: rect.maxX + 6, y: rect.minY + 2),
-                           control: CGPoint(x: rect.maxX + 2, y: rect.minY - 2))
+            p.addQuadCurve(to: CGPoint(x: rect.maxX + 9, y: rect.minY - 5),
+                           control: CGPoint(x: rect.maxX + 1, y: rect.minY - 1))
             p.addQuadCurve(to: CGPoint(x: rect.maxX, y: rect.minY + drop),
-                           control: CGPoint(x: rect.maxX - 1, y: rect.minY + drop / 2))
+                           control: CGPoint(x: rect.maxX, y: rect.minY + 2))
             p.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY - r))
             p.addQuadCurve(to: CGPoint(x: rect.maxX - r, y: rect.maxY),
                            control: CGPoint(x: rect.maxX, y: rect.maxY))
@@ -29,12 +29,12 @@ struct LineBubbleShape: Shape {
                            control: CGPoint(x: rect.minX, y: rect.minY))
         } else {
             p.move(to: CGPoint(x: rect.maxX - r, y: rect.minY))
-            p.addLine(to: CGPoint(x: rect.minX + 8, y: rect.minY))
+            p.addLine(to: CGPoint(x: rect.minX + 6, y: rect.minY))
             // 左上のしっぽ: 外へ跳ねて左辺に合流
-            p.addQuadCurve(to: CGPoint(x: rect.minX - 6, y: rect.minY + 2),
-                           control: CGPoint(x: rect.minX - 2, y: rect.minY - 2))
+            p.addQuadCurve(to: CGPoint(x: rect.minX - 9, y: rect.minY - 5),
+                           control: CGPoint(x: rect.minX - 1, y: rect.minY - 1))
             p.addQuadCurve(to: CGPoint(x: rect.minX, y: rect.minY + drop),
-                           control: CGPoint(x: rect.minX + 1, y: rect.minY + drop / 2))
+                           control: CGPoint(x: rect.minX, y: rect.minY + 2))
             p.addLine(to: CGPoint(x: rect.minX, y: rect.maxY - r))
             p.addQuadCurve(to: CGPoint(x: rect.minX + r, y: rect.maxY),
                            control: CGPoint(x: rect.minX, y: rect.maxY))

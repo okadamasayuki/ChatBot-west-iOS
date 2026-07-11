@@ -112,6 +112,30 @@ struct ChatRoomView: View {
         return nil
     }
 
+    /// メッセージの送信者のアイコン情報(設定済みアイコン → 役割の絵文字)
+    private func avatarInfo(for msg: Message) -> (data: String, icon: String) {
+        switch msg.role {
+        case .ai:
+            return ("", "🤖")
+        case .expert:
+            if !msg.senderName.isEmpty,
+               let m = store.members.first(where: { $0.name == msg.senderName }) {
+                return (m.iconData, m.icon.isEmpty ? "👤" : m.icon)
+            }
+            if let r = room, let m = store.members.first(where: { $0.name == r.handler }) {
+                return (m.iconData, m.icon.isEmpty ? "👤" : m.icon)
+            }
+            return ("", "👤")
+        case .user:
+            if let r = room, let m = store.member(r.ownerUid) {
+                return (m.iconData, m.icon.isEmpty ? "🙋" : m.icon)
+            }
+            return ("", "🙋")
+        case .system:
+            return ("", "")
+        }
+    }
+
     /// この相談の未回答案件(財務のみ、チャット内にBAの案件カードを統合表示する)
     private var roomCases: [CaseItem] {
         guard store.isExpert, let id = store.currentRoomId, !store.isDoneRoom(id) else { return [] }
@@ -129,12 +153,15 @@ struct ChatRoomView: View {
                         let lastIdx = displayMessages.count - 1
                         ForEach(Array(displayMessages.enumerated()), id: \.element.id) { idx, msg in
                             let style = bubbleStyle(for: msg)
+                            let avatar = avatarInfo(for: msg)
                             let bubble = MessageBubble(
                                 message: msg,
                                 senderLabel: style.label,
                                 alignRight: style.right,
                                 bubbleColor: style.color,
                                 borderColor: style.border,
+                                avatarIconData: avatar.data,
+                                avatarIcon: avatar.icon,
                                 readStatus: msg.deleted ? nil : readStatus(for: msg),
                                 myUid: store.myUid(),
                                 onReaction: { emoji in store.toggleReaction(msg, emoji: emoji) },
@@ -496,6 +523,8 @@ struct MessageBubble: View {
     var alignRight = false
     var bubbleColor: Color = Color(.systemBackground)
     var borderColor: Color? = nil
+    var avatarIconData: String = ""
+    var avatarIcon: String = ""
     var readStatus: String? = nil
     var myUid: String = ""
     var onReaction: (String) -> Void = { _ in }
@@ -506,8 +535,12 @@ struct MessageBubble: View {
         if message.role == .system {
             SystemBubble(text: message.text)
         } else {
-            HStack {
+            HStack(alignment: .top, spacing: 8) {
                 if alignRight { Spacer(minLength: 60) }
+                if !alignRight {
+                    // 相手側はアイコン付きで表示
+                    AvatarCircleView(iconData: avatarIconData, icon: avatarIcon, size: 34)
+                }
                 VStack(alignment: alignRight ? .trailing : .leading, spacing: 3) {
                     if let senderLabel {
                         Text(senderLabel)
