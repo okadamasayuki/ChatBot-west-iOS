@@ -198,6 +198,11 @@ struct OrgSettingsView: View {
                     }
                     store.saveOrgConfig()
                 }
+                .onMove { from, to in
+                    // 並び順は新規登録の会社選択肢にもそのまま反映される
+                    store.orgCompanies.move(fromOffsets: from, toOffset: to)
+                    store.saveOrgConfig()
+                }
                 addRow(placeholder: "会社を追加", text: $newCompany) {
                     let name = newCompany.trimmingCharacters(in: .whitespaces)
                     guard !name.isEmpty, !store.orgCompanies.contains(name) else { return }
@@ -209,7 +214,7 @@ struct OrgSettingsView: View {
             } header: {
                 Text("所属会社")
             } footer: {
-                Text("左にスワイプで削除できます。削除しても登録済みユーザーの所属は変わりません。")
+                Text("左にスワイプで削除、長押しして上下に動かすと並び替えできます。並び順は新規登録の選択肢にも反映されます。削除しても登録済みユーザーの所属は変わりません。")
             }
 
             Section("所属部署(会社ごと)") {
