@@ -68,22 +68,22 @@ struct ChatRoomView: View {
         if store.isExpert {
             switch msg.role {
             case .user:
-                return ("🙋 \(questionerName)", false, Color(.systemBackground), nil)
+                return ("\(questionerName)", false, Color(.systemBackground), nil)
             case .ai:
-                return ("🤖 AIアシスタント", true, Color(.systemBackground), nil)
+                return ("AIアシスタント", true, Color(.systemBackground), nil)
             default:
-                return ("👤 \(baName)", true, Theme.myBubble, nil)
+                return ("\(baName)", true, Theme.myBubble, nil)
             }
         } else {
             switch msg.role {
             case .user:
                 // 自分の相談では自分のメッセージに名前は付けない(LINEと同じ)
                 let isMine = room.map { store.isMyRoom($0) } ?? true
-                return (isMine ? nil : "🙋 \(questionerName)", true, Theme.myBubble, nil)
+                return (isMine ? nil : "\(questionerName)", true, Theme.myBubble, nil)
             case .ai:
-                return ("🤖 AIアシスタント", false, Color(.systemBackground), nil)
+                return ("AIアシスタント", false, Color(.systemBackground), nil)
             default:
-                return ("👤 \(baName)", false, Theme.expertBubble, Theme.expertBorder)
+                return ("\(baName)", false, Theme.expertBubble, Theme.expertBorder)
             }
         }
     }
@@ -112,25 +112,25 @@ struct ChatRoomView: View {
         return nil
     }
 
-    /// メッセージの送信者のアイコン情報(設定済みアイコンのみ。未設定はシンボルの丸)
+    /// メッセージの送信者のアイコン情報(未設定は役割の絵文字)
     private func avatarInfo(for msg: Message) -> (data: String, icon: String, fallback: String) {
         switch msg.role {
         case .ai:
-            return ("", "", "sparkles")
+            return ("", "🤖", "")
         case .expert:
             if !msg.senderName.isEmpty,
                let m = store.members.first(where: { $0.name == msg.senderName }) {
-                return (m.iconData, m.icon, "person.fill")
+                return (m.iconData, m.iconData.isEmpty && m.icon.isEmpty ? "👤" : m.icon, "")
             }
             if let r = room, let m = store.members.first(where: { $0.name == r.handler }) {
-                return (m.iconData, m.icon, "person.fill")
+                return (m.iconData, m.iconData.isEmpty && m.icon.isEmpty ? "👤" : m.icon, "")
             }
-            return ("", "", "person.fill")
+            return ("", "👤", "")
         case .user:
             if let r = room, let m = store.member(r.ownerUid) {
-                return (m.iconData, m.icon, "person.fill")
+                return (m.iconData, m.iconData.isEmpty && m.icon.isEmpty ? "🙋" : m.icon, "")
             }
-            return ("", "", "person.fill")
+            return ("", "🙋", "")
         case .system:
             return ("", "", "person.fill")
         }
@@ -229,7 +229,7 @@ struct ChatRoomView: View {
                         }
                         if store.devTypingRoomId == store.currentRoomId, store.devTypingRoomId != nil {
                             // 開発モード: 担当者役が返信を生成中(質問者側に表示)
-                            TypingBubble(label: "🙋 質問者が入力中…", alignRight: !store.isExpert)
+                            TypingBubble(label: "質問者が入力中…", alignRight: !store.isExpert)
                                 .id("devTyping")
                         }
                         // BAタブの該当案件をチャット内に統合表示(財務のみ・未回答の案件)
@@ -651,7 +651,7 @@ struct SystemBubble: View {
 }
 
 struct TypingBubble: View {
-    var label = "🤖 AIアシスタント"
+    var label = "AIアシスタント"
     var alignRight = false
 
     var body: some View {

@@ -143,8 +143,6 @@ struct SettingsView: View {
     @State private var shareURL: URL?
     @State private var sampleBusy = false
     @State private var sampleNote: String?
-    @State private var manualBusy: String?
-    @State private var manualNote: String?
     @State private var styleText = ""
     @State private var styleSavedNote = false
     @FocusState private var styleFocused: Bool
@@ -154,29 +152,19 @@ struct SettingsView: View {
     @State private var deleteAllBusy = false
     @State private var errorNote: String?
 
-    private static let sampleManuals: [(slug: String, title: String)] = [
-        ("keihi", "経費精算マニュアル"),
-        ("kotei", "固定資産管理マニュアル"),
-        ("kosai", "交際費・会議費マニュアル"),
-        ("invoice", "インボイス・消費税マニュアル"),
-        ("kyuyo", "給与・社会保険マニュアル"),
-        ("uriage", "売上計上マニュアル"),
-        ("saiken", "債権管理マニュアル"),
-        ("gaika", "外貨建取引マニュアル"),
-    ]
-
     var body: some View {
         NavigationStack {
             Form {
                 Section("☁ アカウント") {
                     if store.user != nil {
-                        HStack {
-                            AvatarCircleView(iconData: store.myIconData, icon: store.myIcon, size: 44)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(store.myName()).font(.system(size: 15, weight: .semibold))
+                        HStack(spacing: 14) {
+                            AvatarCircleView(iconData: store.myIconData, icon: store.myIcon, size: 72)
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(store.myName()).font(.system(size: 18, weight: .semibold))
                                 Text(store.role?.label ?? "-").font(.footnote).foregroundColor(.secondary)
                             }
                         }
+                        .padding(.vertical, 4)
                         NavigationLink("アイコンを設定") {
                             IconSettingView()
                         }
@@ -198,23 +186,6 @@ struct SettingsView: View {
                     .disabled(sampleBusy)
                     if let sampleNote {
                         Text(sampleNote).font(.footnote).foregroundColor(.secondary)
-                    }
-                }
-
-                Section("📄 サンプルマニュアル") {
-                    ForEach(Self.sampleManuals, id: \.slug) { item in
-                        Button {
-                            addSampleManual(item.slug, item.title)
-                        } label: {
-                            HStack {
-                                if manualBusy == item.slug { ProgressView().padding(.trailing, 6) }
-                                Text("📄 \(item.title) を追加")
-                            }
-                        }
-                        .disabled(manualBusy != nil)
-                    }
-                    if let manualNote {
-                        Text(manualNote).font(.footnote).foregroundColor(.secondary)
                     }
                 }
 
@@ -362,26 +333,21 @@ struct SettingsView: View {
         Task {
             do {
                 let n = try await SampleData.addToCloud(store: store)
-                sampleNote = n > 0 ? "サンプル相談を\(n)件追加しました。"
-                    : "サンプルは既に追加済みのため、メッセージ・案件の状態を初期状態に修復しました。"
+                showSampleNote(n > 0 ? "サンプル相談を\(n)件追加しました。"
+                    : "サンプルは既に追加済みのため、メッセージ・案件の状態を初期状態に修復しました。")
             } catch {
-                sampleNote = "追加に失敗しました: \(error.localizedDescription)"
+                showSampleNote("追加に失敗しました: \(error.localizedDescription)")
             }
             sampleBusy = false
         }
     }
 
-    private func addSampleManual(_ slug: String, _ title: String) {
-        manualBusy = slug
-        manualNote = nil
+    /// 実行結果を一度だけ表示し、数秒で自動的に消す
+    private func showSampleNote(_ text: String) {
+        sampleNote = text
         Task {
-            do {
-                try await SampleData.addSampleManual(slug: slug, title: title, store: store)
-                manualNote = "✓「\(title)」を追加しました。"
-            } catch {
-                manualNote = "追加に失敗しました: \(error.localizedDescription)"
-            }
-            manualBusy = nil
+            try? await Task.sleep(nanoseconds: 4_000_000_000)
+            withAnimation { if sampleNote == text { sampleNote = nil } }
         }
     }
 
@@ -390,7 +356,7 @@ struct SettingsView: View {
         Task {
             do {
                 try await store.deleteAllRooms()
-                sampleNote = "すべての相談を削除しました。"
+                showSampleNote("すべての相談を削除しました。")
             } catch {
                 errorNote = "削除に失敗しました: \(error.localizedDescription)"
             }
