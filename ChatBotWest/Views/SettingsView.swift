@@ -284,7 +284,7 @@ struct OrgSettingsView: View {
                 }
             }
         }
-        .navigationTitle("組織の選択肢")
+        .navigationTitle("組織の設定")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             if deptCompany.isEmpty { deptCompany = store.orgCompanies.first ?? "" }
