@@ -397,7 +397,7 @@ struct ChatRoomView: View {
                         .font(.system(size: 13))
                         .lineLimit(1)
                         .frame(maxWidth: 150)
-                        .foregroundColor(handler.isEmpty ? Theme.accentDark : Color(red: 0xc2 / 255.0, green: 0x6a / 255.0, blue: 0x00 / 255.0))
+                        .foregroundColor(Color(.systemGray))
                 }
                 // ラベルの文字数が変わってもMenuが幅を再計算せず一瞬崩れるため、担当名が変わったら作り直す
                 .id("handler-\(handler)")
@@ -414,7 +414,7 @@ struct ChatRoomView: View {
                 } label: {
                     Image(systemName: linkCopied ? "checkmark" : "link")
                         .font(.system(size: 13))
-                        .foregroundColor(Theme.accentDark)
+                        .foregroundColor(Color(.systemGray))
                 }
             }
             if !store.roomMessages.isEmpty {
@@ -422,7 +422,7 @@ struct ChatRoomView: View {
                     showSummary = true
                 }
                 .font(.system(size: 13))
-                .foregroundColor(Theme.accentDark)
+                .foregroundColor(Color(.systemGray))
             }
             if canToggleDone {
                 Button {
@@ -433,7 +433,7 @@ struct ChatRoomView: View {
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
                         .background(room?.isDone == true ? Theme.accent : Color(.systemBackground))
-                        .foregroundColor(room?.isDone == true ? .white : .primary)
+                        .foregroundColor(room?.isDone == true ? .white : Color(.systemGray))
                         .cornerRadius(8)
                 }
             }
