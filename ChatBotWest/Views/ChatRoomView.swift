@@ -15,6 +15,7 @@ struct ChatRoomView: View {
     @State private var attachError: String?
     @State private var profileMember: CloudStore.MemberInfo?
     @State private var linkCopied = false
+    @State private var showDelegatePicker = false
 
     /// 表示するメッセージ(財務のみ表示のメッセージは質問者には見せない)
     private var displayMessages: [Message] {
@@ -372,18 +373,11 @@ struct ChatRoomView: View {
                             Label("自分が担当する", systemImage: "person.fill.checkmark")
                         }
                     }
-                    let others = store.expertNames.filter { $0 != store.myName() && $0 != handler }
-                    if !others.isEmpty {
-                        // 「対応を依頼する」→ 対応者を選択
-                        Menu {
-                            ForEach(others, id: \.self) { name in
-                                Button(name) {
-                                    store.assignRoomHandler(r.id, to: name)
-                                }
-                            }
-                        } label: {
-                            Label("対応を依頼する", systemImage: "arrowshape.turn.up.right")
-                        }
+                    // 「対応を依頼する」→ 検索できる選択シートを開く
+                    Button {
+                        showDelegatePicker = true
+                    } label: {
+                        Label("対応を依頼する", systemImage: "arrowshape.turn.up.right")
                     }
                     if !handler.isEmpty {
                         Button(role: .destructive) {
@@ -438,6 +432,57 @@ struct ChatRoomView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
         .background(Theme.panelBg)
+        .sheet(isPresented: $showDelegatePicker) {
+            if let r = room {
+                DelegatePickerSheet(excludeNames: [store.myName(), r.handler]) { name in
+                    store.assignRoomHandler(r.id, to: name)
+                }
+            }
+        }
+    }
+}
+
+/// 対応を依頼するBAを検索して選ぶシート
+struct DelegatePickerSheet: View {
+    @EnvironmentObject var store: CloudStore
+    @Environment(\.dismiss) private var dismiss
+    let excludeNames: [String]
+    let onPick: (String) -> Void
+    @State private var searchText = ""
+
+    private var candidates: [CloudStore.MemberInfo] {
+        let all = store.members
+            .filter { $0.role == MemberRole.expert.rawValue && !$0.name.isEmpty && !excludeNames.contains($0.name) }
+            .sorted { $0.name < $1.name }
+        let q = searchText.trimmingCharacters(in: .whitespaces)
+        guard !q.isEmpty else { return all }
+        return all.filter {
+            $0.name.localizedCaseInsensitiveContains(q) || $0.affiliation.localizedCaseInsensitiveContains(q)
+        }
+    }
+
+    var body: some View {
+        NavigationStack {
+            List(candidates) { m in
+                Button {
+                    onPick(m.name)
+                    dismiss()
+                } label: {
+                    MemberRow(member: m, isMe: false)
+                }
+                .buttonStyle(.plain)
+            }
+            .listStyle(.plain)
+            .navigationTitle("対応を依頼する相手")
+            .navigationBarTitleDisplayMode(.inline)
+            .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always),
+                        prompt: "名前・所属で検索")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("キャンセル") { dismiss() }
+                }
+            }
+        }
     }
 }
 
