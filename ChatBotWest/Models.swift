@@ -70,6 +70,11 @@ struct Room: Identifiable, Equatable {
     var pendingHandler: String
     /// 対応依頼をした側のBA(表示名)
     var pendingHandlerBy: String
+    /// 直近の対応依頼の結果("accepted" | "declined")。依頼した側への通知に使う
+    var handlerRequestResult: String
+    var handlerRequestResultBy: String  // 承諾/辞退したBA
+    var handlerRequestResultTo: String  // 依頼していたBA(通知の宛先)
+    var handlerRequestResultTs: String
 
     init(id: String = newUid(), title: String = "新しい相談", createdAt: String = nowIso(),
          lastText: String = "", lastTs: String = nowIso(),
@@ -84,6 +89,10 @@ struct Room: Identifiable, Equatable {
         self.handler = handler
         self.pendingHandler = pendingHandler
         self.pendingHandlerBy = pendingHandlerBy
+        self.handlerRequestResult = ""
+        self.handlerRequestResultBy = ""
+        self.handlerRequestResultTo = ""
+        self.handlerRequestResultTs = ""
     }
 
     init?(dict: [String: Any]) {
@@ -101,6 +110,10 @@ struct Room: Identifiable, Equatable {
         handler = dict["handler"] as? String ?? ""
         pendingHandler = dict["pendingHandler"] as? String ?? ""
         pendingHandlerBy = dict["pendingHandlerBy"] as? String ?? ""
+        handlerRequestResult = dict["handlerRequestResult"] as? String ?? ""
+        handlerRequestResultBy = dict["handlerRequestResultBy"] as? String ?? ""
+        handlerRequestResultTo = dict["handlerRequestResultTo"] as? String ?? ""
+        handlerRequestResultTs = dict["handlerRequestResultTs"] as? String ?? ""
     }
 
     var isDone: Bool { status == "done" }

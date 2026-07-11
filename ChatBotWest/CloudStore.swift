@@ -276,6 +276,7 @@ final class CloudStore: ObservableObject {
             detectRoomNotifications()
             detectTalkNotifications()
             detectHandlerRequestNotifications()
+            detectHandlerResultNotifications()
             refreshTalkUnreadCounts()
             refreshRoomUnreadCounts()
             // メンバー情報(役割・ニックネーム・回答の癖)を常時同期する。
@@ -741,6 +742,7 @@ final class CloudStore: ObservableObject {
                 self?.rooms = snap?.documents.compactMap { Room(dict: $0.data()) } ?? []
                 self?.detectRoomNotifications()
                 self?.detectHandlerRequestNotifications()
+                self?.detectHandlerResultNotifications()
                 self?.refreshRoomUnreadCounts()
                 self?.backfillRoomHandlers()
             }
@@ -1110,20 +1112,32 @@ final class CloudStore: ObservableObject {
     func acceptHandlerRequest(_ roomId: String) {
         guard let r = rooms.first(where: { $0.id == roomId }),
               r.pendingHandler == myName() else { return }
+        recordHandlerRequestResult(roomId, requester: r.pendingHandlerBy, result: "accepted")
         addMessage(Message(role: .system,
                            text: "\(myName())さんが対応依頼を承諾しました。",
                            expertOnly: true), roomId: roomId)
-        assignRoomHandler(roomId, to: myName()) // 承諾待ちの依頼もここで取り下げられる
+        assignRoomHandler(roomId, to: myName())
     }
 
     /// 自分宛の対応依頼を辞退する
     func declineHandlerRequest(_ roomId: String) {
         guard let r = rooms.first(where: { $0.id == roomId }),
               r.pendingHandler == myName() else { return }
-        clearHandlerRequest(roomId)
+        recordHandlerRequestResult(roomId, requester: r.pendingHandlerBy, result: "declined")
         addMessage(Message(role: .system,
                            text: "\(myName())さんが対応依頼を辞退しました。",
                            expertOnly: true), roomId: roomId)
+    }
+
+    /// 承諾/辞退の結果を相談に記録して依頼を取り下げる(依頼した側の端末が結果を通知に使う)
+    private func recordHandlerRequestResult(_ roomId: String, requester: String, result: String) {
+        wsRef().collection("rooms").document(roomId).updateData([
+            "pendingHandler": "", "pendingHandlerBy": "",
+            "handlerRequestResult": result,
+            "handlerRequestResultBy": myName(),
+            "handlerRequestResultTo": requester,
+            "handlerRequestResultTs": nowIso(),
+        ])
     }
 
     /// 対応依頼を取り消す(依頼した側の取り消し・担当決定時の後始末)
@@ -1163,6 +1177,30 @@ final class CloudStore: ObservableObject {
             }
         }
         if changed { UserDefaults.standard.set(Array(notified), forKey: key) }
+    }
+
+    /// 対応依頼の結果(承諾/辞退)を依頼した側に通知する。
+    /// 通知済みの結果tsを端末に記録して、スナップショットのたびに重複しないようにする
+    private func detectHandlerResultNotifications() {
+        guard isExpert else { return }
+        let me = myName()
+        guard !me.isEmpty else { return }
+        let key = "handlerResNotified-\(myUid())"
+        var seen = UserDefaults.standard.dictionary(forKey: key) as? [String: String] ?? [:]
+        var changed = false
+        for r in rooms {
+            guard r.handlerRequestResultTo == me, !r.handlerRequestResult.isEmpty,
+                  !r.handlerRequestResultTs.isEmpty,
+                  seen[r.id] != r.handlerRequestResultTs else { continue }
+            seen[r.id] = r.handlerRequestResultTs; changed = true
+            // 古い結果(3日以上前)は再インストール直後などのノイズなので通知しない
+            if let d = parseIso(r.handlerRequestResultTs), d < Date(timeIntervalSinceNow: -3 * 86400) { continue }
+            let accepted = r.handlerRequestResult == "accepted"
+            addNotification(kind: "room", targetId: r.id,
+                            title: "対応依頼: \(r.title.isEmpty ? "相談" : r.title)",
+                            body: "\(r.handlerRequestResultBy)さんが対応依頼を\(accepted ? "承諾しました。" : "辞退しました。別のBAに依頼するか、担当を決め直してください。")")
+        }
+        if changed { UserDefaults.standard.set(seen, forKey: key) }
     }
 
     static let handlerWaitNotice = "担当BAが割り当てられると、AIアシスタントが回答します。しばらくお待ちください。"
