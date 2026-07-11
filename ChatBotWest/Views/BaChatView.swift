@@ -201,19 +201,6 @@ struct NewBaTalkSheet: View {
             // 会社・部署・担当・役職で絞り込み、まとめて選択できる
             MemberFilterBar(filter: $filter, pool: pool)
             Form {
-                Section {
-                    // 自分しかいないトーク(メモとして利用)
-                    Button {
-                        let talkId = store.startBaTalk(with: [])
-                        dismiss()
-                        store.openBaTalk(talkId)
-                    } label: {
-                        Label("自分だけのメモを作成", systemImage: "note.text")
-                    }
-                } footer: {
-                    Text("自分にしか見えないトークです。メモとして使えます。")
-                }
-
                 Section("財務アカウント一覧 — トークする相手を選択") {
                     if candidates.isEmpty {
                         Text("該当する財務アカウントがありません。")
@@ -280,6 +267,17 @@ struct NewBaTalkSheet: View {
                         }
                     }
                     .disabled(selected.isEmpty)
+                }
+
+                Section {
+                    // 自分しかいないトーク(メモとして利用)
+                    Button {
+                        let talkId = store.startBaTalk(with: [])
+                        dismiss()
+                        store.openBaTalk(talkId)
+                    } label: {
+                        Label("自分だけのメモを作成", systemImage: "note.text")
+                    }
                 }
             }
             }
