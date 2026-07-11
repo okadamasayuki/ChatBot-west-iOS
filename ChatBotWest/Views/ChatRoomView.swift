@@ -148,6 +148,10 @@ struct ChatRoomView: View {
     var body: some View {
         VStack(spacing: 0) {
             actionBar
+            // 自分宛の対応依頼は、承諾するまで担当にならない
+            if store.isExpert, let r = room, r.pendingHandler == store.myName() {
+                handlerRequestBanner(r)
+            }
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(spacing: 10) {
@@ -253,6 +257,13 @@ struct ChatRoomView: View {
                 .onChange(of: lastMessageId) { id in
                     if let id {
                         withAnimation { proxy.scrollTo(id, anchor: .bottom) }
+                    }
+                }
+                .onAppear {
+                    // 通知タップなどで開いた直後は、画面遷移中の scrollTo が無効になることがあるため
+                    // 遷移が落ち着いてからもう一度最下部へスクロールする
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                        if let id = lastMessageId { proxy.scrollTo(id, anchor: .bottom) }
                     }
                 }
                 .onTapGesture { inputFocused = false }
@@ -390,11 +401,18 @@ struct ChatRoomView: View {
                             Label("自分が担当する", systemImage: "person.fill.checkmark")
                         }
                     }
-                    // 「対応を依頼する」→ 検索できる選択シートを開く
+                    // 「対応を依頼する」→ 検索できる選択シートを開く(相手の承諾で担当が決まる)
                     Button {
                         showDelegatePicker = true
                     } label: {
                         Label("対応を依頼する", systemImage: "arrowshape.turn.up.right")
+                    }
+                    if !r.pendingHandler.isEmpty {
+                        Button(role: .destructive) {
+                            store.cancelHandlerRequest(r.id)
+                        } label: {
+                            Label("\(r.pendingHandler)さんへの依頼を取り消す", systemImage: "arrow.uturn.backward")
+                        }
                     }
                     if !handler.isEmpty {
                         Button(role: .destructive) {
@@ -404,14 +422,16 @@ struct ChatRoomView: View {
                         }
                     }
                 } label: {
-                    Text(handler.isEmpty ? "担当" : "担当: \(handler)")
+                    Text(!r.pendingHandler.isEmpty
+                         ? "承諾待ち: \(r.pendingHandler)"
+                         : (handler.isEmpty ? "担当" : "担当: \(handler)"))
                         .font(.system(size: 13, weight: .bold))
                         .lineLimit(1)
                         .frame(maxWidth: 150)
                         .foregroundColor(Color(.darkGray))
                 }
                 // ラベルの文字数が変わってもMenuが幅を再計算せず一瞬崩れるため、担当名が変わったら作り直す
-                .id("handler-\(handler)")
+                .id("handler-\(handler)-\(r.pendingHandler)")
             }
             if store.isExpert, let r = room {
                 // この相談へのリンクをコピー(BAチャットに貼るとリンクカードになる)
@@ -455,11 +475,40 @@ struct ChatRoomView: View {
         .background(Theme.chatBg)
         .sheet(isPresented: $showDelegatePicker) {
             if let r = room {
-                DelegatePickerSheet(excludeNames: [store.myName(), r.handler]) { name in
-                    store.assignRoomHandler(r.id, to: name)
+                DelegatePickerSheet(excludeNames: [store.myName(), r.handler, r.pendingHandler]) { name in
+                    store.requestRoomHandler(r.id, to: name)
                 }
             }
         }
+    }
+
+    /// 自分宛の対応依頼の承諾/辞退バナー
+    private func handlerRequestBanner(_ r: Room) -> some View {
+        HStack(spacing: 10) {
+            Text("\(r.pendingHandlerBy)さんから対応依頼が届いています")
+                .font(.system(size: 12, weight: .semibold))
+                .lineLimit(2)
+            Spacer()
+            Button("辞退") {
+                store.declineHandlerRequest(r.id)
+            }
+            .font(.system(size: 12, weight: .bold))
+            .foregroundColor(Color(.darkGray))
+            Button {
+                store.acceptHandlerRequest(r.id)
+            } label: {
+                Text("承諾する")
+                    .font(.system(size: 12, weight: .bold))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(Theme.accent)
+                    .foregroundColor(.white)
+                    .cornerRadius(8)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Theme.accent.opacity(0.12))
     }
 }
 

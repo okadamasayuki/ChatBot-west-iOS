@@ -134,8 +134,11 @@ final class CloudStore: ObservableObject {
     @Published var notifications: [AppNotification] = []
     /// トークごとの未読メッセージ数(LINE式のバッジ表示用)
     @Published var talkUnread: [String: Int] = [:]
+    /// 相談ごとの未読メッセージ数(質問者=自分の相談 / 財務=担当中の相談)
+    @Published var roomUnread: [String: Int] = [:]
     /// 未読数の集計世代。古い getDocuments の結果が新しい集計を上書きしないようにする
     private var talkUnreadGeneration = 0
+    private var roomUnreadGeneration = 0
     /// 新着検知用: 前回見た lastTs(端末に保存し、アプリを閉じている間の新着も次回起動時に通知する)
     private var roomNotifyTs: [String: String] = [:]
     private var talkNotifyTs: [String: String] = [:]
@@ -151,6 +154,11 @@ final class CloudStore: ObservableObject {
         let uid = myUid()
         return baTalks.filter { $0.memberUids.contains(uid) }
             .reduce(0) { $0 + (talkUnread[$1.id] ?? 0) }
+    }
+
+    /// 相談の未読合計(質問者のタブバッジ用)
+    var totalRoomUnread: Int {
+        unreadTargetRooms().reduce(0) { $0 + (roomUnread[$1.id] ?? 0) }
     }
     @Published var currentRoomId: String?
     @Published var roomMessages: [Message] = []
@@ -267,7 +275,9 @@ final class CloudStore: ObservableObject {
             // isExpert 未確定のまま未読・通知の計算を素通りしているのでここでやり直す
             detectRoomNotifications()
             detectTalkNotifications()
+            detectHandlerRequestNotifications()
             refreshTalkUnreadCounts()
+            refreshRoomUnreadCounts()
             // メンバー情報(役割・ニックネーム・回答の癖)を常時同期する。
             // Web版で「回答の癖」を編集した場合も、アプリを再起動せずに反映される。
             listeners.append(mref.addSnapshotListener { [weak self] snap, _ in
@@ -424,6 +434,56 @@ final class CloudStore: ObservableObject {
                             body: snippet(t.lastText, 60))
         }
         UserDefaults.standard.set(talkNotifyTs, forKey: notifyTsKey("baTalk"))
+    }
+
+    /// 未読バッジの対象になる相談(質問者=自分の相談 / 財務=担当中の相談)
+    private func unreadTargetRooms() -> [Room] {
+        if isExpert {
+            let me = myName()
+            guard !me.isEmpty else { return [] }
+            return rooms.filter { $0.handler == me }
+        }
+        return rooms.filter { isMyRoom($0) }
+    }
+
+    /// 相談ごとの未読数を数える(自分の既読時刻より後の、相手からのメッセージ)
+    private func refreshRoomUnreadCounts() {
+        roomUnreadGeneration += 1
+        let gen = roomUnreadGeneration
+        for r in unreadTargetRooms() {
+            // 開いている相談はその場で読んでいるので常に0
+            if r.id == currentRoomId {
+                if roomUnread[r.id] != 0 { roomUnread[r.id] = 0 }
+                continue
+            }
+            let myRead = r.reads[myUid()] ?? ""
+            if r.lastTs.isEmpty || r.lastTs <= myRead {
+                if roomUnread[r.id] != 0 { roomUnread[r.id] = 0 }
+                continue
+            }
+            let ref = wsRef().collection("rooms").document(r.id).collection("messages")
+            let query: Query = myRead.isEmpty ? ref : ref.whereField("ts", isGreaterThan: myRead)
+            query.getDocuments { [weak self] snap, _ in
+                Task { @MainActor in
+                    guard let self, gen == self.roomUnreadGeneration else { return }
+                    let expert = self.isExpert
+                    let me = self.myName()
+                    let count = snap?.documents.filter { d in
+                        let role = d.data()["role"] as? String ?? ""
+                        if d.data()["deleted"] as? Bool ?? false { return false }
+                        if role == "system" { return false }
+                        if expert {
+                            // 財務: 自分(BA)の回答以外を数える
+                            let sender = d.data()["senderName"] as? String ?? ""
+                            return !(role == "expert" && sender == me)
+                        }
+                        // 質問者: 自分の発言と財務専用メッセージ以外(AI・BAの回答)を数える
+                        return role != "user" && !(d.data()["expertOnly"] as? Bool ?? false)
+                    }.count ?? 0
+                    if self.roomUnread[r.id] != count { self.roomUnread[r.id] = count }
+                }
+            }
+        }
     }
 
     /// トークごとの未読数を数える(自分の既読時刻より後の、自分・システム以外のメッセージ)
@@ -680,6 +740,8 @@ final class CloudStore: ObservableObject {
             Task { @MainActor in
                 self?.rooms = snap?.documents.compactMap { Room(dict: $0.data()) } ?? []
                 self?.detectRoomNotifications()
+                self?.detectHandlerRequestNotifications()
+                self?.refreshRoomUnreadCounts()
                 self?.backfillRoomHandlers()
             }
         })
@@ -763,6 +825,7 @@ final class CloudStore: ObservableObject {
     func openRoom(_ id: String) {
         pendingRoom = nil // 別ルームを開いたら未送信の下書きは破棄
         currentRoomId = id
+        if roomUnread[id] != 0 { roomUnread[id] = 0 } // 既読の書き込みを待たずにバッジを消す
         subscribeRoomMessages(id)
         if chatPath != [id] { chatPath = [id] }
     }
@@ -818,6 +881,12 @@ final class CloudStore: ObservableObject {
             lastText = type == "image" ? "📷 写真" : "📎 \(msg.attachmentName ?? "ファイル")"
         }
         let roomRef = wsRef().collection("rooms").document(roomId)
+
+        // 財務のみに見えるメッセージは、質問者にも見える一覧プレビュー(lastText/lastTs)を変えない
+        if msg.expertOnly {
+            roomRef.collection("messages").document(msg.id).setData(msg.dict)
+            return
+        }
 
         if var room = pendingRoom, room.id == roomId {
             pendingRoom = nil
@@ -1007,24 +1076,93 @@ final class CloudStore: ObservableObject {
         assignRoomHandler(roomId, to: current == me ? "" : me)
     }
 
-    /// 相談の担当BAを指定の人に割り当てる(他のBAへの対応依頼にも使う)。
+    /// 相談の担当BAを指定の人に割り当てる(自分が担当する/依頼の承諾後に使う)。
     /// 未回答案件の対応者も連動して同じ担当に揃える
     func assignRoomHandler(_ roomId: String, to handler: String) {
         guard isExpert else { return }
         setRoomHandler(roomId, handler: handler)
+        // 担当が決まったら承諾待ちの依頼は意味を失うので取り下げる
+        if !handler.isEmpty, let r = rooms.first(where: { $0.id == roomId }), !r.pendingHandler.isEmpty {
+            clearHandlerRequest(roomId)
+        }
         for c in cases where c.roomId == roomId && c.status != .answered {
             updateCase(c.id, ["handledBy": handler])
         }
         guard !handler.isEmpty else { return }
         // 担当が付いたら、待機案内を消してAI回答待ちだった質問への回答を開始する
         removeHandlerWaitNotices(roomId)
-        if handler != myName() {
-            // 他のBAへの依頼はチャットに記録して相手にも分かるようにする(財務のみ表示)
-            addMessage(Message(role: .system,
-                               text: "\(myName())さんが\(handler)さんに対応を依頼しました。",
-                               expertOnly: true), roomId: roomId)
-        }
         triggerPendingTriage(roomId)
+    }
+
+    // MARK: - 対応依頼(承諾フロー)
+
+    /// 他のBAに対応を依頼する(相手が承諾するまで担当にはならない)
+    func requestRoomHandler(_ roomId: String, to name: String) {
+        guard isExpert, !name.isEmpty, name != myName() else { return }
+        wsRef().collection("rooms").document(roomId)
+            .setData(["pendingHandler": name, "pendingHandlerBy": myName()], merge: true)
+        addMessage(Message(role: .system,
+                           text: "\(myName())さんが\(name)さんに対応を依頼しました。(承諾待ち)",
+                           expertOnly: true), roomId: roomId)
+    }
+
+    /// 自分宛の対応依頼を承諾して担当になる
+    func acceptHandlerRequest(_ roomId: String) {
+        guard let r = rooms.first(where: { $0.id == roomId }),
+              r.pendingHandler == myName() else { return }
+        addMessage(Message(role: .system,
+                           text: "\(myName())さんが対応依頼を承諾しました。",
+                           expertOnly: true), roomId: roomId)
+        assignRoomHandler(roomId, to: myName()) // 承諾待ちの依頼もここで取り下げられる
+    }
+
+    /// 自分宛の対応依頼を辞退する
+    func declineHandlerRequest(_ roomId: String) {
+        guard let r = rooms.first(where: { $0.id == roomId }),
+              r.pendingHandler == myName() else { return }
+        clearHandlerRequest(roomId)
+        addMessage(Message(role: .system,
+                           text: "\(myName())さんが対応依頼を辞退しました。",
+                           expertOnly: true), roomId: roomId)
+    }
+
+    /// 対応依頼を取り消す(依頼した側の取り消し・担当決定時の後始末)
+    func clearHandlerRequest(_ roomId: String) {
+        guard isExpert else { return }
+        wsRef().collection("rooms").document(roomId)
+            .updateData(["pendingHandler": "", "pendingHandlerBy": ""])
+    }
+
+    /// 承諾待ちの対応依頼を取り消してチャットに記録する
+    func cancelHandlerRequest(_ roomId: String) {
+        guard let r = rooms.first(where: { $0.id == roomId }), !r.pendingHandler.isEmpty else { return }
+        clearHandlerRequest(roomId)
+        addMessage(Message(role: .system,
+                           text: "\(myName())さんが\(r.pendingHandler)さんへの対応依頼を取り消しました。",
+                           expertOnly: true), roomId: roomId)
+    }
+
+    /// 自分宛の対応依頼(承諾待ち)を通知に積む。
+    /// 通知済みの相談は端末に記録して、スナップショットのたびに重複しないようにする
+    private func detectHandlerRequestNotifications() {
+        guard isExpert else { return }
+        let me = myName()
+        guard !me.isEmpty else { return }
+        let key = "handlerReqNotified-\(myUid())"
+        var notified = Set(UserDefaults.standard.stringArray(forKey: key) ?? [])
+        var changed = false
+        for r in rooms {
+            if r.pendingHandler == me {
+                guard !notified.contains(r.id) else { continue }
+                notified.insert(r.id); changed = true
+                addNotification(kind: "room", targetId: r.id,
+                                title: "対応依頼: \(r.title.isEmpty ? "相談" : r.title)",
+                                body: "\(r.pendingHandlerBy)さんから対応を依頼されています。相談を開いて承諾/辞退を選んでください。")
+            } else if notified.contains(r.id) {
+                notified.remove(r.id); changed = true // 依頼が片付いたら再依頼でまた通知できるようにする
+            }
+        }
+        if changed { UserDefaults.standard.set(Array(notified), forKey: key) }
     }
 
     static let handlerWaitNotice = "担当BAが割り当てられると、AIアシスタントが回答します。しばらくお待ちください。"

@@ -113,6 +113,7 @@ struct RoomListView: View {
                                 // ステータスタグも「担当:」と同じ統一ロジック(effectiveHandler)で表示
                                 openCaseHandler: openCaseRoomIds.contains(room.id) ? effectiveHandler(room) : nil,
                                 handlerName: effectiveHandler(room),
+                                unread: store.roomUnread[room.id] ?? 0,
                                 selectable: store.isExpert,
                                 selected: selectedRooms.contains(room.id),
                                 onToggleSelect: {
@@ -287,6 +288,8 @@ struct RoomRowView: View {
     let openCaseHandler: String?
     /// この相談の実質的な担当BA(空=未定)
     var handlerName: String = ""
+    /// 未読メッセージ数(LINE式のバッジ表示用)
+    var unread = 0
     var selectable = false
     var selected = false
     var onToggleSelect: () -> Void = {}
@@ -319,18 +322,34 @@ struct RoomRowView: View {
                 }
             }
             Spacer()
-            Text(fmtDate(room.lastTs))
-                .font(.system(size: 10))
-                .foregroundColor(Color(.tertiaryLabel))
+            VStack(alignment: .trailing, spacing: 4) {
+                Text(fmtDate(room.lastTs))
+                    .font(.system(size: 10))
+                    .foregroundColor(Color(.tertiaryLabel))
+                // LINEと同じ、未読数の緑バッジ
+                if unread > 0 {
+                    Text("\(unread)")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 5)
+                        .frame(minWidth: 18, minHeight: 18)
+                        .background(Capsule().fill(Theme.accent))
+                }
+            }
         }
         .padding(.vertical, 2)
     }
 
-    // ステータス: 完了 / 対応者未決定 / 〇〇さん対応中 / 担当者回答待ち
+    // ステータス: 完了 / 依頼承諾待ち / 対応者未決定 / 〇〇さん対応中 / 担当者回答待ち
     @ViewBuilder
     private var statusTag: some View {
         if room.isDone {
             TagView(text: "✓ 完了", bg: Theme.tagDoneBg, fg: Theme.tagDoneFg)
+        } else if selectable && !room.pendingHandler.isEmpty {
+            // 対応依頼の承諾待ち(財務のみ表示)
+            TagView(text: "\(room.pendingHandler)さん承諾待ち",
+                    bg: Color(red: 1.0, green: 0xf0 / 255.0, blue: 0xdd / 255.0),   // オレンジ系
+                    fg: Color(red: 0xc2 / 255.0, green: 0x6a / 255.0, blue: 0x00 / 255.0))
         } else if let handler = openCaseHandler {
             if handler.isEmpty {
                 TagView(text: "対応者未決定",

@@ -40,8 +40,8 @@ struct MainTabView: View {
                     Label(store.isExpert ? "相談一覧" : "質問者",
                           systemImage: "bubble.left.and.bubble.right.fill")
                 }
-                // 未回答かつ対応者が決まっていない案件の数(財務のみ)
-                .badge(store.isExpert ? store.unassignedCaseCount : 0)
+                // 財務=未回答かつ対応者が決まっていない案件の数 / 質問者=未読の返答数
+                .badge(store.isExpert ? store.unassignedCaseCount : store.totalRoomUnread)
                 .tag(AppTab.chat)
 
             if store.isExpert {

@@ -461,6 +461,13 @@ struct BaTalkView: View {
                         withAnimation { proxy.scrollTo(id, anchor: .bottom) }
                     }
                 }
+                .onAppear {
+                    // 通知タップなどで開いた直後は、画面遷移中の scrollTo が無効になることがあるため
+                    // 遷移が落ち着いてからもう一度最下部へスクロールする
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                        if let id = visibleMessages.last?.id { proxy.scrollTo(id, anchor: .bottom) }
+                    }
+                }
                 .onTapGesture { inputFocused = false }
             }
 
