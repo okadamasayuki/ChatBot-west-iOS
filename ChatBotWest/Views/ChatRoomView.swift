@@ -233,6 +233,7 @@ struct ChatRoomView: View {
                                     .font(.system(size: 14))
                                     .lineSpacing(4)
                                     .padding(12)
+                                    .frame(maxWidth: 300, alignment: .leading) // バブルと同じ幅感で折り返す
                                     .background(Color(.systemBackground))
                             }
                         }
