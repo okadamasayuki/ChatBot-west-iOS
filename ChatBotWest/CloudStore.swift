@@ -521,8 +521,22 @@ final class CloudStore: ObservableObject {
         for c in cases where c.roomId == roomId && c.status != .answered {
             updateCase(c.id, ["handledBy": newHandler])
         }
-        // 担当が付いたら、AI回答待ちだった質問への回答を開始する
-        if !newHandler.isEmpty { triggerPendingTriage(roomId) }
+        // 担当が付いたら、待機案内を消してAI回答待ちだった質問への回答を開始する
+        if !newHandler.isEmpty {
+            removeHandlerWaitNotices(roomId)
+            triggerPendingTriage(roomId)
+        }
+    }
+
+    static let handlerWaitNotice = "担当BAが割り当てられると、AIアシスタントが回答します。しばらくお待ちください。"
+
+    /// 担当BAの割り当て待ち案内を相談から削除する
+    private func removeHandlerWaitNotices(_ roomId: String) {
+        guard currentRoomId == roomId else { return }
+        let roomRef = wsRef().collection("rooms").document(roomId)
+        for m in roomMessages where m.role == .system && m.text == Self.handlerWaitNotice {
+            roomRef.collection("messages").document(m.id).delete()
+        }
     }
 
     /// 担当BA待ちで止まっていた質問があれば、AIのトリアージを実行する
@@ -683,9 +697,8 @@ final class CloudStore: ObservableObject {
         let handler = currentRoom().map { $0.handler.isEmpty ? derivedHandler(roomId: $0.id) : $0.handler } ?? ""
         if handler.isEmpty {
             pendingTyping = false
-            let notice = "担当BAが割り当てられると、AIアシスタントが回答します。しばらくお待ちください。"
-            if !roomMessages.contains(where: { $0.role == .system && $0.text == notice }) {
-                addMessage(Message(role: .system, text: notice), roomId: roomId)
+            if !roomMessages.contains(where: { $0.role == .system && $0.text == Self.handlerWaitNotice }) {
+                addMessage(Message(role: .system, text: Self.handlerWaitNotice), roomId: roomId)
             }
             return
         }
