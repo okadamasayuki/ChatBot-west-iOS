@@ -511,7 +511,7 @@ struct ChatRoomView: View {
             Button {
                 store.acceptHandlerRequest(r.id)
             } label: {
-                Text("承諾する")
+                Text("承諾")
                     .font(.system(size: 12, weight: .bold))
                     .padding(.horizontal, 10)
                     .padding(.vertical, 5)

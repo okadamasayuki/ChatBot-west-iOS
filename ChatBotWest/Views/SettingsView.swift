@@ -319,34 +319,123 @@ struct OrgSettingsView: View {
     }
 }
 
-/// 画面のどこかに触れたら、開いているスワイプ行を閉じる合図を送る(アプリ全体で1つ)。
-/// 行の外(背景・ヘッダー・他の行など)のタップはSwiftUIのジェスチャでは拾えないため、
-/// ウィンドウにUIKitのタップ認識を仕込んで全タッチを検知する
-final class SwipeRowCloseOnTouch: NSObject, UIGestureRecognizerDelegate {
-    static let shared = SwipeRowCloseOnTouch()
-    /// 開いているスワイプ行を閉じる合図。object が UUID ならその行自身は閉じない
-    static let closeNotification = Notification.Name("SwipeDeleteRowCloseAll")
-    private var installed = false
+/// 開いているスワイプ行をアプリ全体で1つに保つ。
+/// 行のタップ・リストのスクロール・別の行のスワイプで自動的に閉じる
+@MainActor
+final class SwipeRowCoordinator: NSObject, ObservableObject {
+    static let shared = SwipeRowCoordinator()
+    /// いま開いている行のID(nil = どの行も開いていない)。行側は onChange で自分以外なら閉じる
+    @Published var openRowId: UUID?
+    private var hookedScrollViews = Set<ObjectIdentifier>()
 
-    func installIfNeeded() {
-        guard !installed,
-              let window = UIApplication.shared.connectedScenes
-                  .compactMap({ ($0 as? UIWindowScene)?.windows.first(where: { $0.isKeyWindow }) })
-                  .first else { return }
-        installed = true
-        let tap = UITapGestureRecognizer(target: self, action: #selector(onTap))
-        tap.cancelsTouchesInView = false // 通常のタップ動作(行を開く等)はそのまま通す
-        tap.delegate = self
-        window.addGestureRecognizer(tap)
+    /// リストのスクロールが始まったら開いている行を閉じる(スクロールのパンに直接フックする)
+    func hookScrollView(_ scrollView: UIScrollView) {
+        let id = ObjectIdentifier(scrollView)
+        guard !hookedScrollViews.contains(id) else { return }
+        hookedScrollViews.insert(id)
+        scrollView.panGestureRecognizer.addTarget(self, action: #selector(scrollPanned(_:)))
     }
 
-    @objc private func onTap() {
-        NotificationCenter.default.post(name: Self.closeNotification, object: nil)
+    @objc private func scrollPanned(_ g: UIPanGestureRecognizer) {
+        if g.state == .changed, openRowId != nil { openRowId = nil }
     }
 
-    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
-                           shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
-        true
+    /// 行が開いたときに呼ぶ(他の行は onChange で閉じる)
+    func rowOpened(_ id: UUID) {
+        openRowId = id
+    }
+
+    /// 行が閉じたときに呼ぶ
+    func rowClosed(_ id: UUID) {
+        if openRowId == id { openRowId = nil }
+    }
+}
+
+/// 行に「横方向のパンだけ」を認識させる(縦の動きはListのスクロールにそのまま渡す)。
+/// SwiftUIのDragGestureはListの縦スクロールをブロックしてしまうため、UIKitのパン認識を
+/// 行を包むセルに直接仕込み、横に動かしたときだけ began する
+private struct HorizontalPanCatcher: UIViewRepresentable {
+    var onChanged: (CGFloat) -> Void  // 横方向の移動量(translation.x)
+    var onEnded: () -> Void
+
+    func makeCoordinator() -> Coordinator { Coordinator(onChanged: onChanged, onEnded: onEnded) }
+
+    func makeUIView(context: Context) -> AttachView {
+        let v = AttachView()
+        v.isUserInteractionEnabled = false // 自分はタッチを受けない(タップ等の邪魔をしない)
+        v.coordinator = context.coordinator
+        return v
+    }
+
+    func updateUIView(_ v: AttachView, context: Context) {
+        context.coordinator.onChanged = onChanged
+        context.coordinator.onEnded = onEnded
+    }
+
+    /// 行を包む祖先ビュー(Listのセル)にパン認識を付け外しするための実体
+    final class AttachView: UIView {
+        weak var coordinator: Coordinator?
+        private weak var pan: UIPanGestureRecognizer?
+        private weak var attachedTo: UIView?
+
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            if window == nil {
+                // セルの再利用で行が入れ替わっても認識が残らないように外す
+                if let pan, let attachedTo { attachedTo.removeGestureRecognizer(pan) }
+                pan = nil; attachedTo = nil
+                return
+            }
+            guard pan == nil, let coordinator else { return }
+            // 行全体のタッチを拾える祖先(セル)を探す。見つからなければ数段上に付ける
+            var host: UIView? = superview
+            var steps = 0
+            while let v = host, !(v is UICollectionViewCell), !(v is UITableViewCell), steps < 6 {
+                host = v.superview; steps += 1
+                if v.superview is UICollectionViewCell || v.superview is UITableViewCell {
+                    host = v.superview; break
+                }
+            }
+            guard let target = host else { return }
+            let g = UIPanGestureRecognizer(target: coordinator, action: #selector(Coordinator.handle(_:)))
+            g.delegate = coordinator
+            target.addGestureRecognizer(g)
+            pan = g; attachedTo = target
+            // リストのスクロールで開いている行を閉じられるように、包んでいるスクロールビューにフック
+            var sv: UIView? = target.superview
+            while let v = sv, !(v is UIScrollView) { sv = v.superview }
+            if let scrollView = sv as? UIScrollView {
+                SwipeRowCoordinator.shared.hookScrollView(scrollView)
+            }
+        }
+    }
+
+    final class Coordinator: NSObject, UIGestureRecognizerDelegate {
+        var onChanged: (CGFloat) -> Void
+        var onEnded: () -> Void
+
+        init(onChanged: @escaping (CGFloat) -> Void, onEnded: @escaping () -> Void) {
+            self.onChanged = onChanged
+            self.onEnded = onEnded
+        }
+
+        @objc func handle(_ g: UIPanGestureRecognizer) {
+            switch g.state {
+            case .changed:
+                onChanged(g.translation(in: g.view).x)
+            case .ended, .cancelled, .failed:
+                onEnded()
+            default:
+                break
+            }
+        }
+
+        /// 横に動かしたときだけ認識を始める(縦はListのスクロールに渡す)
+        func gestureRecognizerShouldBegin(_ g: UIGestureRecognizer) -> Bool {
+            guard let pan = g as? UIPanGestureRecognizer else { return true }
+            let v = pan.velocity(in: pan.view)
+            return abs(v.x) > abs(v.y)
+        }
     }
 }
 
@@ -366,7 +455,7 @@ struct SwipeDeleteRow<Content: View>: View {
     @State private var opened = false
     @State private var leadOpened = false
     @State private var rowId = UUID()
-    @State private var postedOpenSignal = false
+    @ObservedObject private var coordinator = SwipeRowCoordinator.shared
 
     private let full: CGFloat = 72
 
@@ -426,40 +515,42 @@ struct SwipeDeleteRow<Content: View>: View {
             }
         .listRowInsets(EdgeInsets())
         .contentShape(Rectangle())
-        .onAppear { SwipeRowCloseOnTouch.shared.installIfNeeded() }
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 10)
-                .onChanged { v in
-                    guard abs(v.translation.width) > abs(v.translation.height) else { return }
-                    if !postedOpenSignal {
-                        postedOpenSignal = true
-                        // スライドを始めたら、他の行の開いているスライドを閉じる
-                        NotificationCenter.default.post(name: SwipeRowCloseOnTouch.closeNotification, object: rowId)
-                    }
-                    if leadOpened || (v.translation.width > 0 && !opened) {
-                        guard leadingIcon != nil, onLeading != nil else { return }
-                        let base: CGFloat = leadOpened ? full : 0
-                        leadWidth = max(0, min(full + 12, base + v.translation.width))
-                    } else {
-                        let base: CGFloat = opened ? full : 0
-                        width = max(0, min(full + 12, base - v.translation.width))
-                    }
+        .overlay {
+            HorizontalPanCatcher(onChanged: { tx in
+                if leadOpened || (tx > 0 && !opened) {
+                    guard leadingIcon != nil, onLeading != nil else { return }
+                    let base: CGFloat = leadOpened ? full : 0
+                    leadWidth = max(0, min(full + 12, base + tx))
+                } else {
+                    let base: CGFloat = opened ? full : 0
+                    width = max(0, min(full + 12, base - tx))
                 }
-                .onEnded { _ in
-                    postedOpenSignal = false
-                    withAnimation(.spring(response: 0.25, dampingFraction: 0.9)) {
-                        opened = width > full * 0.5
-                        width = opened ? full : 0
-                        leadOpened = leadWidth > full * 0.5
-                        leadWidth = leadOpened ? full : 0
-                    }
+            }, onEnded: {
+                withAnimation(.spring(response: 0.25, dampingFraction: 0.9)) {
+                    opened = width > full * 0.5
+                    width = opened ? full : 0
+                    leadOpened = leadWidth > full * 0.5
+                    leadWidth = leadOpened ? full : 0
                 }
-        )
-        .onReceive(NotificationCenter.default.publisher(for: SwipeRowCloseOnTouch.closeNotification)) { note in
-            // 画面のどこかが触られた/他の行がスライドを始めたら、開いている自分は閉じる
-            if let id = note.object as? UUID, id == rowId { return }
-            guard opened || leadOpened || width > 0 || leadWidth > 0 else { return }
-            closeAll()
+                if opened || leadOpened {
+                    coordinator.rowOpened(rowId)
+                } else {
+                    coordinator.rowClosed(rowId)
+                }
+            })
+            .allowsHitTesting(false)
+        }
+        .simultaneousGesture(TapGesture().onEnded {
+            // 行のどこかに触れたら、他の行の開いているスライドを閉じる(自分はoverlayが閉じる)
+            if coordinator.openRowId != rowId { coordinator.openRowId = nil }
+        })
+        .onChange(of: coordinator.openRowId) { openId in
+            // 別の行が開いた/どこかが触られた(nil)ら、開いている自分は閉じる
+            guard openId != rowId, opened || leadOpened || width > 0 || leadWidth > 0 else { return }
+            withAnimation(.spring(response: 0.25, dampingFraction: 0.9)) {
+                width = 0; opened = false
+                leadWidth = 0; leadOpened = false
+            }
         }
     }
 
@@ -468,6 +559,7 @@ struct SwipeDeleteRow<Content: View>: View {
             width = 0; opened = false
             leadWidth = 0; leadOpened = false
         }
+        coordinator.rowClosed(rowId)
     }
 }
 

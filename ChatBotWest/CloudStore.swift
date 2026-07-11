@@ -526,6 +526,8 @@ final class CloudStore: ObservableObject {
     }
 
     private func addNotification(kind: String, targetId: String, title: String, body: String, action: String? = nil) {
+        // 同じ相談/トークの未読通知が既にあれば置き換える(連投や再検知で積み上がらないように)
+        notifications.removeAll { $0.kind == kind && $0.targetId == targetId && !$0.read && $0.action == action }
         let n = AppNotification(id: newUid(), ts: nowIso(), kind: kind,
                                 targetId: targetId, title: title, body: body, read: false, action: action)
         notifications.insert(n, at: 0)
