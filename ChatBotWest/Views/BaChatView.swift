@@ -1087,7 +1087,7 @@ struct BaMessageBubble: View {
                                       memberFor: { uid in store.member(uid) }) { emoji in
                         store.toggleBaReaction(message, emoji: emoji)
                     }
-                    .padding(.top, -10)
+                    .padding(.top, -7) // 間隔3pt込みで枠に4pt重なる
                     .padding(isMine ? .trailing : .leading, 10)
                     .zIndex(1)
                 }
