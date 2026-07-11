@@ -226,10 +226,31 @@ struct ChatRoomView: View {
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
                 if store.isExpert, let r = room, store.pendingRoom?.id != r.id {
-                    // 相談の担当BA(一覧と同じロジック: rooms.handler、未反映の間は案件から補完)
+                    // 相談の担当BA(一覧と同じロジック: rooms.handler、未反映の間は案件から補完)。
+                    // メニューから自分が担当になる/他のBAに対応を依頼/担当を外す、ができる
                     let handler = r.handler.isEmpty ? store.derivedHandler(roomId: r.id) : r.handler
-                    Button {
-                        store.toggleRoomHandler(r.id)
+                    Menu {
+                        if handler != store.myName() {
+                            Button {
+                                store.assignRoomHandler(r.id, to: store.myName())
+                            } label: {
+                                Label("自分が担当になる", systemImage: "person.fill.checkmark")
+                            }
+                        }
+                        ForEach(store.expertNames.filter { $0 != store.myName() && $0 != handler }, id: \.self) { name in
+                            Button {
+                                store.assignRoomHandler(r.id, to: name)
+                            } label: {
+                                Label("\(name)さんに依頼する", systemImage: "arrowshape.turn.up.right")
+                            }
+                        }
+                        if !handler.isEmpty {
+                            Button(role: .destructive) {
+                                store.assignRoomHandler(r.id, to: "")
+                            } label: {
+                                Label("担当を外す", systemImage: "person.fill.xmark")
+                            }
+                        }
                     } label: {
                         Text(handler.isEmpty ? "担当になる" : "担当: \(handler)")
                             .font(.system(size: 13))

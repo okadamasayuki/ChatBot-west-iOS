@@ -29,6 +29,18 @@ final class CloudStore: ObservableObject {
     @Published var qaLog: [QaEntry] = []
     @Published var manuals: [Manual] = []
 
+    struct MemberInfo: Identifiable, Equatable {
+        let id: String   // uid
+        let name: String // ニックネーム(なければメール)
+        let role: String
+    }
+    @Published var members: [MemberInfo] = []
+
+    /// BA(財務)メンバーの表示名一覧(対応依頼の宛先に使う)
+    var expertNames: [String] {
+        members.filter { $0.role == MemberRole.expert.rawValue && !$0.name.isEmpty }.map { $0.name }
+    }
+
     // MARK: - 画面状態
     @Published var activeTab: AppTab = .chat
     @Published var highlightCaseId: String?   // BAタブでハイライトする案件(チャットからのジャンプ)
@@ -250,6 +262,20 @@ final class CloudStore: ObservableObject {
         listeners.append(wsRef().collection("qa").order(by: "answered_at").addSnapshotListener { [weak self] snap, _ in
             Task { @MainActor in
                 self?.qaLog = snap?.documents.map { QaEntry(dict: $0.data()) } ?? []
+            }
+        })
+
+        // メンバー一覧(BAへの対応依頼の宛先に使う)
+        listeners.append(wsRef().collection("members").addSnapshotListener { [weak self] snap, _ in
+            Task { @MainActor in
+                self?.members = snap?.documents.map { d in
+                    let data = d.data()
+                    let nickname = data["nickname"] as? String ?? ""
+                    let email = data["email"] as? String ?? ""
+                    return MemberInfo(id: d.documentID,
+                                      name: nickname.isEmpty ? email : nickname,
+                                      role: data["role"] as? String ?? "")
+                } ?? []
             }
         })
     }
@@ -518,22 +544,30 @@ final class CloudStore: ObservableObject {
     }
 
     /// 相談の担当BAのトグル(自分なら外す、そうでなければ自分に)。
-    /// 未回答案件の対応者も連動して同じ担当に揃える
     func toggleRoomHandler(_ roomId: String) {
         let me = myName()
         guard !me.isEmpty, isExpert,
               let r = rooms.first(where: { $0.id == roomId }) else { return }
         let current = r.handler.isEmpty ? derivedHandler(roomId: roomId) : r.handler
-        let newHandler = current == me ? "" : me
-        setRoomHandler(roomId, handler: newHandler)
+        assignRoomHandler(roomId, to: current == me ? "" : me)
+    }
+
+    /// 相談の担当BAを指定の人に割り当てる(他のBAへの対応依頼にも使う)。
+    /// 未回答案件の対応者も連動して同じ担当に揃える
+    func assignRoomHandler(_ roomId: String, to handler: String) {
+        guard isExpert else { return }
+        setRoomHandler(roomId, handler: handler)
         for c in cases where c.roomId == roomId && c.status != .answered {
-            updateCase(c.id, ["handledBy": newHandler])
+            updateCase(c.id, ["handledBy": handler])
         }
+        guard !handler.isEmpty else { return }
         // 担当が付いたら、待機案内を消してAI回答待ちだった質問への回答を開始する
-        if !newHandler.isEmpty {
-            removeHandlerWaitNotices(roomId)
-            triggerPendingTriage(roomId)
+        removeHandlerWaitNotices(roomId)
+        if handler != myName() {
+            // 他のBAへの依頼はチャットに記録して相手にも分かるようにする
+            addMessage(Message(role: .system, text: "\(myName())さんが\(handler)さんに対応を依頼しました。"), roomId: roomId)
         }
+        triggerPendingTriage(roomId)
     }
 
     static let handlerWaitNotice = "担当BAが割り当てられると、AIアシスタントが回答します。しばらくお待ちください。"
