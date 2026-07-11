@@ -309,6 +309,17 @@ struct ChatRoomView: View {
         // 戻るは相談一覧タブの再タップ・左端スワイプ
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
+        // 送信せずに戻っても入力した文字が残るように、相談ごとに下書きを保持する
+        .onAppear {
+            if input.isEmpty, let id = store.currentRoomId {
+                input = store.roomDrafts[id] ?? ""
+            }
+        }
+        .onChange(of: input) { text in
+            if let id = store.currentRoomId {
+                store.roomDrafts[id] = text
+            }
+        }
         .sheet(item: $editingMessage) { msg in
             EditMessageSheet(initialText: msg.text) { newText in
                 store.updateMessageText(msg, newText: newText)

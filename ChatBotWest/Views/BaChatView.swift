@@ -560,6 +560,17 @@ struct BaTalkView: View {
         .navigationBarTitleDisplayMode(.inline)
         // 戻るボタンは出さない(BAチャットタブの再タップ・左端スワイプで戻る)
         .navigationBarBackButtonHidden(true)
+        // 送信せずに戻っても入力した文字が残るように、トークごとに下書きを保持する
+        .onAppear {
+            if input.isEmpty, let id = store.currentBaTalkId {
+                input = store.baDrafts[id] ?? ""
+            }
+        }
+        .onChange(of: input) { text in
+            if let id = store.currentBaTalkId {
+                store.baDrafts[id] = text
+            }
+        }
         .toolbar {
             // タイトル部分。タイトルのタップでメンバー一覧、ペンのタップでルーム名変更
             // (メンバー名の羅列が長いときは省略して右上のボタンに重ならないようにする)

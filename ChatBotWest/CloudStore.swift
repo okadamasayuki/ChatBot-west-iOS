@@ -117,6 +117,9 @@ final class CloudStore: ObservableObject {
     @Published var activeTab: AppTab = .chat
     @Published var highlightCaseId: String?   // BAタブでハイライトする案件(チャットからのジャンプ)
     @Published var chatPath: [String] = []    // NavigationStack のパス(相談を開くとプッシュ遷移)
+    /// 送信せずに画面を離れたときの下書き(ルーム/トークごと。端末内のみ)
+    var roomDrafts: [String: String] = [:]
+    var baDrafts: [String: String] = [:]
     @Published var currentRoomId: String?
     @Published var roomMessages: [Message] = []
     @Published var pendingTyping = false
