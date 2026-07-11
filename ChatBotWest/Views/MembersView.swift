@@ -136,59 +136,59 @@ struct MembersView: View {
 /// メンバーのプロフィール(アイコンタップで表示): 名前・役割・所属会社・部署・担当
 struct MemberProfileSheet: View {
     let member: CloudStore.MemberInfo
-    @Environment(\.dismiss) private var dismiss
 
     private var roleLabel: String {
         member.role == MemberRole.expert.rawValue ? "財務(BA)" : "担当者(質問者)"
     }
 
     var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    VStack(spacing: 10) {
-                        AvatarCircleView(iconData: member.iconData,
-                                         icon: member.icon,
-                                         fallbackBg: member.role == MemberRole.expert.rawValue
-                                             ? Theme.accent.opacity(0.8) : Theme.chatBg,
-                                         size: 88)
-                        Text(member.name.isEmpty ? "(名前未設定)" : member.name)
-                            .font(.system(size: 18, weight: .semibold))
-                        Text(roleLabel)
-                            .font(.footnote)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 2)
-                            .background(Theme.tagDoneBg)
-                            .foregroundColor(Theme.tagDoneFg)
-                            .cornerRadius(8)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .listRowBackground(Color.clear)
+        VStack(spacing: 8) {
+            AvatarCircleView(iconData: member.iconData,
+                             icon: member.icon,
+                             fallbackBg: member.role == MemberRole.expert.rawValue
+                                 ? Theme.accent.opacity(0.8) : Theme.chatBg,
+                             size: 64)
+            Text(member.name.isEmpty ? "(名前未設定)" : member.name)
+                .font(.system(size: 17, weight: .semibold))
+            Text(roleLabel)
+                .font(.footnote)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 2)
+                .background(Theme.tagDoneBg)
+                .foregroundColor(Theme.tagDoneFg)
+                .cornerRadius(8)
+
+            Divider().padding(.vertical, 4)
+
+            VStack(spacing: 6) {
+                if member.companies.isEmpty && member.department.isEmpty && member.section.isEmpty {
+                    Text("所属は未設定です").font(.footnote).foregroundColor(.secondary)
                 }
-                Section("所属") {
-                    if member.companies.isEmpty && member.department.isEmpty && member.section.isEmpty {
-                        Text("未設定").foregroundColor(.secondary)
-                    }
-                    ForEach(member.companies, id: \.self) { c in
-                        LabeledContent("会社") { Text(c) }
-                    }
-                    if !member.department.isEmpty {
-                        LabeledContent("部署") { Text(member.department) }
-                    }
-                    if !member.section.isEmpty {
-                        LabeledContent("担当") { Text(member.section) }
-                    }
+                ForEach(member.companies, id: \.self) { c in
+                    profileRow("会社", c)
                 }
+                if !member.department.isEmpty { profileRow("部署", member.department) }
+                if !member.section.isEmpty { profileRow("担当", member.section) }
             }
-            .navigationTitle("プロフィール")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("閉じる") { dismiss() }
-                }
-            }
+            Spacer(minLength: 0)
         }
-        .presentationDetents([.medium])
+        .padding(.horizontal, 24)
+        .padding(.top, 20)
+        .presentationDetents([.height(300)])
+        .presentationDragIndicator(.visible)
+    }
+
+    private func profileRow(_ label: String, _ value: String) -> some View {
+        HStack(alignment: .top) {
+            Text(label)
+                .font(.system(size: 13))
+                .foregroundColor(.secondary)
+                .frame(width: 44, alignment: .leading)
+            Spacer()
+            Text(value)
+                .font(.system(size: 13, weight: .medium))
+                .multilineTextAlignment(.trailing)
+        }
     }
 }
 
