@@ -185,14 +185,9 @@ struct OrgSettingsView: View {
         Form {
             Section {
                 ForEach(store.orgCompanies, id: \.self) { c in
-                    Text(c)
-                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                            Button(role: .destructive) {
-                                deleteCompany(c)
-                            } label: {
-                                Label("削除", systemImage: "trash.fill")
-                            }
-                        }
+                    SwipeDeleteRow(onDelete: { deleteCompany(c) }) {
+                        Text(c)
+                    }
                 }
                 .onMove { from, to in
                     // 並び順は新規登録の会社選択肢にもそのまま反映される
@@ -210,7 +205,7 @@ struct OrgSettingsView: View {
             } header: {
                 Text("会社")
             } footer: {
-                Text("左にスライドで削除、長押しして上下に動かすと並び替えできます。並び順は新規登録の選択肢にも反映されます。削除しても登録済みユーザーの所属は変わりません。")
+                Text("左にスライドすると削除ボタンが出ます。長押しして上下に動かすと並び替えでき、並び順は新規登録の選択肢にも反映されます。削除しても登録済みユーザーの所属は変わりません。")
             }
 
             Section("部署") {
@@ -221,14 +216,9 @@ struct OrgSettingsView: View {
                 }
                 .pickerStyle(.menu)
                 ForEach(store.departments(for: deptCompany), id: \.self) { d in
-                    Text(d)
-                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                            Button(role: .destructive) {
-                                deleteDepartment(d)
-                            } label: {
-                                Label("削除", systemImage: "trash.fill")
-                            }
-                        }
+                    SwipeDeleteRow(onDelete: { deleteDepartment(d) }) {
+                        Text(d)
+                    }
                 }
                 addRow(placeholder: "部署を追加", text: $newDepartment) {
                     let name = newDepartment.trimmingCharacters(in: .whitespaces)
@@ -260,14 +250,9 @@ struct OrgSettingsView: View {
                 }
                 .pickerStyle(.menu)
                 ForEach(store.sections(company: sectionCompany, department: sectionDept), id: \.self) { s in
-                    Text(s)
-                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                            Button(role: .destructive) {
-                                deleteSection(s)
-                            } label: {
-                                Label("削除", systemImage: "trash.fill")
-                            }
-                        }
+                    SwipeDeleteRow(onDelete: { deleteSection(s) }) {
+                        Text(s)
+                    }
                 }
                 addRow(placeholder: "担当を追加", text: $newSection) {
                     let name = newSection.trimmingCharacters(in: .whitespaces)
@@ -332,6 +317,45 @@ struct OrgSettingsView: View {
             Button("追加", action: onAdd)
                 .disabled(text.wrappedValue.trimmingCharacters(in: .whitespaces).isEmpty)
         }
+    }
+}
+
+/// 左にスライドすると赤い四角形の削除ボタンが出てくる行
+/// (OS標準のスワイプ削除はボタンが丸く表示されるため自作)
+struct SwipeDeleteRow<Content: View>: View {
+    let onDelete: () -> Void
+    @ViewBuilder var content: () -> Content
+    @State private var revealed = false
+
+    var body: some View {
+        HStack(spacing: 10) {
+            content()
+                .frame(maxWidth: .infinity, alignment: .leading)
+            if revealed {
+                Button {
+                    withAnimation(.easeOut(duration: 0.15)) { revealed = false }
+                    onDelete()
+                } label: {
+                    Image(systemName: "trash.fill")
+                        .font(.system(size: 13))
+                        .foregroundColor(.white)
+                        .frame(width: 48, height: 30)
+                        .background(Rectangle().fill(Color.red)) // 四角形・赤
+                }
+                .buttonStyle(.borderless)
+                .transition(.move(edge: .trailing).combined(with: .opacity))
+            }
+        }
+        .contentShape(Rectangle())
+        .gesture(
+            DragGesture(minimumDistance: 15)
+                .onEnded { v in
+                    guard abs(v.translation.width) > abs(v.translation.height) else { return }
+                    withAnimation(.easeOut(duration: 0.15)) {
+                        revealed = v.translation.width < 0
+                    }
+                }
+        )
     }
 }
 
