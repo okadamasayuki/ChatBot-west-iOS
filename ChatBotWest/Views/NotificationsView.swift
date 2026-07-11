@@ -18,7 +18,10 @@ struct NotificationsView: View {
                         .listRowSeparator(.hidden)
                 }
                 ForEach(store.notifications) { n in
+                    // 左スライド=削除 / 右スライド=未読⇄既読
                     SwipeDeleteRow(onDelete: { store.deleteNotification(n.id) },
+                                   leadingIcon: n.read ? "envelope.badge.fill" : "envelope.open.fill",
+                                   onLeading: { store.toggleNotificationRead(n.id) },
                                    contentInsets: EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16)) {
                         notificationRow(n)
                             .contentShape(Rectangle())

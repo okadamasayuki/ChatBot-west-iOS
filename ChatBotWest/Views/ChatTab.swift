@@ -360,6 +360,11 @@ struct RoomRowView: View {
                         bg: Color(red: 1.0, green: 0xf0 / 255.0, blue: 0xdd / 255.0),   // オレンジ系
                         fg: Color(red: 0xc2 / 255.0, green: 0x6a / 255.0, blue: 0x00 / 255.0))
             }
+        } else if handlerName.isEmpty {
+            // 担当BAが未割り当ての間はAIが回答を保留している状態なのでBA待ち扱い
+            TagView(text: "BA回答待ち",
+                    bg: Color(red: 1.0, green: 0xf0 / 255.0, blue: 0xdd / 255.0),   // オレンジ系
+                    fg: Color(red: 0xc2 / 255.0, green: 0x6a / 255.0, blue: 0x00 / 255.0))
         } else {
             TagView(text: "担当者回答待ち", bg: Theme.tagWaitingBg, fg: Theme.tagWaitingFg)
         }

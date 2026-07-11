@@ -554,6 +554,14 @@ final class CloudStore: ObservableObject {
         }
     }
 
+    /// 既読⇄未読の切り替え(通知一覧の右スライド)
+    func toggleNotificationRead(_ id: String) {
+        if let i = notifications.firstIndex(where: { $0.id == id }) {
+            notifications[i].read.toggle()
+            saveNotifications()
+        }
+    }
+
     func markAllNotificationsRead() {
         notifications = notifications.map { var n = $0; n.read = true; return n }
         saveNotifications()
