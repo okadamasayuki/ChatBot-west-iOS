@@ -666,12 +666,10 @@ struct MessageBubble: View {
                             }
                         }
                         // 既読・時刻はバブルの下端の真横に固定(リアクションの幅に影響されない)。
-                        // 幅0のフレームからバブルの外側へあふれさせる。
-                        // リアクションがある時は少し持ち上げて重ならないようにする
+                        // 幅0のフレームからバブルの外側へあふれさせる(位置はリアクションの有無で変えない)
                         .overlay(alignment: alignRight ? .bottomLeading : .bottomTrailing) {
                             sideMeta
                                 .padding(alignRight ? .trailing : .leading, 4)
-                                .padding(.bottom, (!message.reactions.isEmpty && !message.deleted) ? 10 : 0)
                                 .fixedSize()
                                 .frame(width: 0, alignment: alignRight ? .trailing : .leading)
                         }

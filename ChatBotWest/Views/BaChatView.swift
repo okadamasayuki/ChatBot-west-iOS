@@ -1061,12 +1061,10 @@ struct BaMessageBubble: View {
                     }
                 }
                 // 既読・時刻はバブルの下端の真横に固定(リアクションの幅に影響されない)。
-                // contextMenuの後に重ねるので、長押しプレビューは画面のバブルそのまま。
-                // リアクションがある時は少し持ち上げて重ならないようにする
+                // contextMenuの後に重ねるので、長押しプレビューは画面のバブルそのまま(位置はリアクションの有無で変えない)
                 .overlay(alignment: isMine ? .bottomLeading : .bottomTrailing) {
                     sideMeta
                         .padding(isMine ? .trailing : .leading, 4)
-                        .padding(.bottom, (!message.reactions.isEmpty && !message.deleted) ? 10 : 0)
                         .fixedSize()
                         .frame(width: 0, alignment: isMine ? .trailing : .leading)
                 }
