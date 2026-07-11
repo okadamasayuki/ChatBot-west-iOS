@@ -14,6 +14,7 @@ struct ChatRoomView: View {
     @State private var photosItem: PhotosPickerItem?
     @State private var attachError: String?
     @State private var profileMember: CloudStore.MemberInfo?
+    @State private var linkCopied = false
 
     /// 表示するメッセージ(財務のみ表示のメッセージは質問者には見せない)
     private var displayMessages: [Message] {
@@ -390,6 +391,20 @@ struct ChatRoomView: View {
                             .font(.system(size: 13))
                             .lineLimit(1)
                             .foregroundColor(handler.isEmpty ? Theme.accentDark : Color(red: 0xc2 / 255.0, green: 0x6a / 255.0, blue: 0x00 / 255.0))
+                    }
+                }
+                if store.isExpert, let r = room {
+                    // この相談へのリンクをコピー(BAチャットに貼るとリンクカードになる)
+                    Button {
+                        UIPasteboard.general.string = "chatbotwest://room/\(r.id)"
+                        linkCopied = true
+                        Task {
+                            try? await Task.sleep(nanoseconds: 1_500_000_000)
+                            linkCopied = false
+                        }
+                    } label: {
+                        Image(systemName: linkCopied ? "checkmark" : "link")
+                            .font(.system(size: 13))
                     }
                 }
                 if !store.roomMessages.isEmpty {

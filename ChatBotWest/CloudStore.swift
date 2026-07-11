@@ -1120,6 +1120,16 @@ final class CloudStore: ObservableObject {
     /// 開いているトークにメッセージを送る(roomId=相談リンク / attachment=写真・ファイル添付)
     func sendBaTalkMessage(_ text: String, roomId: String? = nil, roomTitle: String? = nil,
                            attachmentData: Data? = nil, attachmentName: String? = nil, attachmentType: String? = nil) {
+        var text = text, roomId = roomId, roomTitle = roomTitle
+        // 相談チャットでコピーしたリンク(chatbotwest://room/…)が貼られていたらリンクカードに変換する
+        if roomId == nil, let range = text.range(of: #"chatbotwest://room/[A-Za-z0-9_-]+"#, options: .regularExpression) {
+            let id = String(text[range].dropFirst("chatbotwest://room/".count))
+            if let room = rooms.first(where: { $0.id == id }) {
+                roomId = room.id
+                roomTitle = room.title
+                text.removeSubrange(range)
+            }
+        }
         let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard isExpert, let talkId = currentBaTalkId,
               !t.isEmpty || roomId != nil || attachmentData != nil else { return }
