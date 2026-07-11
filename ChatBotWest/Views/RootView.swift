@@ -51,7 +51,7 @@ struct MainTabView: View {
             }
 
             MembersView()
-                .tabItem { Label("ユーザー", systemImage: "person.3.fill") }
+                .tabItem { Label("ユーザ", systemImage: "person.3.fill") }
                 .tag(AppTab.membersList)
 
             if store.isExpert {

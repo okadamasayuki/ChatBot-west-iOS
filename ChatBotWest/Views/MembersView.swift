@@ -126,10 +126,13 @@ struct MemberFilterBar: View {
 }
 
 /// ユーザー一覧: 財務(BA)のアカウントを表示(どちらの役割からも見られる)
+/// 財務は「選択」から複数ユーザを選んでグループトークを組める
 struct MembersView: View {
     @EnvironmentObject var store: CloudStore
     @State private var searchText = ""
     @State private var filter = MemberFilter()
+    @State private var selecting = false
+    @State private var selected: Set<String> = []
 
     private var allExperts: [CloudStore.MemberInfo] {
         store.members.filter { $0.role == MemberRole.expert.rawValue }
@@ -152,22 +155,70 @@ struct MembersView: View {
                 List {
                     Section("財務(BA) — \(experts.count)人") {
                         ForEach(experts) { member in
-                            // 財務同士は右のトークアイコンをタップするとトークを開始できる
-                            MemberRow(member: member,
-                                      isMe: member.id == store.myUid(),
-                                      onTalk: (store.isExpert && member.id != store.myUid()) ? {
-                                          let talkId = store.startBaTalk(with: [member])
-                                          store.activeTab = .baChat
-                                          store.openBaTalk(talkId)
-                                      } : nil)
+                            if selecting {
+                                // 選択モード: タップで選択/解除(自分は選べない)
+                                Button {
+                                    guard member.id != store.myUid() else { return }
+                                    if selected.contains(member.id) { selected.remove(member.id) }
+                                    else { selected.insert(member.id) }
+                                } label: {
+                                    HStack(spacing: 8) {
+                                        Image(systemName: selected.contains(member.id) ? "checkmark.circle.fill" : "circle")
+                                            .foregroundColor(member.id == store.myUid() ? Color(.quaternaryLabel)
+                                                             : (selected.contains(member.id) ? Theme.accent : .secondary))
+                                        MemberRow(member: member, isMe: member.id == store.myUid())
+                                    }
+                                }
+                                .buttonStyle(.plain)
+                            } else {
+                                // 財務同士は右のトークアイコンをタップするとトークを開始できる
+                                MemberRow(member: member,
+                                          isMe: member.id == store.myUid(),
+                                          onTalk: (store.isExpert && member.id != store.myUid()) ? {
+                                              let talkId = store.startBaTalk(with: [member])
+                                              store.activeTab = .baChat
+                                              store.openBaTalk(talkId)
+                                          } : nil)
+                            }
                         }
                     }
                 }
             }
-            .navigationTitle("ユーザー一覧")
+            .navigationTitle("ユーザ一覧")
             .navigationBarTitleDisplayMode(.inline)
             .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always),
-                        prompt: "ユーザー名で検索")
+                        prompt: "ユーザ名で検索")
+            .toolbar {
+                if store.isExpert {
+                    ToolbarItemGroup(placement: .topBarTrailing) {
+                        if selecting {
+                            // 複数選択してグループトークを組む
+                            Button {
+                                let picked = allExperts.filter { selected.contains($0.id) }
+                                guard !picked.isEmpty else { return }
+                                let talkId = store.startBaTalk(with: picked)
+                                selecting = false
+                                selected = []
+                                store.activeTab = .baChat
+                                store.openBaTalk(talkId)
+                            } label: {
+                                Text("トーク開始")
+                                    .font(.system(size: 13, weight: .bold))
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(Theme.accent)
+                            .disabled(selected.isEmpty)
+
+                            Button("キャンセル") {
+                                selecting = false
+                                selected = []
+                            }
+                        } else {
+                            Button("選択") { selecting = true }
+                        }
+                    }
+                }
+            }
         }
     }
 }

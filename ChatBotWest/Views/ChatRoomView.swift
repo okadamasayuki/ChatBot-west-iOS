@@ -629,13 +629,17 @@ struct MessageBubble: View {
         if message.role == .system {
             SystemBubble(text: message.text)
         } else {
-            HStack(alignment: .top, spacing: 8) {
+            HStack(alignment: .bottom, spacing: 6) {
                 if alignRight { Spacer(minLength: 60) }
+                if alignRight, !message.deleted {
+                    reactionQuickMenu
+                }
                 if !alignRight {
                     // 相手側はアイコン付きで表示(タップでプロフィール)
                     AvatarCircleView(iconData: avatarIconData, icon: avatarIcon,
                                      fallbackSystemImage: avatarFallback, size: 34)
                         .onTapGesture { onAvatarTap?() }
+                        .frame(maxHeight: .infinity, alignment: .top)
                 }
                 VStack(alignment: alignRight ? .trailing : .leading, spacing: 3) {
                     if let senderLabel {
@@ -663,8 +667,34 @@ struct MessageBubble: View {
                         if !alignRight { readStatusText }
                     }
                 }
+                if !alignRight, !message.deleted {
+                    reactionQuickMenu
+                }
                 if !alignRight { Spacer(minLength: 60) }
             }
+        }
+    }
+
+    /// 長押ししなくてもリアクションできる、バブル横のスマイルボタン
+    private var reactionQuickMenu: some View {
+        Menu {
+            if #available(iOS 17.0, *) {
+                ControlGroup {
+                    ForEach(CloudStore.reactionEmojis, id: \.self) { emoji in
+                        Button(emoji) { onReaction(emoji) }
+                    }
+                }
+                .controlGroupStyle(.palette)
+            } else {
+                ForEach(CloudStore.reactionEmojis, id: \.self) { emoji in
+                    Button(emoji) { onReaction(emoji) }
+                }
+            }
+        } label: {
+            Image(systemName: "face.smiling")
+                .font(.system(size: 15))
+                .foregroundColor(Theme.header.opacity(0.45))
+                .padding(.bottom, 18) // 時刻表示ぶん浮かせてバブルの下端に合わせる
         }
     }
 
