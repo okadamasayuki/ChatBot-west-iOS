@@ -132,11 +132,11 @@ struct RoomListView: View {
             }
         }
         .listStyle(.plain)
-        .navigationTitle(store.isExpert ? "相談一覧" : "相談")
+        // タイトル表記は出さず、フィルタを中央に置く
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             if store.isExpert {
-                ToolbarItem(placement: .topBarLeading) {
+                ToolbarItem(placement: .principal) {
                     Picker("フィルタ", selection: $expertFilter) {
                         Text("すべて").tag(ExpertFilter.all)
                         Text("自分が対応中").tag(ExpertFilter.handling)
@@ -145,7 +145,7 @@ struct RoomListView: View {
                     .frame(width: 210)
                 }
             } else {
-                ToolbarItem(placement: .topBarLeading) {
+                ToolbarItem(placement: .principal) {
                     Picker("フィルタ", selection: $filter) {
                         Text("自分の相談").tag(RoomFilter.mine)
                         Text("全員の相談").tag(RoomFilter.all)
