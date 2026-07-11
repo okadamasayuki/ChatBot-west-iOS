@@ -670,7 +670,7 @@ struct MessageBubble: View {
                         .overlay(alignment: alignRight ? .bottomLeading : .bottomTrailing) {
                             sideMeta
                                 .padding(alignRight ? .trailing : .leading, 4)
-                                .padding(.bottom, 5) // バブルの下枠から5pt上
+                                .padding(.bottom, 6) // バブルの下枠から6pt上
                                 .fixedSize()
                                 .frame(width: 0, alignment: alignRight ? .trailing : .leading)
                         }
