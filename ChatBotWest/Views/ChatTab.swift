@@ -65,9 +65,10 @@ struct RoomListView: View {
             }
             let openRoomIds = Set(store.cases.filter { $0.status != .answered }.map { $0.roomId })
             list = list.filter { room in
-                if room.handler == me, !room.isDone { return true } // 相談の担当BAが自分
+                if room.handler == me { return true } // 相談の担当BAが自分(完了した相談も含む)
                 if handlingRoomIds.contains(room.id) { return true }
-                return !room.isDone && !openRoomIds.contains(room.id) && (latest[room.id]?.mine ?? false)
+                // 最新のBA回答が自分の相談(完了済みも含む。他のBAが対応中のものは除く)
+                return !openRoomIds.contains(room.id) && (latest[room.id]?.mine ?? false)
             }
         }
         let handlers = openCaseHandlers
