@@ -119,9 +119,16 @@ struct ChatRoomView: View {
                                 }
                             )
                             .id(msg.id)
-                            // 長押しで編集・削除・復元(財務: AI・BAのメッセージ / 担当者: 自分の質問)
-                            if canEdit(msg) {
-                                bubble.contextMenu {
+                            // 長押しでコピー(全メッセージ)・編集・削除・復元(財務: AI・BAのメッセージ / 担当者: 自分の質問)
+                            bubble.contextMenu {
+                                if !msg.deleted {
+                                    Button {
+                                        UIPasteboard.general.string = msg.text
+                                    } label: {
+                                        Label("コピー", systemImage: "doc.on.doc")
+                                    }
+                                }
+                                if canEdit(msg) {
                                     if msg.deleted {
                                         Button {
                                             store.restoreMessage(msg)
@@ -141,8 +148,6 @@ struct ChatRoomView: View {
                                         }
                                     }
                                 }
-                            } else {
-                                bubble
                             }
                         }
                         if store.pendingTyping {
