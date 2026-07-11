@@ -33,15 +33,9 @@ struct RoomListView: View {
     enum RoomFilter { case mine, all }
     enum ExpertFilter { case all, handling }
 
-    /// 相談ごとの未回答案件の対応者(nil=案件なし / ""=対応者未決定 / 名前=対応中)。
-    /// 複数の案件がある場合は「対応者未決定」を優先して表示する
-    private var openCaseHandlers: [String: String] {
-        var map: [String: String] = [:]
-        for c in store.cases where c.status != .answered {
-            if let current = map[c.roomId], current.isEmpty { continue }
-            map[c.roomId] = c.handledBy
-        }
-        return map
+    /// 未回答案件のある相談の集合
+    private var openCaseRoomIds: Set<String> {
+        Set(store.cases.filter { $0.status != .answered }.map { $0.roomId })
     }
 
     private var visibleRooms: [Room] {
@@ -75,14 +69,14 @@ struct RoomListView: View {
         if hideDone {
             list = list.filter { !$0.isDone }
         }
-        let handlers = openCaseHandlers
+        let openIds = openCaseRoomIds
         let byNew: (Room, Room) -> Bool = { $0.lastTs > $1.lastTs }
         if sort == "status" {
             // 対応者未決定 → 対応中 → 担当者回答待ち → 完了(同じステータス内は新しい順)
             func rank(_ r: Room) -> Int {
                 if r.isDone { return 3 }
-                guard let h = handlers[r.id] else { return 2 }
-                return h.isEmpty ? 0 : 1
+                guard openIds.contains(r.id) else { return 2 }
+                return effectiveHandler(r).isEmpty ? 0 : 1
             }
             return list.sorted { rank($0) != rank($1) ? rank($0) < rank($1) : byNew($0, $1) }
         }
@@ -112,7 +106,8 @@ struct RoomListView: View {
 
                 ForEach(visibleRooms) { room in
                     RoomRowView(room: room,
-                                openCaseHandler: openCaseHandlers[room.id],
+                                // ステータスタグも「担当:」と同じ統一ロジック(effectiveHandler)で表示
+                                openCaseHandler: openCaseRoomIds.contains(room.id) ? effectiveHandler(room) : nil,
                                 handlerName: effectiveHandler(room),
                                 selectable: store.isExpert,
                                 selected: selectedRooms.contains(room.id),

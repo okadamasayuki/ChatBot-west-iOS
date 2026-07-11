@@ -495,9 +495,11 @@ final class CloudStore: ObservableObject {
     }
 
     private var backfilledRoomIds: Set<String> = []
+    private var backfilledCaseIds: Set<String> = []
 
     /// 担当BAが未設定の相談に、案件から推定した担当を書き戻す。
-    /// これにより一覧・チャットとも rooms.handler だけを見れば担当が一致する
+    /// 逆に、相談の担当BAが決まっているのに未回答案件の対応者が空なら揃える。
+    /// これにより一覧・チャットとも同じ担当が表示される
     func backfillRoomHandlers() {
         guard isExpert else { return }
         for r in rooms where r.handler.isEmpty && !backfilledRoomIds.contains(r.id) {
@@ -505,6 +507,12 @@ final class CloudStore: ObservableObject {
             if !derived.isEmpty {
                 backfilledRoomIds.insert(r.id)
                 setRoomHandler(r.id, handler: derived)
+            }
+        }
+        for c in cases where c.status != .answered && c.handledBy.isEmpty && !backfilledCaseIds.contains(c.id) {
+            if let r = rooms.first(where: { $0.id == c.roomId }), !r.handler.isEmpty {
+                backfilledCaseIds.insert(c.id)
+                updateCase(c.id, ["handledBy": r.handler])
             }
         }
     }
