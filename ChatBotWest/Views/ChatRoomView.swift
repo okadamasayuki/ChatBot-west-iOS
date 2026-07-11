@@ -641,21 +641,15 @@ struct MessageBubble: View {
                         .onTapGesture { onAvatarTap?() }
                 }
                 VStack(alignment: alignRight ? .trailing : .leading, spacing: 3) {
-                    // 名前ラベルの横に既読・時刻を表示(バブル際に名前が来る並び)
+                    // 名前ラベルの横に時刻を表示(バブル際に名前が来る並び)
                     HStack(spacing: 6) {
-                        if alignRight {
-                            readStatusText
-                            timeText
-                        }
+                        if alignRight { timeText }
                         if let senderLabel {
                             Text(senderLabel)
                                 .font(.system(size: 11))
                                 .foregroundColor(Theme.header.opacity(0.8))
                         }
-                        if !alignRight {
-                            timeText
-                            readStatusText
-                        }
+                        if !alignRight { timeText }
                     }
                     bubbleText
                         .background(LineBubbleShape(isMine: alignRight).fill(bubbleColor))
@@ -675,6 +669,8 @@ struct MessageBubble: View {
                         // 聞き返しの選択肢ボタン
                         FlowChoices(options: message.clarifyOptions, onChoice: onChoice)
                     }
+                    // 未読・既読はメッセージの下に表示
+                    readStatusText
                 }
                 if !alignRight { Spacer(minLength: 60) }
             }
