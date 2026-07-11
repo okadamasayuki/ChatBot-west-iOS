@@ -9,7 +9,8 @@ struct LoginView: View {
     enum Mode { case chooser, login, signup }
     @State private var mode: Mode = .chooser
     @State private var email = ""
-    @State private var password = ""
+    // デモ用: サンプルアカウント共通のパスワードを最初から入れておく
+    @State private var password = "00000000"
     @State private var nicknameInput = ""
     @State private var role: MemberRole = .questioner
     @State private var company = Companies.all[0]
