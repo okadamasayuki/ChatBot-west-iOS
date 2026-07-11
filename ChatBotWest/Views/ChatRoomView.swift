@@ -440,7 +440,8 @@ struct ChatRoomView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background(Theme.panelBg)
+        // ヘッダーもチャット本体と同じ背景色にする
+        .background(Theme.chatBg)
         .sheet(isPresented: $showDelegatePicker) {
             if let r = room {
                 DelegatePickerSheet(excludeNames: [store.myName(), r.handler]) { name in
