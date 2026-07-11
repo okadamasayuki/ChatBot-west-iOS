@@ -24,18 +24,18 @@ struct BaTalkListView: View {
     @EnvironmentObject var store: CloudStore
     @State private var showNewTalk = false
 
-    private var talks: [BaTalk] {
-        var list = store.myBaTalks
-        // BA全体トークはまだメッセージが無くても常に一覧の先頭に出す
-        if !list.contains(where: { $0.id == "all" }) {
-            list.insert(BaTalk(id: "all", name: "BA全体", isGroup: true,
-                               lastText: "BA全員のトーク", lastTs: ""), at: 0)
-        }
-        return list
-    }
-
     var body: some View {
-        List(talks) { talk in
+        List {
+            if store.myBaTalks.isEmpty {
+                Text("トークはまだありません。\n右上のボタンから相手を選んでトークを始めてください。")
+                    .font(.footnote)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 40)
+                    .listRowSeparator(.hidden)
+            }
+            ForEach(store.myBaTalks) { talk in
             Button {
                 store.openBaTalk(talk.id)
             } label: {
@@ -67,6 +67,7 @@ struct BaTalkListView: View {
                 }
                 .padding(.vertical, 2)
             }
+            }
         }
         .listStyle(.plain)
         .navigationTitle("BAチャット")
@@ -93,11 +94,15 @@ struct NewBaTalkSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var selected: Set<String> = [] // uid
     @State private var groupName = ""
+    @State private var searchText = ""
 
     private var candidates: [CloudStore.MemberInfo] {
-        store.members
+        let all = store.members
             .filter { $0.role == MemberRole.expert.rawValue && $0.id != store.myUid() && !$0.name.isEmpty }
             .sorted { $0.name < $1.name }
+        let q = searchText.trimmingCharacters(in: .whitespaces)
+        guard !q.isEmpty else { return all }
+        return all.filter { $0.name.localizedCaseInsensitiveContains(q) }
     }
 
     var body: some View {
@@ -149,6 +154,8 @@ struct NewBaTalkSheet: View {
             }
             .navigationTitle("新規トーク")
             .navigationBarTitleDisplayMode(.inline)
+            .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always),
+                        prompt: "ユーザー名で検索")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("キャンセル") { dismiss() }
@@ -164,11 +171,43 @@ struct BaTalkView: View {
     @EnvironmentObject var store: CloudStore
     @State private var input = ""
     @State private var showRoomPicker = false
+    @State private var showRename = false
+    @State private var renameText = ""
     @FocusState private var inputFocused: Bool
 
     private var talk: BaTalk? {
         store.baTalks.first { $0.id == store.currentBaTalkId }
-            ?? (store.currentBaTalkId == "all" ? BaTalk(id: "all", name: "BA全体", isGroup: true) : nil)
+    }
+
+    /// 入力中の「@…」部分(空白が入るまでをクエリとする)
+    private var mentionQuery: String? {
+        guard let atIdx = input.lastIndex(of: "@") else { return nil }
+        let after = String(input[input.index(after: atIdx)...])
+        if after.contains(" ") || after.contains("\n") || after.contains("　") { return nil }
+        return after
+    }
+
+    /// メンション候補(トークのメンバーから自分を除く)
+    private var mentionCandidates: [String] {
+        guard let q = mentionQuery, let t = talk else { return [] }
+        let names = t.memberNames.filter { $0 != store.myName() && !$0.isEmpty }
+        return q.isEmpty ? names : names.filter { $0.localizedCaseInsensitiveContains(q) }
+    }
+
+    /// 入力中の「@…」を「@名前 」に置き換える
+    private func insertMention(_ name: String) {
+        guard let atIdx = input.lastIndex(of: "@") else { return }
+        input = String(input[..<atIdx]) + "@\(name) "
+    }
+
+    /// 自分のメッセージの既読状況(1:1は既読/未読、グループは既読数)
+    private func readStatus(for msg: BaMessage) -> String? {
+        guard let t = talk, msg.senderUid == store.myUid() else { return nil }
+        let readers = t.reads.filter { $0.key != store.myUid() && $0.value >= msg.ts }.count
+        if t.isGroup {
+            return readers > 0 ? "既読\(readers)" : "未読"
+        }
+        return readers > 0 ? "既読" : "未読"
     }
 
     var body: some View {
@@ -187,7 +226,10 @@ struct BaTalkView: View {
                                 .cornerRadius(10)
                         }
                         ForEach(store.baTalkMessages) { msg in
-                            BaMessageBubble(message: msg, isMine: msg.senderUid == store.myUid())
+                            BaMessageBubble(message: msg,
+                                            isMine: msg.senderUid == store.myUid(),
+                                            readStatus: readStatus(for: msg),
+                                            mentionNames: talk?.memberNames ?? [])
                                 .id(msg.id)
                         }
                     }
@@ -201,6 +243,28 @@ struct BaTalkView: View {
                     }
                 }
                 .onTapGesture { inputFocused = false }
+            }
+
+            // @メンションの候補(入力中の「@…」に応じて表示。タップで挿入)
+            if !mentionCandidates.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(mentionCandidates, id: \.self) { name in
+                            Button("@\(name)") {
+                                insertMention(name)
+                            }
+                            .font(.system(size: 13))
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(Theme.tagWaitingBg)
+                            .foregroundColor(Theme.tagWaitingFg)
+                            .cornerRadius(12)
+                        }
+                    }
+                    .padding(.horizontal, 8)
+                }
+                .padding(.top, 6)
+                .background(Color(.secondarySystemBackground))
             }
 
             HStack(alignment: .bottom, spacing: 8) {
@@ -240,6 +304,29 @@ struct BaTalkView: View {
         }
         .navigationTitle(talk.map { store.baTalkName($0) } ?? "トーク")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            // グループトークはルーム名を変更できる
+            if let t = talk, t.isGroup {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("ルーム名") {
+                        renameText = t.name.isEmpty ? "" : t.name
+                        showRename = true
+                    }
+                    .font(.system(size: 13))
+                }
+            }
+        }
+        .alert("ルーム名を設定", isPresented: $showRename) {
+            TextField("例: 決算チーム", text: $renameText)
+            Button("保存") {
+                if let t = talk {
+                    store.renameBaTalk(t.id, name: renameText)
+                }
+            }
+            Button("キャンセル", role: .cancel) {}
+        } message: {
+            Text("空にするとメンバー名の一覧が表示されます。")
+        }
         .sheet(isPresented: $showRoomPicker) {
             RoomLinkPickerSheet { room in
                 store.sendBaTalkMessage(input, roomId: room.id, roomTitle: room.title)
@@ -254,6 +341,8 @@ struct BaMessageBubble: View {
     @EnvironmentObject var store: CloudStore
     let message: BaMessage
     let isMine: Bool
+    var readStatus: String? = nil
+    var mentionNames: [String] = []
 
     var body: some View {
         HStack {
@@ -266,7 +355,7 @@ struct BaMessageBubble: View {
                 }
                 VStack(alignment: .leading, spacing: 6) {
                     if !message.text.isEmpty {
-                        Text(message.text)
+                        Text(Self.highlightMentions(message.text, names: mentionNames))
                             .font(.system(size: 14))
                             .lineSpacing(4)
                     }
@@ -309,12 +398,37 @@ struct BaMessageBubble: View {
                         }
                     }
                 }
-                Text(fmtTime(message.ts))
-                    .font(.system(size: 10))
-                    .foregroundColor(Theme.header.opacity(0.6))
+                HStack(spacing: 4) {
+                    if isMine, let readStatus {
+                        Text(readStatus)
+                            .font(.system(size: 10))
+                            .foregroundColor(Theme.header.opacity(0.6))
+                    }
+                    Text(fmtTime(message.ts))
+                        .font(.system(size: 10))
+                        .foregroundColor(Theme.header.opacity(0.6))
+                }
             }
             if !isMine { Spacer(minLength: 60) }
         }
+    }
+
+    /// 「@名前」をハイライトする
+    static func highlightMentions(_ text: String, names: [String]) -> AttributedString {
+        var attr = AttributedString(text)
+        for name in names where !name.isEmpty {
+            let needle = "@\(name)"
+            var searchIdx = text.startIndex
+            while let r = text.range(of: needle, range: searchIdx..<text.endIndex) {
+                if let lower = AttributedString.Index(r.lowerBound, within: attr),
+                   let upper = AttributedString.Index(r.upperBound, within: attr) {
+                    attr[lower..<upper].foregroundColor = Theme.tagWaitingFg
+                    attr[lower..<upper].font = .system(size: 14, weight: .semibold)
+                }
+                searchIdx = r.upperBound
+            }
+        }
+        return attr
     }
 }
 

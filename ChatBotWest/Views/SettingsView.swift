@@ -104,6 +104,9 @@ struct SettingsView: View {
                     }
 
                     Section("📘 社内ルール") {
+                        NavigationLink("社内ルールを見る") {
+                            NaikiView()
+                        }
                         Button("🗑 社内ルールを空にする", role: .destructive) {
                             confirmClearNaiki = true
                         }

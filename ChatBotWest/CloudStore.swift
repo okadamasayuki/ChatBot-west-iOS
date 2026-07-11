@@ -4,7 +4,7 @@ import FirebaseAuth
 import FirebaseFirestore
 
 enum AppTab: Hashable {
-    case chat, baChat, expert, naiki, manual, settings
+    case chat, baChat, expert, naiki, manual, membersList, settings
 }
 
 /// Firebase(Auth / Firestore)との同期と、アプリの状態を一元管理する。
@@ -724,16 +724,15 @@ final class CloudStore: ObservableObject {
 
     // MARK: - BAトーク(財務同士のトークルーム)
 
-    /// 自分が参加しているトーク(BA全体は常に含む)
+    /// 自分が参加しているトーク
     var myBaTalks: [BaTalk] {
         baTalks
-            .filter { $0.id == "all" || $0.memberUids.contains(myUid()) }
+            .filter { $0.memberUids.contains(myUid()) }
             .sorted { $0.lastTs > $1.lastTs }
     }
 
     /// トークの表示名(1:1は相手の名前、グループは名前かメンバー列挙)
     func baTalkName(_ t: BaTalk) -> String {
-        if t.id == "all" { return "BA全体" }
         if t.isGroup {
             return t.name.isEmpty ? t.memberNames.joined(separator: "、") : t.name
         }
@@ -765,8 +764,19 @@ final class CloudStore: ObservableObject {
             .order(by: "ts").addSnapshotListener { [weak self] snap, _ in
                 Task { @MainActor in
                     self?.baTalkMessages = snap?.documents.compactMap { BaMessage(dict: $0.data()) } ?? []
+                    self?.markBaTalkRead()
                 }
             }
+    }
+
+    /// 開いているトークのメッセージを既読にする
+    private func markBaTalkRead() {
+        guard let uid = user?.uid, let talkId = currentBaTalkId,
+              let talk = baTalks.first(where: { $0.id == talkId }),
+              let lastTs = baTalkMessages.last?.ts, !lastTs.isEmpty else { return }
+        let current = talk.reads[uid] ?? ""
+        guard lastTs > current else { return }
+        wsRef().collection("baTalks").document(talkId).updateData(["reads.\(uid)": lastTs])
     }
 
     /// 1:1 / グループのトークを開始する(1:1は同じ相手との既存トークがあればそれを返す)
@@ -786,6 +796,14 @@ final class CloudStore: ObservableObject {
         return talkId
     }
 
+    /// グループトークのルーム名を変更する
+    func renameBaTalk(_ id: String, name: String) {
+        guard isExpert,
+              let talk = baTalks.first(where: { $0.id == id }), talk.isGroup else { return }
+        wsRef().collection("baTalks").document(id)
+            .updateData(["name": name.trimmingCharacters(in: .whitespacesAndNewlines)])
+    }
+
     /// 開いているトークにメッセージを送る(roomId を渡すと相談チャットへのリンク付き)
     func sendBaTalkMessage(_ text: String, roomId: String? = nil, roomTitle: String? = nil) {
         let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -795,15 +813,7 @@ final class CloudStore: ObservableObject {
         let talkRef = wsRef().collection("baTalks").document(talkId)
         talkRef.collection("messages").document(msg.id).setData(msg.dict)
         let preview = t.isEmpty ? "🔗 \(roomTitle?.isEmpty == false ? roomTitle! : "相談")" : t
-        if talkId == "all", !baTalks.contains(where: { $0.id == "all" }) {
-            // BA全体トークは最初の送信時に作成
-            var talk = BaTalk(id: "all", name: "BA全体", isGroup: true)
-            talk.lastText = preview
-            talk.lastTs = msg.ts
-            talkRef.setData(talk.dict)
-        } else {
-            talkRef.setData(["lastText": preview, "lastTs": msg.ts], merge: true)
-        }
+        talkRef.setData(["lastText": preview, "lastTs": msg.ts], merge: true)
     }
 
     /// トークの相談リンクから相談チャットを開く

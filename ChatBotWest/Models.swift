@@ -332,13 +332,17 @@ struct BaTalk: Identifiable, Equatable {
     var lastText: String
     var lastTs: String
     var createdAt: String
+    /// 既読管理: uid → そのユーザーが読んだ最後のメッセージの ts
+    var reads: [String: String]
 
     init(id: String, name: String = "", memberUids: [String] = [], memberNames: [String] = [],
-         isGroup: Bool = false, lastText: String = "", lastTs: String = nowIso(), createdAt: String = nowIso()) {
+         isGroup: Bool = false, lastText: String = "", lastTs: String = nowIso(), createdAt: String = nowIso(),
+         reads: [String: String] = [:]) {
         self.id = id; self.name = name
         self.memberUids = memberUids; self.memberNames = memberNames
         self.isGroup = isGroup
         self.lastText = lastText; self.lastTs = lastTs; self.createdAt = createdAt
+        self.reads = reads
     }
 
     init?(dict: [String: Any]) {
@@ -351,11 +355,14 @@ struct BaTalk: Identifiable, Equatable {
         lastText = dict["lastText"] as? String ?? ""
         lastTs = dict["lastTs"] as? String ?? ""
         createdAt = dict["createdAt"] as? String ?? ""
+        reads = dict["reads"] as? [String: String] ?? [:]
     }
 
     var dict: [String: Any] {
-        ["id": id, "name": name, "memberUids": memberUids, "memberNames": memberNames,
-         "isGroup": isGroup, "lastText": lastText, "lastTs": lastTs, "createdAt": createdAt]
+        var d: [String: Any] = ["id": id, "name": name, "memberUids": memberUids, "memberNames": memberNames,
+                                "isGroup": isGroup, "lastText": lastText, "lastTs": lastTs, "createdAt": createdAt]
+        if !reads.isEmpty { d["reads"] = reads }
+        return d
     }
 }
 

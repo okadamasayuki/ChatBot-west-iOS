@@ -2,49 +2,47 @@ import SwiftUI
 import PDFKit
 import UniformTypeIdentifiers
 
-/// 社内ルールタブ(財務のみ・閲覧+コンパクト整理)
+/// 社内ルール(財務のみ・閲覧+コンパクト整理)。設定タブから開く
 struct NaikiView: View {
     @EnvironmentObject var store: CloudStore
     @State private var showCompact = false
 
     var body: some View {
-        NavigationStack {
-            VStack(alignment: .leading, spacing: 10) {
-                ScrollView {
-                    Text(store.naiki)
-                        .font(.system(size: 14))
-                        .lineSpacing(5)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(12)
-                        .background(Color(.systemBackground))
-                        .cornerRadius(10)
-                        .padding(12)
-                }
+        VStack(alignment: .leading, spacing: 10) {
+            ScrollView {
+                Text(store.naiki)
+                    .font(.system(size: 14))
+                    .lineSpacing(5)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(12)
+                    .background(Color(.systemBackground))
+                    .cornerRadius(10)
+                    .padding(12)
+            }
 
-                Button("🧹 コンパクト") {
-                    showCompact = true
-                }
-                .buttonStyle(.bordered)
-                .frame(maxWidth: .infinity)
-                .padding(.bottom, 12)
-                .disabled(store.naiki.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            Button("🧹 コンパクト") {
+                showCompact = true
             }
-            .background(Theme.panelBg)
-            .navigationTitle("社内ルール")
-            .navigationBarTitleDisplayMode(.inline)
-            .sheet(isPresented: $showCompact) {
-                // 重複の統合・言い回しの整理を行った案を確認して置き換える
-                NaikiUpdateSheet(
-                    title: "社内ルールをコンパクトに",
-                    extract: { try await store.compactNaiki() },
-                    apply: { text in store.saveNaiki(text) },
-                    savedMessage: "✓ 社内ルールを更新しました。全員の回答に反映されます。",
-                    applyLabel: "社内ルールを更新",
-                    confirmBeforeApply: "現在の社内ルールをこの内容で置き換えます。よろしいですか?",
-                    diffBase: store.naiki, // コンパクト前後の差分を表示
-                    dismissOnApply: true   // 更新したらシートを閉じる
-                )
-            }
+            .buttonStyle(.bordered)
+            .frame(maxWidth: .infinity)
+            .padding(.bottom, 12)
+            .disabled(store.naiki.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        }
+        .background(Theme.panelBg)
+        .navigationTitle("社内ルール")
+        .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $showCompact) {
+            // 重複の統合・言い回しの整理を行った案を確認して置き換える
+            NaikiUpdateSheet(
+                title: "社内ルールをコンパクトに",
+                extract: { try await store.compactNaiki() },
+                apply: { text in store.saveNaiki(text) },
+                savedMessage: "✓ 社内ルールを更新しました。全員の回答に反映されます。",
+                applyLabel: "社内ルールを更新",
+                confirmBeforeApply: "現在の社内ルールをこの内容で置き換えます。よろしいですか?",
+                diffBase: store.naiki, // コンパクト前後の差分を表示
+                dismissOnApply: true   // 更新したらシートを閉じる
+            )
         }
     }
 }

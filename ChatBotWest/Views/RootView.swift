@@ -38,14 +38,14 @@ struct MainTabView: View {
                     .tabItem { Label("BAチャット", systemImage: "person.2.fill") }
                     .tag(AppTab.baChat)
 
-                NaikiView()
-                    .tabItem { Label("社内ルール", systemImage: "doc.text.fill") }
-                    .tag(AppTab.naiki)
-
                 ManualView()
                     .tabItem { Label("マニュアル", systemImage: "books.vertical.fill") }
                     .tag(AppTab.manual)
             }
+
+            MembersView()
+                .tabItem { Label("ユーザー", systemImage: "person.3.fill") }
+                .tag(AppTab.membersList)
 
             SettingsView()
                 .tabItem { Label("設定", systemImage: "gearshape.fill") }
