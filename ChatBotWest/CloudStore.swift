@@ -236,6 +236,15 @@ final class CloudStore: ObservableObject {
         }
     }
 
+    /// ニックネームを保存
+    func saveNickname(_ name: String) {
+        let trimmed = name.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty, trimmed != nickname, let uid = user?.uid else { return }
+        nickname = trimmed
+        wsRef().collection("members").document(uid)
+            .setData(["nickname": trimmed], merge: true)
+    }
+
     /// アイコン(絵文字)を保存(画像アイコンは解除)
     func saveIcon(_ emoji: String) {
         myIcon = emoji

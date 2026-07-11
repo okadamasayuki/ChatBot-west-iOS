@@ -2,7 +2,7 @@ import SwiftUI
 import UIKit
 import PhotosUI
 
-/// アイコン設定: 絵文字から選ぶ / 写真から選ぶ / AIで自動生成
+/// プロフィール設定: ニックネーム / アイコン(絵文字・写真・AI生成)
 struct IconSettingView: View {
     @EnvironmentObject var store: CloudStore
     @State private var photosItem: PhotosPickerItem?
@@ -10,6 +10,9 @@ struct IconSettingView: View {
     @State private var aiBusy = false
     @State private var aiPreview: UIImage?
     @State private var errorMessage: String?
+    @State private var nicknameText = ""
+    @State private var nicknameSaved = false
+    @FocusState private var nicknameFocused: Bool
 
     private static let emojis = ["😀", "😎", "🤓", "🥸", "😺", "🐶", "🐱", "🐰", "🦊", "🐻",
                                  "🐼", "🐨", "🦁", "🐯", "🐸", "🐥", "🦉", "🐢", "🐬", "🦄",
@@ -24,6 +27,23 @@ struct IconSettingView: View {
                     Spacer()
                 }
                 .listRowBackground(Color.clear)
+            }
+
+            Section("ニックネーム") {
+                HStack {
+                    TextField("ニックネーム", text: $nicknameText)
+                        .focused($nicknameFocused)
+                        .submitLabel(.done)
+                        .onSubmit { saveNickname() }
+                    if nicknameSaved {
+                        Text("✓ 保存しました").font(.footnote).foregroundColor(.secondary)
+                    } else if nicknameText.trimmingCharacters(in: .whitespaces) != store.nickname,
+                              !nicknameText.trimmingCharacters(in: .whitespaces).isEmpty {
+                        Button("保存") { saveNickname() }
+                            .buttonStyle(.borderedProminent)
+                            .tint(Theme.accent)
+                    }
+                }
             }
 
             Section("絵文字から選ぶ") {
@@ -94,8 +114,9 @@ struct IconSettingView: View {
                 Text("イメージを入力すると、AIが絵文字と配色を選んでアイコンを生成します。")
             }
         }
-        .navigationTitle("アイコンを設定")
+        .navigationTitle("プロフィール")
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear { nicknameText = store.nickname.isEmpty ? store.myName() : store.nickname }
         .onChange(of: photosItem) { item in
             guard let item else { return }
             Task {
@@ -119,6 +140,18 @@ struct IconSettingView: View {
                 }
                 photosItem = nil
             }
+        }
+    }
+
+    private func saveNickname() {
+        let trimmed = nicknameText.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return }
+        store.saveNickname(trimmed)
+        nicknameFocused = false
+        nicknameSaved = true
+        Task {
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            withAnimation { nicknameSaved = false }
         }
     }
 
