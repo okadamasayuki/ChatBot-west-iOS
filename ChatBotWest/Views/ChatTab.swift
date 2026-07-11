@@ -310,7 +310,7 @@ struct RoomRowView: View {
                         bg: Color(red: 1.0, green: 0xe9 / 255.0, blue: 0xe7 / 255.0),   // 赤系
                         fg: Color(red: 0xc0 / 255.0, green: 0x39 / 255.0, blue: 0x2b / 255.0))
             } else {
-                TagView(text: "\(handler)さん対応中",
+                TagView(text: "BA回答待ち",
                         bg: Color(red: 1.0, green: 0xf0 / 255.0, blue: 0xdd / 255.0),   // オレンジ系
                         fg: Color(red: 0xc2 / 255.0, green: 0x6a / 255.0, blue: 0x00 / 255.0))
             }
