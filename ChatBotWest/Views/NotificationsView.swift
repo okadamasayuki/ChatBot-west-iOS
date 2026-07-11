@@ -57,7 +57,7 @@ struct NotificationsView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(n.title)
                     .font(.system(size: 13, weight: n.read ? .regular : .semibold))
-                    .foregroundColor(.primary)
+                    .foregroundColor(n.read ? .primary : Theme.accentDark) // 未読は緑の太文字
                     .lineLimit(1)
                 // どんな対応が必要か
                 if let action = n.action, !action.isEmpty {
