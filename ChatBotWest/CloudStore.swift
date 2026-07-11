@@ -37,8 +37,24 @@ final class CloudStore: ObservableObject {
 
     // 組織の選択肢(会社・部署・担当)。ワークスペース設定で編集でき、全員に同期される
     @Published var orgCompanies: [String] = CloudStore.cachedList("orgCompanies") ?? Companies.all
-    @Published var orgDepartments: [String] = CloudStore.cachedList("orgDepartments") ?? Departments.all
-    @Published var orgSections: [String: [String]] = CloudStore.cachedSections() ?? Departments.sections
+    @Published var orgDepartments: [String: [String]] = CloudStore.cachedMap("orgDepartmentsMap") ?? Departments.byCompany
+    @Published var orgSections: [String: [String]] = CloudStore.cachedMap("orgSections") ?? Departments.sections
+
+    /// 会社に紐づく部署の選択肢
+    func departments(for company: String) -> [String] {
+        orgDepartments[company] ?? []
+    }
+
+    /// 全社の部署の選択肢(重複なし・会社順)
+    var allDepartments: [String] {
+        var seen = Set<String>(), out: [String] = []
+        for c in orgCompanies {
+            for d in orgDepartments[c] ?? [] where !seen.contains(d) {
+                seen.insert(d); out.append(d)
+            }
+        }
+        return out
+    }
 
     struct MemberInfo: Identifiable, Equatable {
         let id: String   // uid
@@ -277,7 +293,7 @@ final class CloudStore: ObservableObject {
     private func cacheOrgConfig() {
         let ud = UserDefaults.standard
         ud.set(orgCompanies, forKey: "orgCompanies")
-        ud.set(orgDepartments, forKey: "orgDepartments")
+        ud.set(orgDepartments, forKey: "orgDepartmentsMap")
         ud.set(orgSections, forKey: "orgSections")
     }
 
@@ -286,8 +302,8 @@ final class CloudStore: ObservableObject {
         return (v?.isEmpty ?? true) ? nil : v
     }
 
-    static func cachedSections() -> [String: [String]]? {
-        let v = UserDefaults.standard.dictionary(forKey: "orgSections") as? [String: [String]]
+    static func cachedMap(_ key: String) -> [String: [String]]? {
+        let v = UserDefaults.standard.dictionary(forKey: key) as? [String: [String]]
         return (v?.isEmpty ?? true) ? nil : v
     }
 
@@ -414,13 +430,17 @@ final class CloudStore: ObservableObject {
         listeners.append(wsRef().collection("config").document("org").addSnapshotListener { [weak self] snap, _ in
             Task { @MainActor in
                 guard let self, let d = snap?.data() else { return }
-                if let c = d["companies"] as? [String], !c.isEmpty { self.orgCompanies = c }
-                if let dep = d["departments"] as? [String], !dep.isEmpty { self.orgDepartments = dep }
-                if let sec = d["sections"] as? [String: Any] {
+                func stringMap(_ v: Any?) -> [String: [String]] {
+                    guard let raw = v as? [String: Any] else { return [:] }
                     var m: [String: [String]] = [:]
-                    for (k, v) in sec { m[k] = (v as? [Any])?.compactMap { $0 as? String } ?? [] }
-                    if !m.isEmpty { self.orgSections = m }
+                    for (k, arr) in raw { m[k] = (arr as? [Any])?.compactMap { $0 as? String } ?? [] }
+                    return m
                 }
+                if let c = d["companies"] as? [String], !c.isEmpty { self.orgCompanies = c }
+                let dep = stringMap(d["departments"])
+                if !dep.isEmpty { self.orgDepartments = dep }
+                let sec = stringMap(d["sections"])
+                if !sec.isEmpty { self.orgSections = sec }
                 self.cacheOrgConfig()
             }
         })

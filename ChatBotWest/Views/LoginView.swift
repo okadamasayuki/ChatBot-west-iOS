@@ -18,7 +18,8 @@ struct LoginView: View {
 
     private func syncOrgDefaults() {
         if !store.orgCompanies.contains(company) { company = store.orgCompanies.first ?? "" }
-        if !store.orgDepartments.contains(department) { department = store.orgDepartments.first ?? "" }
+        let depts = store.departments(for: company)
+        if !depts.contains(department) { department = depts.first ?? "" }
         let secs = store.orgSections[department] ?? []
         if !secs.contains(section) { section = secs.first ?? "" }
     }
@@ -95,8 +96,13 @@ struct LoginView: View {
                                 }
                             }
                             .pickerStyle(.menu)
+                            .onChange(of: company) { c in
+                                // 会社を変えたら、その会社の部署・担当に合わせ直す
+                                department = store.departments(for: c).first ?? ""
+                                section = (store.orgSections[department] ?? []).first ?? ""
+                            }
                             Picker("所属部署", selection: $department) {
-                                ForEach(store.orgDepartments, id: \.self) { dept in
+                                ForEach(store.departments(for: company), id: \.self) { dept in
                                     Text(dept).tag(dept)
                                 }
                             }

@@ -178,6 +178,8 @@ struct OrgSettingsView: View {
     @State private var newSection = ""
     @State private var sectionDept = ""
 
+    @State private var deptCompany = ""
+
     var body: some View {
         Form {
             Section {
@@ -185,11 +187,23 @@ struct OrgSettingsView: View {
                     Text(c)
                 }
                 .onDelete { idx in
+                    // 会社を消したらその会社の部署リストも消す
+                    for i in idx { store.orgDepartments[store.orgCompanies[i]] = nil }
                     store.orgCompanies.remove(atOffsets: idx)
+                    if !store.orgCompanies.contains(deptCompany) {
+                        deptCompany = store.orgCompanies.first ?? ""
+                    }
+                    if !store.allDepartments.contains(sectionDept) {
+                        sectionDept = store.allDepartments.first ?? ""
+                    }
                     store.saveOrgConfig()
                 }
                 addRow(placeholder: "会社を追加", text: $newCompany) {
-                    addItem(newCompany, to: \.orgCompanies)
+                    let name = newCompany.trimmingCharacters(in: .whitespaces)
+                    guard !name.isEmpty, !store.orgCompanies.contains(name) else { return }
+                    store.orgCompanies.append(name)
+                    store.orgDepartments[name] = []
+                    store.saveOrgConfig()
                     newCompany = ""
                 }
             } header: {
@@ -198,28 +212,48 @@ struct OrgSettingsView: View {
                 Text("左にスワイプで削除できます。削除しても登録済みユーザーの所属は変わりません。")
             }
 
-            Section("所属部署") {
-                ForEach(store.orgDepartments, id: \.self) { d in
+            Section("所属部署(会社ごと)") {
+                Picker("会社", selection: $deptCompany) {
+                    ForEach(store.orgCompanies, id: \.self) { c in
+                        Text(c).tag(c)
+                    }
+                }
+                .pickerStyle(.menu)
+                ForEach(store.departments(for: deptCompany), id: \.self) { d in
                     Text(d)
                 }
                 .onDelete { idx in
-                    // 部署を消したらその部署の担当リストも消す
-                    for i in idx { store.orgSections[store.orgDepartments[i]] = nil }
-                    store.orgDepartments.remove(atOffsets: idx)
-                    if !store.orgDepartments.contains(sectionDept) {
-                        sectionDept = store.orgDepartments.first ?? ""
+                    var list = store.departments(for: deptCompany)
+                    // 他の会社で使われていない部署なら担当リストも消す
+                    for i in idx {
+                        let dept = list[i]
+                        let usedElsewhere = store.orgCompanies.contains {
+                            $0 != deptCompany && (store.orgDepartments[$0] ?? []).contains(dept)
+                        }
+                        if !usedElsewhere { store.orgSections[dept] = nil }
+                    }
+                    list.remove(atOffsets: idx)
+                    store.orgDepartments[deptCompany] = list
+                    if !store.allDepartments.contains(sectionDept) {
+                        sectionDept = store.allDepartments.first ?? ""
                     }
                     store.saveOrgConfig()
                 }
                 addRow(placeholder: "部署を追加", text: $newDepartment) {
-                    addItem(newDepartment, to: \.orgDepartments)
+                    let name = newDepartment.trimmingCharacters(in: .whitespaces)
+                    guard !name.isEmpty, !deptCompany.isEmpty else { return }
+                    var list = store.departments(for: deptCompany)
+                    guard !list.contains(name) else { newDepartment = ""; return }
+                    list.append(name)
+                    store.orgDepartments[deptCompany] = list
+                    store.saveOrgConfig()
                     newDepartment = ""
                 }
             }
 
-            Section("所属担当") {
+            Section("所属担当(部署ごと)") {
                 Picker("部署", selection: $sectionDept) {
-                    ForEach(store.orgDepartments, id: \.self) { d in
+                    ForEach(store.allDepartments, id: \.self) { d in
                         Text(d).tag(d)
                     }
                 }
@@ -248,15 +282,9 @@ struct OrgSettingsView: View {
         .navigationTitle("組織の選択肢")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
-            if sectionDept.isEmpty { sectionDept = store.orgDepartments.first ?? "" }
+            if deptCompany.isEmpty { deptCompany = store.orgCompanies.first ?? "" }
+            if sectionDept.isEmpty { sectionDept = store.allDepartments.first ?? "" }
         }
-    }
-
-    private func addItem(_ raw: String, to keyPath: ReferenceWritableKeyPath<CloudStore, [String]>) {
-        let name = raw.trimmingCharacters(in: .whitespaces)
-        guard !name.isEmpty, !store[keyPath: keyPath].contains(name) else { return }
-        store[keyPath: keyPath].append(name)
-        store.saveOrgConfig()
     }
 
     private func addRow(placeholder: String, text: Binding<String>, onAdd: @escaping () -> Void) -> some View {
@@ -286,6 +314,7 @@ struct SettingsView: View {
     @State private var errorNote: String?
     @State private var manualBusy: String?
     @State private var manualNote: String?
+    @State private var baTalkBusy = false
 
     private static let sampleManuals: [(slug: String, title: String)] = [
         ("keihi", "経費精算マニュアル"),
@@ -331,6 +360,17 @@ struct SettingsView: View {
                         }
                     }
                     .disabled(sampleBusy)
+                    if store.isExpert {
+                        Button {
+                            addSampleBaTalks()
+                        } label: {
+                            HStack {
+                                if baTalkBusy { ProgressView().padding(.trailing, 6) }
+                                Text("サンプルBAチャットを追加(デモ)")
+                            }
+                        }
+                        .disabled(baTalkBusy)
+                    }
                     if let sampleNote {
                         Text(sampleNote).font(.footnote).foregroundColor(.secondary)
                     }
@@ -509,6 +549,20 @@ struct SettingsView: View {
                 showSampleNote("追加に失敗しました: \(error.localizedDescription)")
             }
             sampleBusy = false
+        }
+    }
+
+    private func addSampleBaTalks() {
+        baTalkBusy = true
+        Task {
+            do {
+                let n = try await SampleData.addSampleBaTalks(store: store)
+                showSampleNote(n > 0 ? "サンプルBAチャットを\(n)件追加しました。"
+                    : "サンプルBAチャットは既に追加済みのため、メッセージを初期状態に修復しました。")
+            } catch {
+                showSampleNote("追加に失敗しました: \(error.localizedDescription)")
+            }
+            baTalkBusy = false
         }
     }
 

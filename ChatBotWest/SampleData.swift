@@ -153,6 +153,88 @@ enum SampleData {
         return added
     }
 
+    /// サンプルBAチャット(1:1・グループ・メモ)を追加。既存(同じID)はメッセージを正規の状態に修復。追加件数を返す。
+    @MainActor
+    static func addSampleBaTalks(store: CloudStore) async throws -> Int {
+        let others = store.members
+            .filter { $0.role == MemberRole.expert.rawValue && $0.id != store.myUid() }
+            .sorted { $0.name < $1.name }
+        guard others.count >= 3 else {
+            throw NSError(domain: "SampleData", code: 3,
+                          userInfo: [NSLocalizedDescriptionKey: "サンプルには自分以外に財務アカウントが3人以上必要です"])
+        }
+        let me = CloudStore.MemberInfo(id: store.myUid(), name: store.myName(),
+                                       role: MemberRole.expert.rawValue)
+        let a = others[0], b = others[1], c = others[2]
+
+        // 12時間前起点で10分刻み(未来の時刻を作らない)
+        let base = Date().addingTimeInterval(-12 * 3600)
+        var step = 0
+        func ts() -> String {
+            let fmt = DateFormatter()
+            fmt.locale = Locale(identifier: "en_US_POSIX")
+            fmt.timeZone = TimeZone(identifier: "UTC")
+            fmt.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"
+            step += 1
+            return fmt.string(from: base.addingTimeInterval(Double(step) * 600))
+        }
+        func msg(_ id: String, _ text: String, _ sender: CloudStore.MemberInfo) -> BaMessage {
+            BaMessage(id: id, text: text, ts: ts(), senderUid: sender.id, senderName: sender.name)
+        }
+
+        // 1:1 は実運用と同じ dm_ ID(同じ相手とは1つだけ)
+        let dmId = "dm_" + [me.id, a.id].sorted().joined(separator: "_")
+        let dm = BaTalk(id: dmId, memberUids: [me.id, a.id].sorted(), memberNames: [me.name, a.name])
+        let dmMsgs = [
+            msg("sample-ba-dm-1", "お疲れさまです。「海外出張の日当」の相談、内規だと役員2万円までで合ってますか?", a),
+            msg("sample-ba-dm-2", "合ってます。国内は1万円まで、精算は帰着後1週間以内です。", me),
+            msg("sample-ba-dm-3", "ありがとうございます!回答案そのまま承認しますね。", a),
+        ]
+
+        let groupId = "sample-ba-group"
+        let group = BaTalk(id: groupId, name: "月次決算チーム",
+                           memberUids: [me.id, a.id, b.id, c.id].sorted(),
+                           memberNames: [me.name, a.name, b.name, c.name],
+                           isGroup: true)
+        let groupMsgs = [
+            msg("sample-ba-group-1", "今月の月次決算のスケジュールを共有します。5営業日締めでお願いします。", b),
+            msg("sample-ba-group-2", "@\(a.name) 売掛金の消込、昨日時点の未消込リストを今日中にもらえますか?", me),
+            msg("sample-ba-group-3", "承知しました。夕方までに共有します!", a),
+            msg("sample-ba-group-4", "経費精算の締めは今日17時です。未提出の方に催促お願いします。", c),
+        ]
+
+        let memoId = "sample-ba-memo"
+        let memo = BaTalk(id: memoId, memberUids: [me.id], memberNames: [me.name])
+        let memoMsgs = [
+            msg("sample-ba-memo-1", "【メモ】インボイス経過措置: 免税事業者からの仕入は80%控除(〜2026/9)", me),
+            msg("sample-ba-memo-2", "決算賞与の3要件: ①各人別に通知 ②翌日から1か月以内に支給 ③未払計上", me),
+        ]
+
+        let ws = Firestore.firestore().collection("workspaces").document(widHex())
+        var added = 0
+        for (talk, msgs) in [(dm, dmMsgs), (group, groupMsgs), (memo, memoMsgs)] {
+            let ref = ws.collection("baTalks").document(talk.id)
+            let exists = store.baTalks.contains { $0.id == talk.id }
+            if exists {
+                // 既存サンプル: サンプル以外の(自分で送った)メッセージは残し、サンプル分だけ正規化
+                for m in msgs {
+                    try await ref.collection("messages").document(m.id).setData(m.dict)
+                }
+                try await ref.setData(["lastText": msgs.last!.text, "lastTs": msgs.last!.ts], merge: true)
+            } else {
+                var t = talk
+                t.lastText = msgs.last!.text
+                t.lastTs = msgs.last!.ts
+                try await ref.setData(t.dict)
+                for m in msgs {
+                    try await ref.collection("messages").document(m.id).setData(m.dict)
+                }
+                added += 1
+            }
+        }
+        return added
+    }
+
     /// サンプルマニュアル(PDF)を取得→文字抽出→追加(固定IDで重複なし)
     @MainActor
     static func addSampleManual(slug: String, title: String, store: CloudStore) async throws {
