@@ -233,7 +233,7 @@ struct NewBaTalkSheet: View {
             Form {
                 Section("選択中 — \(selected.count)人") {
                     if selected.isEmpty {
-                        Text("未選択(そのまま開始すると自分だけのメモになります)")
+                        Text("自分用メモも作成できます")
                             .font(.footnote)
                             .foregroundColor(.secondary)
                     } else {
