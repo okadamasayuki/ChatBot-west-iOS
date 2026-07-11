@@ -12,7 +12,7 @@ struct LoginView: View {
     @State private var password = ""
     @State private var nicknameInput = ""
     @State private var role: MemberRole = .questioner
-    @State private var companies: Set<String> = [Companies.all[0]]
+    @State private var company = Companies.all[0]
     @State private var department = Departments.all[0]
     @State private var section = Departments.sections(for: Departments.all[0])[0]
     @State private var errorMessage: String?
@@ -81,34 +81,12 @@ struct LoginView: View {
                         }
 
                         Section("所属") {
-                            // 所属会社は複数選択できる(兼務あり)
-                            Menu {
+                            Picker("所属会社", selection: $company) {
                                 ForEach(Companies.all, id: \.self) { c in
-                                    Button {
-                                        if companies.contains(c) {
-                                            if companies.count > 1 { companies.remove(c) }
-                                        } else {
-                                            companies.insert(c)
-                                        }
-                                    } label: {
-                                        if companies.contains(c) {
-                                            Label(c, systemImage: "checkmark")
-                                        } else {
-                                            Text(c)
-                                        }
-                                    }
-                                }
-                            } label: {
-                                HStack {
-                                    Text("所属会社").foregroundColor(.primary)
-                                    Spacer()
-                                    Text(Companies.all.filter { companies.contains($0) }
-                                        .joined(separator: "/"))
-                                        .foregroundColor(.secondary)
-                                        .lineLimit(1)
-                                        .font(.footnote)
+                                    Text(c).tag(c)
                                 }
                             }
+                            .pickerStyle(.menu)
                             Picker("所属部署", selection: $department) {
                                 ForEach(Departments.all, id: \.self) { dept in
                                     Text(dept).tag(dept)
@@ -196,7 +174,7 @@ struct LoginView: View {
                 if mode == .signup {
                     try await store.signup(email: email, password: password, role: role,
                                            nickname: nickname,
-                                           companies: Companies.all.filter { companies.contains($0) },
+                                           companies: [company],
                                            department: department, section: section)
                 } else {
                     try await store.login(email: email, password: password)

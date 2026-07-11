@@ -133,6 +133,65 @@ struct MembersView: View {
     }
 }
 
+/// メンバーのプロフィール(アイコンタップで表示): 名前・役割・所属会社・部署・担当
+struct MemberProfileSheet: View {
+    let member: CloudStore.MemberInfo
+    @Environment(\.dismiss) private var dismiss
+
+    private var roleLabel: String {
+        member.role == MemberRole.expert.rawValue ? "財務(BA)" : "担当者(質問者)"
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    VStack(spacing: 10) {
+                        AvatarCircleView(iconData: member.iconData,
+                                         icon: member.icon,
+                                         fallbackBg: member.role == MemberRole.expert.rawValue
+                                             ? Theme.accent.opacity(0.8) : Theme.chatBg,
+                                         size: 88)
+                        Text(member.name.isEmpty ? "(名前未設定)" : member.name)
+                            .font(.system(size: 18, weight: .semibold))
+                        Text(roleLabel)
+                            .font(.footnote)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 2)
+                            .background(Theme.tagDoneBg)
+                            .foregroundColor(Theme.tagDoneFg)
+                            .cornerRadius(8)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .listRowBackground(Color.clear)
+                }
+                Section("所属") {
+                    if member.companies.isEmpty && member.department.isEmpty && member.section.isEmpty {
+                        Text("未設定").foregroundColor(.secondary)
+                    }
+                    ForEach(member.companies, id: \.self) { c in
+                        LabeledContent("会社") { Text(c) }
+                    }
+                    if !member.department.isEmpty {
+                        LabeledContent("部署") { Text(member.department) }
+                    }
+                    if !member.section.isEmpty {
+                        LabeledContent("担当") { Text(member.section) }
+                    }
+                }
+            }
+            .navigationTitle("プロフィール")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("閉じる") { dismiss() }
+                }
+            }
+        }
+        .presentationDetents([.medium])
+    }
+}
+
 struct MemberRow: View {
     let member: CloudStore.MemberInfo
     let isMe: Bool

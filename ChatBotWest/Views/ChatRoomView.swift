@@ -13,6 +13,7 @@ struct ChatRoomView: View {
     @State private var showFileImporter = false
     @State private var photosItem: PhotosPickerItem?
     @State private var attachError: String?
+    @State private var profileMember: CloudStore.MemberInfo?
 
     /// 表示するメッセージ(財務のみ表示のメッセージは質問者には見せない)
     private var displayMessages: [Message] {
@@ -112,27 +113,27 @@ struct ChatRoomView: View {
         return nil
     }
 
-    /// メッセージの送信者のアイコン情報(未設定は役割の絵文字)
-    private func avatarInfo(for msg: Message) -> (data: String, icon: String, fallback: String) {
+    /// メッセージの送信者のアイコン情報(未設定は役割の絵文字)と、プロフィール表示用のメンバー
+    private func avatarInfo(for msg: Message) -> (data: String, icon: String, fallback: String, member: CloudStore.MemberInfo?) {
         switch msg.role {
         case .ai:
-            return ("", "🤖", "")
+            return ("", "🤖", "", nil)
         case .expert:
             if !msg.senderName.isEmpty,
                let m = store.members.first(where: { $0.name == msg.senderName }) {
-                return (m.iconData, m.iconData.isEmpty && m.icon.isEmpty ? "👤" : m.icon, "")
+                return (m.iconData, m.iconData.isEmpty && m.icon.isEmpty ? "👤" : m.icon, "", m)
             }
             if let r = room, let m = store.members.first(where: { $0.name == r.handler }) {
-                return (m.iconData, m.iconData.isEmpty && m.icon.isEmpty ? "👤" : m.icon, "")
+                return (m.iconData, m.iconData.isEmpty && m.icon.isEmpty ? "👤" : m.icon, "", m)
             }
-            return ("", "👤", "")
+            return ("", "👤", "", nil)
         case .user:
             if let r = room, let m = store.member(r.ownerUid) {
-                return (m.iconData, m.iconData.isEmpty && m.icon.isEmpty ? "🙋" : m.icon, "")
+                return (m.iconData, m.iconData.isEmpty && m.icon.isEmpty ? "🙋" : m.icon, "", m)
             }
-            return ("", "🙋", "")
+            return ("", "🙋", "", nil)
         case .system:
-            return ("", "", "person.fill")
+            return ("", "", "person.fill", nil)
         }
     }
 
@@ -163,6 +164,7 @@ struct ChatRoomView: View {
                                 avatarIconData: avatar.data,
                                 avatarIcon: avatar.icon,
                                 avatarFallback: avatar.fallback,
+                                onAvatarTap: avatar.member.map { m in { profileMember = m } },
                                 readStatus: msg.deleted ? nil : readStatus(for: msg),
                                 myUid: store.myUid(),
                                 onReaction: { emoji in store.toggleReaction(msg, emoji: emoji) },
@@ -340,6 +342,9 @@ struct ChatRoomView: View {
         }
         .sheet(isPresented: $showSummary) {
             SummarySheet { try await store.summarizeCurrentRoom() }
+        }
+        .sheet(item: $profileMember) { m in
+            MemberProfileSheet(member: m)
         }
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
@@ -527,6 +532,7 @@ struct MessageBubble: View {
     var avatarIconData: String = ""
     var avatarIcon: String = ""
     var avatarFallback: String = "person.fill"
+    var onAvatarTap: (() -> Void)? = nil
     var readStatus: String? = nil
     var myUid: String = ""
     var onReaction: (String) -> Void = { _ in }
@@ -540,9 +546,10 @@ struct MessageBubble: View {
             HStack(alignment: .top, spacing: 8) {
                 if alignRight { Spacer(minLength: 60) }
                 if !alignRight {
-                    // 相手側はアイコン付きで表示
+                    // 相手側はアイコン付きで表示(タップでプロフィール)
                     AvatarCircleView(iconData: avatarIconData, icon: avatarIcon,
                                      fallbackSystemImage: avatarFallback, size: 34)
+                        .onTapGesture { onAvatarTap?() }
                 }
                 VStack(alignment: alignRight ? .trailing : .leading, spacing: 3) {
                     if let senderLabel {
