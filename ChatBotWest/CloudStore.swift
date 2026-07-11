@@ -509,12 +509,18 @@ final class CloudStore: ObservableObject {
         }
     }
 
-    /// 相談の担当BAのトグル(自分なら外す、そうでなければ自分に)
+    /// 相談の担当BAのトグル(自分なら外す、そうでなければ自分に)。
+    /// 未回答案件の対応者も連動して同じ担当に揃える
     func toggleRoomHandler(_ roomId: String) {
         let me = myName()
         guard !me.isEmpty, isExpert,
               let r = rooms.first(where: { $0.id == roomId }) else { return }
-        setRoomHandler(roomId, handler: r.handler == me ? "" : me)
+        let current = r.handler.isEmpty ? derivedHandler(roomId: roomId) : r.handler
+        let newHandler = current == me ? "" : me
+        setRoomHandler(roomId, handler: newHandler)
+        for c in cases where c.roomId == roomId && c.status != .answered {
+            updateCase(c.id, ["handledBy": newHandler])
+        }
     }
 
     func addQa(_ entry: QaEntry) {

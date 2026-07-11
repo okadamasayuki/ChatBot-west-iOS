@@ -91,10 +91,17 @@ struct CaseCardView: View {
     @State private var checkingRefs = false
     @State private var errorMessage: String?
 
-    /// 自分が対応者になっている案件だけ、選択肢の選択〜回答の送信ができる
+    /// 相談の担当BA(チャット上部の「担当」と同じ値)
+    private var roomHandler: String {
+        guard let r = store.rooms.first(where: { $0.id == caseItem.roomId }) else { return caseItem.handledBy }
+        return r.handler.isEmpty ? store.derivedHandler(roomId: r.id) : r.handler
+    }
+
+    /// 相談の担当BAが自分のときだけ、選択肢の選択〜回答の送信ができる
+    /// (対応者の管理はチャット上部の「担当」に統合)
     private var mineHandling: Bool {
         let me = store.myName()
-        return !me.isEmpty && caseItem.handledBy == me
+        return !me.isEmpty && roomHandler == me
     }
 
     var body: some View {
@@ -132,23 +139,14 @@ struct CaseCardView: View {
         .onAppear { draftText = caseItem.draft ?? "" }
     }
 
-    // ステータス＋対応者を統合したラベル(要対応 / 対応中：対応者 / 対応済み：対応者)
-    // 未回答はタップで自分を対応者にON/OFF(トグル)できる
+    // ステータスラベル。対応者の管理はチャット上部の「担当」に統合したため、
+    // カード側は「対応済み」の表示と、担当未設定時の案内だけを出す
     @ViewBuilder
     private var statusLabel: some View {
         if caseItem.status == .answered {
             labelChip("✓ 対応済み" + (caseItem.handledBy.isEmpty ? "" : "：\(caseItem.handledBy)"), bg: Theme.accent)
-        } else {
-            Button {
-                store.toggleHandler(caseItem)
-            } label: {
-                if caseItem.handledBy.isEmpty {
-                    labelChip("要対応", bg: Color(red: 0xd6 / 255.0, green: 0x3a / 255.0, blue: 0x2f / 255.0))       // 赤
-                } else {
-                    labelChip("対応中：\(caseItem.handledBy)", bg: Color(red: 0xe8 / 255.0, green: 0x8a / 255.0, blue: 0x1a / 255.0)) // オレンジ
-                }
-            }
-            .buttonStyle(.plain)
+        } else if roomHandler.isEmpty {
+            labelChip("要対応 — 右上の「担当になる」から担当を設定", bg: Color(red: 0xd6 / 255.0, green: 0x3a / 255.0, blue: 0x2f / 255.0)) // 赤
         }
     }
 
