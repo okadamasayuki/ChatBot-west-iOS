@@ -16,6 +16,8 @@ struct ChatRoomView: View {
     @State private var profileMember: CloudStore.MemberInfo?
     @State private var linkCopied = false
     @State private var showDelegatePicker = false
+    /// 開いた直後の最下部スクロールが済んだか(以降の新着はアニメーション付きでスクロール)
+    @State private var didInitialScroll = false
 
     /// 表示するメッセージ(財務のみ表示のメッセージは質問者には見せない)
     private var displayMessages: [Message] {
@@ -249,23 +251,26 @@ struct ChatRoomView: View {
                             CaseCardView(caseItem: c)
                                 .padding(.top, 4)
                         }
+                        // 最下部スクロールの着地点(案件カードまで含めた本当の最下部)
+                        Color.clear.frame(height: 1).id("roomBottom")
                     }
                     .padding(.horizontal, 10)
                     .padding(.vertical, 12)
                 }
                 .background(Theme.chatBg)
                 .onChange(of: lastMessageId) { id in
-                    if let id {
-                        withAnimation { proxy.scrollTo(id, anchor: .bottom) }
+                    guard id != nil else { return }
+                    if didInitialScroll {
+                        withAnimation { proxy.scrollTo("roomBottom", anchor: .bottom) }
+                    } else {
+                        // 初回ロードはLazyVStackのレイアウト確定前でscrollToが途中で止まるため、
+                        // 時間差で数回に分けて最下部に合わせる
+                        didInitialScroll = true
+                        settleToBottom(proxy)
                     }
                 }
-                .onAppear {
-                    // 通知タップなどで開いた直後は、画面遷移中の scrollTo が無効になることがあるため
-                    // 遷移が落ち着いてからもう一度最下部へスクロールする
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                        if let id = lastMessageId { proxy.scrollTo(id, anchor: .bottom) }
-                    }
-                }
+                .onChange(of: store.currentRoomId) { _ in didInitialScroll = false }
+                .onAppear { settleToBottom(proxy) }
                 .onTapGesture { inputFocused = false }
             }
 
@@ -478,6 +483,15 @@ struct ChatRoomView: View {
                 DelegatePickerSheet(excludeNames: [store.myName(), r.handler, r.pendingHandler]) { name in
                     store.requestRoomHandler(r.id, to: name)
                 }
+            }
+        }
+    }
+
+    /// 最下部へスクロールする。吹き出しの高さが出揃うまで位置がずれるので、時間差で数回合わせる
+    private func settleToBottom(_ proxy: ScrollViewProxy) {
+        for delay in [0.05, 0.35, 0.8] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                if lastMessageId != nil { proxy.scrollTo("roomBottom", anchor: .bottom) }
             }
         }
     }

@@ -388,6 +388,8 @@ struct BaTalkView: View {
     @State private var showMembers = false
     @State private var profileMember: CloudStore.MemberInfo?
     @State private var showSearch = false
+    /// 開いた直後の最下部スクロールが済んだか(以降の新着はアニメーション付きでスクロール)
+    @State private var didInitialScroll = false
     @FocusState private var inputFocused: Bool
 
     private var talk: BaTalk? {
@@ -428,6 +430,15 @@ struct BaTalkView: View {
         return store.baTalkMessages.filter { $0.ts >= from }
     }
 
+    /// 最下部へスクロールする。吹き出しの高さが出揃うまで位置がずれるので、時間差で数回合わせる
+    private func settleToBottom(_ proxy: ScrollViewProxy) {
+        for delay in [0.05, 0.35, 0.8] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                if !visibleMessages.isEmpty { proxy.scrollTo("talkBottom", anchor: .bottom) }
+            }
+        }
+    }
+
     /// 自分のメッセージの既読状況(1:1は既読/未読、グループは既読数。メモでは表示しない)
     private func readStatus(for msg: BaMessage) -> String? {
         guard let t = talk, t.memberUids.count > 1, msg.senderUid == store.myUid() else { return nil }
@@ -451,23 +462,26 @@ struct BaTalkView: View {
                                             mentionNames: talk?.memberNames ?? [])
                                 .id(msg.id)
                         }
+                        // 最下部スクロールの着地点
+                        Color.clear.frame(height: 1).id("talkBottom")
                     }
                     .padding(.horizontal, 10)
                     .padding(.vertical, 12)
                 }
                 .background(Theme.chatBg)
                 .onChange(of: visibleMessages.last?.id) { id in
-                    if let id {
-                        withAnimation { proxy.scrollTo(id, anchor: .bottom) }
+                    guard id != nil else { return }
+                    if didInitialScroll {
+                        withAnimation { proxy.scrollTo("talkBottom", anchor: .bottom) }
+                    } else {
+                        // 初回ロードはLazyVStackのレイアウト確定前でscrollToが途中で止まるため、
+                        // 時間差で数回に分けて最下部に合わせる
+                        didInitialScroll = true
+                        settleToBottom(proxy)
                     }
                 }
-                .onAppear {
-                    // 通知タップなどで開いた直後は、画面遷移中の scrollTo が無効になることがあるため
-                    // 遷移が落ち着いてからもう一度最下部へスクロールする
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                        if let id = visibleMessages.last?.id { proxy.scrollTo(id, anchor: .bottom) }
-                    }
-                }
+                .onChange(of: store.currentBaTalkId) { _ in didInitialScroll = false }
+                .onAppear { settleToBottom(proxy) }
                 .onTapGesture { inputFocused = false }
             }
 
