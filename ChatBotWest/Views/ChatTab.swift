@@ -25,6 +25,7 @@ struct RoomListView: View {
     @State private var filter: RoomFilter = .mine
     @State private var expertFilter: ExpertFilter = .all // 財務: すべて / 自分が対応中
     @AppStorage("roomSort") private var sort: String = "new" // "new"=新しい順 / "status"=ステータス順
+    @AppStorage("hideDone") private var hideDone = false     // 完了した相談を一覧に出さない
     @State private var deleteTarget: Room?
     @State private var selectedRooms: Set<String> = [] // 財務: まとめて社内ルール更新する相談の選択
     @State private var showBatchNaiki = false
@@ -70,6 +71,9 @@ struct RoomListView: View {
                 // 最新のBA回答が自分の相談(完了済みも含む。他のBAが対応中のものは除く)
                 return !openRoomIds.contains(room.id) && (latest[room.id]?.mine ?? false)
             }
+        }
+        if hideDone {
+            list = list.filter { !$0.isDone }
         }
         let handlers = openCaseHandlers
         let byNew: (Room, Room) -> Bool = { $0.lastTs > $1.lastTs }
@@ -194,6 +198,18 @@ struct RoomListView: View {
         room.handler.isEmpty ? store.derivedHandler(roomId: room.id) : room.handler
     }
 
+    /// 並び替え・フィルタ用のチップ
+    private func sortChip(_ label: String, active: Bool) -> some View {
+        Text(label)
+            .font(.system(size: 11))
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .background(active ? Theme.accent : Color(.systemBackground))
+            .foregroundColor(active ? .white : .secondary)
+            .overlay(Capsule().stroke(active ? Theme.accent : Color(.separator), lineWidth: 1))
+            .clipShape(Capsule())
+    }
+
     /// すべての相談が選択済みか
     private var allSelected: Bool {
         !visibleRooms.isEmpty && visibleRooms.allSatisfy { selectedRooms.contains($0.id) }
@@ -229,17 +245,16 @@ struct RoomListView: View {
                 Button {
                     sort = key
                 } label: {
-                    Text(label)
-                        .font(.system(size: 11))
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 4)
-                        .background(sort == key ? Theme.accent : Color(.systemBackground))
-                        .foregroundColor(sort == key ? .white : .secondary)
-                        .overlay(Capsule().stroke(sort == key ? Theme.accent : Color(.separator), lineWidth: 1))
-                        .clipShape(Capsule())
+                    sortChip(label, active: sort == key)
                 }
                 .buttonStyle(.plain)
             }
+            Button {
+                hideDone.toggle()
+            } label: {
+                sortChip("完了を非表示", active: hideDone)
+            }
+            .buttonStyle(.plain)
         }
     }
 }
