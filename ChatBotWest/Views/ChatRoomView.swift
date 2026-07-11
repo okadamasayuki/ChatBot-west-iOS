@@ -75,7 +75,9 @@ struct ChatRoomView: View {
             ? r.reads.contains { $0.key != store.myUid() && $0.value >= msg.ts }
             : (r.reads[r.ownerUid] ?? "") >= msg.ts
         let replied = store.roomMessages.contains { $0.role == .user && $0.ts > msg.ts }
-        return (humanRead || replied) ? "既読" : "未読"
+        // 開発モードの担当者役が入力中 = 読んでいる、として既読扱いにする
+        let devReading = store.devTypingRoomId == r.id
+        return (humanRead || replied || devReading) ? "既読" : "未読"
     }
 
     /// この相談の未回答案件(財務のみ、チャット内にBAの案件カードを統合表示する)
