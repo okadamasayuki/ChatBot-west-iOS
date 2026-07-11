@@ -1015,18 +1015,6 @@ struct BaMessageBubble: View {
                 .padding(.horizontal, 12)
                 .padding(.vertical, 9)
                 .background(LineBubbleShape(isMine: isMine).fill(isMine ? Theme.myBubble : Color(.systemBackground)))
-                // Teams風: リアクションはバブルの下角に重ねて表示。
-                // 時刻の位置が動かないよう、余白は増やさず重ねるだけにする
-                .overlay(alignment: isMine ? .bottomLeading : .bottomTrailing) {
-                    if !message.reactions.isEmpty, !message.deleted {
-                        ReactionChipsView(reactions: message.reactions, myUid: store.myUid(),
-                                          memberFor: { uid in store.member(uid) }) { emoji in
-                            store.toggleBaReaction(message, emoji: emoji)
-                        }
-                        .fixedSize() // 短いバブルでも潰れて折り返さないように
-                        .offset(x: isMine ? -4 : 4, y: 9)
-                    }
-                }
                 .contextMenu {
                     if !message.deleted {
                         // 1列目: リアクション絵文字を1行に横並び
@@ -1079,10 +1067,24 @@ struct BaMessageBubble: View {
                             }
                         }
                     }
+                } preview: {
+                    // 長押しプレビューは本文だけ(リアクションバッジ等は含めない)
+                    Text(message.text.isEmpty ? "(添付ファイル)" : message.text)
+                        .font(.system(size: 14))
+                        .lineSpacing(4)
+                        .padding(12)
+                        .background(Color(.systemBackground))
                 }
                 .sheet(isPresented: $showEdit) {
                     EditMessageSheet(initialText: message.text) { newText in
                         store.updateBaMessageText(message, newText: newText)
+                    }
+                }
+                // リアクションはバブルの下に表示(バブル幅に依存しない通常の行)
+                if !message.reactions.isEmpty, !message.deleted {
+                    ReactionChipsView(reactions: message.reactions, myUid: store.myUid(),
+                                      memberFor: { uid in store.member(uid) }) { emoji in
+                        store.toggleBaReaction(message, emoji: emoji)
                     }
                 }
             }

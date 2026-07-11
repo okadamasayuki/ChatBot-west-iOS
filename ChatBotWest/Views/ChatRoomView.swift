@@ -227,6 +227,13 @@ struct ChatRoomView: View {
                                         }
                                     }
                                 }
+                            } preview: {
+                                // 長押しプレビューは本文だけ(リアクションバッジ等は含めない)
+                                Text(msg.text.isEmpty ? "(添付ファイル)" : msg.text)
+                                    .font(.system(size: 14))
+                                    .lineSpacing(4)
+                                    .padding(12)
+                                    .background(Color(.systemBackground))
                             }
                         }
                         if store.pendingTyping {
@@ -662,19 +669,14 @@ struct MessageBubble: View {
                             LineBubbleShape(isMine: alignRight)
                                 .stroke(borderColor ?? .clear, lineWidth: 1)
                         )
-                        // Teams風: リアクションはバブルの下角に重ねて表示。
-                        // 時刻の位置が動かないよう、余白は増やさず重ねるだけにする
-                        .overlay(alignment: alignRight ? .bottomLeading : .bottomTrailing) {
-                            if !message.reactions.isEmpty, !message.deleted {
-                                ReactionChipsView(reactions: message.reactions, myUid: myUid,
-                                                  memberFor: reactionMemberFor, onToggle: onReaction)
-                                    .fixedSize() // 短いバブルでも潰れて折り返さないように
-                                    .offset(x: alignRight ? -4 : 4, y: 9)
-                            }
-                        }
                     if showClarify {
                         // 聞き返しの選択肢ボタン
                         FlowChoices(options: message.clarifyOptions, onChoice: onChoice)
+                    }
+                    // リアクションはバブルの下に表示(バブル幅に依存しない通常の行)
+                    if !message.reactions.isEmpty, !message.deleted {
+                        ReactionChipsView(reactions: message.reactions, myUid: myUid,
+                                          memberFor: reactionMemberFor, onToggle: onReaction)
                     }
                 }
                 if !alignRight {
