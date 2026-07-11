@@ -694,8 +694,6 @@ struct AddBaMembersSheet: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-            // 会社・部署・担当・役職で絞り込み、まとめて選択できる
-            MemberFilterBar(filter: $filter, pool: pool)
             Form {
                 if !selected.isEmpty {
                     Section("選択中 — \(selected.count)人") {
@@ -711,6 +709,17 @@ struct AddBaMembersSheet: View {
                         .tint(Theme.accent)
                 }
 
+                // 検索・絞り込みはメンバー選択の真上に置く
+                Section {
+                    HStack(spacing: 6) {
+                        Image(systemName: "magnifyingglass")
+                            .foregroundColor(.secondary)
+                        TextField("ユーザー名で検索", text: $searchText)
+                            .autocorrectionDisabled()
+                    }
+                    MemberFilterBar(filter: $filter, pool: pool)
+                        .listRowInsets(EdgeInsets())
+                }
 
                 Section("メンバー選択") {
                     if candidates.isEmpty {
@@ -761,20 +770,25 @@ struct AddBaMembersSheet: View {
             }
             .navigationTitle("メンバー追加")
             .navigationBarTitleDisplayMode(.inline)
-            .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always),
-                        prompt: "ユーザー名で検索")
             .toolbar {
                 ToolbarItemGroup(placement: .topBarTrailing) {
+                    // 追加するとキャンセルは別々の枠のボタンで表示
                     Button {
                         // 絞り込みを変えても選択は保持されるよう、全体から選ぶ
                         let picked = pool.filter { selected.contains($0.id) }
                         store.addBaTalkMembers(talk.id, members: picked, showHistory: showHistory)
                         dismiss()
                     } label: {
-                        Text(selected.count > 1 ? "追加する(\(selected.count)人)" : "追加する").bold()
+                        Text(selected.count > 1 ? "追加する(\(selected.count)人)" : "追加する")
+                            .font(.system(size: 13, weight: .bold))
                     }
+                    .buttonStyle(.borderedProminent)
+                    .tint(Theme.accent)
                     .disabled(selected.isEmpty)
+
                     Button("キャンセル") { dismiss() }
+                        .font(.system(size: 13))
+                        .buttonStyle(.bordered)
                 }
             }
         }
