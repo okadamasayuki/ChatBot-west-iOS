@@ -711,21 +711,6 @@ struct AddBaMembersSheet: View {
                         .tint(Theme.accent)
                 }
 
-                Section {
-                    Button {
-                        // 絞り込みを変えても選択は保持されるよう、全体から選ぶ
-                        let picked = pool.filter { selected.contains($0.id) }
-                        store.addBaTalkMembers(talk.id, members: picked, showHistory: showHistory)
-                        dismiss()
-                    } label: {
-                        HStack {
-                            Spacer()
-                            Text(selected.count > 1 ? "追加する(\(selected.count)人)" : "追加する").bold()
-                            Spacer()
-                        }
-                    }
-                    .disabled(selected.isEmpty)
-                }
 
                 Section("メンバー選択") {
                     if candidates.isEmpty {
@@ -779,7 +764,16 @@ struct AddBaMembersSheet: View {
             .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always),
                         prompt: "ユーザー名で検索")
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    Button {
+                        // 絞り込みを変えても選択は保持されるよう、全体から選ぶ
+                        let picked = pool.filter { selected.contains($0.id) }
+                        store.addBaTalkMembers(talk.id, members: picked, showHistory: showHistory)
+                        dismiss()
+                    } label: {
+                        Text(selected.count > 1 ? "追加する(\(selected.count)人)" : "追加する").bold()
+                    }
+                    .disabled(selected.isEmpty)
                     Button("キャンセル") { dismiss() }
                 }
             }
