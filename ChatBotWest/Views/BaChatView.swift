@@ -1006,7 +1006,7 @@ struct BaMessageBubble: View {
                 .overlay(alignment: isMine ? .bottomLeading : .bottomTrailing) {
                     if !message.reactions.isEmpty, !message.deleted {
                         ReactionChipsView(reactions: message.reactions, myUid: store.myUid(),
-                                          nameFor: { uid in store.member(uid)?.name ?? "" }) { emoji in
+                                          memberFor: { uid in store.member(uid) }) { emoji in
                             store.toggleBaReaction(message, emoji: emoji)
                         }
                         .offset(x: isMine ? -4 : 4, y: 9)

@@ -163,45 +163,104 @@ enum AvatarRenderer {
 struct ReactionChipsView: View {
     let reactions: [String: [String]]
     let myUid: String
-    /// uid → 表示名(長押しで誰がリアクションしたかを出すのに使う)
-    var nameFor: (String) -> String = { _ in "" }
+    /// uid → メンバー情報(長押しの詳細シートでアバター・名前を出すのに使う)
+    var memberFor: (String) -> CloudStore.MemberInfo? = { _ in nil }
     let onToggle: (String) -> Void
+    @State private var showDetail = false
 
     var body: some View {
         let items = reactions.filter { !$0.value.isEmpty }.sorted { $0.key < $1.key }
         if !items.isEmpty {
             HStack(spacing: 6) {
                 ForEach(items, id: \.key) { emoji, uids in
-                    Button {
-                        onToggle(emoji)
-                    } label: {
-                        // Teams風: 白いピル型バッジ(自分が付けたものは青系ハイライト)
-                        Text("\(emoji) \(uids.count)")
-                            .font(.system(size: 12, weight: uids.contains(myUid) ? .semibold : .regular))
-                            .padding(.horizontal, 7)
-                            .padding(.vertical, 3)
-                            .foregroundColor(uids.contains(myUid) ? Theme.tagWaitingFg : Theme.header)
-                            .background(uids.contains(myUid) ? Theme.tagWaitingBg : Color.white)
-                            .clipShape(Capsule())
-                            .overlay(
-                                Capsule().stroke(uids.contains(myUid) ? Theme.tagWaitingFg.opacity(0.5)
-                                                 : Color(.separator), lineWidth: 1)
-                            )
-                            .shadow(color: .black.opacity(0.12), radius: 2, y: 1)
-                    }
-                    .buttonStyle(.plain)
-                    // 長押しでリアクションした人の名前を表示
-                    .contextMenu {
-                        Section("\(emoji) リアクションした人") {
-                            ForEach(uids, id: \.self) { uid in
-                                let name = nameFor(uid)
-                                Text(name.isEmpty ? "不明なユーザ" : name)
-                            }
-                        }
-                    }
+                    // Teams風: 白いピル型バッジ(自分が付けたものは青系ハイライト)。
+                    // タップで付け外し、長押しで誰が押したかの詳細シート
+                    Text("\(emoji) \(uids.count)")
+                        .font(.system(size: 12, weight: uids.contains(myUid) ? .semibold : .regular))
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 3)
+                        .foregroundColor(uids.contains(myUid) ? Theme.tagWaitingFg : Theme.header)
+                        .background(uids.contains(myUid) ? Theme.tagWaitingBg : Color.white)
+                        .clipShape(Capsule())
+                        .overlay(
+                            Capsule().stroke(uids.contains(myUid) ? Theme.tagWaitingFg.opacity(0.5)
+                                             : Color(.separator), lineWidth: 1)
+                        )
+                        .shadow(color: .black.opacity(0.12), radius: 2, y: 1)
+                        .contentShape(Capsule())
+                        .onTapGesture { onToggle(emoji) }
+                        .onLongPressGesture { showDetail = true }
                 }
             }
+            .sheet(isPresented: $showDetail) {
+                ReactionDetailSheet(reactions: reactions, memberFor: memberFor)
+            }
         }
+    }
+}
+
+/// Teams風のリアクション詳細: 上部に絵文字タブ、下に押した人の一覧(アバター+名前+絵文字)
+struct ReactionDetailSheet: View {
+    let reactions: [String: [String]]
+    let memberFor: (String) -> CloudStore.MemberInfo?
+    @Environment(\.dismiss) private var dismiss
+    @State private var selected = "" // 空 = すべて
+
+    private var items: [(String, [String])] {
+        reactions.filter { !$0.value.isEmpty }.sorted { $0.key < $1.key }
+    }
+
+    private var rows: [(id: String, uid: String, emoji: String)] {
+        items.flatMap { emoji, uids in
+            uids.map { (id: "\(emoji)-\($0)", uid: $0, emoji: emoji) }
+        }
+        .filter { selected.isEmpty || $0.emoji == selected }
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // 絵文字タブ(すべて / 絵文字ごと)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    tabChip("すべて \(items.reduce(0) { $0 + $1.1.count })", "")
+                    ForEach(items, id: \.0) { emoji, uids in
+                        tabChip("\(emoji) \(uids.count)", emoji)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+            }
+            Divider()
+            List(rows, id: \.id) { row in
+                let m = memberFor(row.uid)
+                HStack(spacing: 10) {
+                    AvatarCircleView(iconData: m?.iconData ?? "", icon: m?.icon ?? "", size: 32)
+                    Text(m?.name.isEmpty == false ? m!.name : "不明なユーザ")
+                        .font(.system(size: 14))
+                    Spacer()
+                    Text(row.emoji)
+                        .font(.system(size: 18))
+                }
+            }
+            .listStyle(.plain)
+        }
+        .presentationDetents([.medium])
+        .presentationDragIndicator(.visible)
+    }
+
+    private func tabChip(_ label: String, _ value: String) -> some View {
+        Button {
+            selected = value
+        } label: {
+            Text(label)
+                .font(.system(size: 13, weight: selected == value ? .semibold : .regular))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(selected == value ? Theme.tagWaitingBg : Color(.secondarySystemBackground))
+                .foregroundColor(selected == value ? Theme.tagWaitingFg : .primary)
+                .cornerRadius(14)
+        }
+        .buttonStyle(.plain)
     }
 }
 
