@@ -143,6 +143,8 @@ struct BaTalkListView: View {
             }
             .padding(.vertical, 2)
         }
+        // 区切り線を全行とも左端から表示(行によって途切れて見えないように)
+        .alignmentGuide(.listRowSeparatorLeading) { _ in 0 }
         // LINE風: 左スワイプ=削除(赤・ゴミ箱) / 右スワイプ=ピン留め(青・フルスワイプ可)
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
             Button(role: .destructive) {
