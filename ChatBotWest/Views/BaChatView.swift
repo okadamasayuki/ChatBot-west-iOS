@@ -661,8 +661,6 @@ struct AddBaMembersSheet: View {
                 Section {
                     Toggle("過去の履歴も見せる", isOn: $showHistory)
                         .tint(Theme.accent)
-                } footer: {
-                    Text("オフにすると、追加したメンバーには追加した時点より後のメッセージだけが表示されます。")
                 }
 
                 Section {
