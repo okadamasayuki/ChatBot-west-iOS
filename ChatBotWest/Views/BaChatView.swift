@@ -658,6 +658,7 @@ struct BaTalkMembersSheet: View {
                 name: i < talk.memberNames.count ? talk.memberNames[i] : "(退会済み)",
                 role: MemberRole.expert.rawValue)
         }
+        .filter { $0.id != store.myUid() } // 自分は表示しない
         .sorted { $0.name < $1.name }
     }
 
