@@ -146,7 +146,7 @@ struct CaseCardView: View {
         if caseItem.status == .answered {
             labelChip("✓ 対応済み" + (caseItem.handledBy.isEmpty ? "" : "：\(caseItem.handledBy)"), bg: Theme.accent)
         } else if roomHandler.isEmpty {
-            labelChip("要対応 — 右上の「担当になる」から担当を設定", bg: Color(red: 0xd6 / 255.0, green: 0x3a / 255.0, blue: 0x2f / 255.0)) // 赤
+            labelChip("担当になると回答ができます", bg: Color(red: 0xd6 / 255.0, green: 0x3a / 255.0, blue: 0x2f / 255.0)) // 赤
         }
     }
 
