@@ -38,8 +38,13 @@ struct BaChatView: View {
             }
             // 戻りアニメーション中はナビバーを出さず、一覧に戻り切ってから表示する
             .toolbar(store.baTalkPath.isEmpty ? .visible : .hidden, for: .navigationBar)
-            .navigationDestination(for: String.self) { _ in
-                BaTalkView()
+            .navigationDestination(for: String.self) { value in
+                if value.hasPrefix("room:") {
+                    // トーク内の相談リンクから開いた相談チャット
+                    ChatRoomView()
+                } else {
+                    BaTalkView()
+                }
             }
         }
         // トーク中はタブバーを隠し、一覧に戻った瞬間に表示する
