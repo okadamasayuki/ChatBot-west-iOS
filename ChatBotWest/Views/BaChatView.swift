@@ -243,7 +243,7 @@ struct NewBaTalkSheet: View {
                     }
                 }
 
-                Section("ルーム名(任意)") {
+                Section("ルーム名") {
                     TextField("例: 決算チーム", text: $groupName)
                 }
 
