@@ -673,11 +673,13 @@ struct MessageBubble: View {
                         // 聞き返しの選択肢ボタン
                         FlowChoices(options: message.clarifyOptions, onChoice: onChoice)
                     }
-                    // リアクションはバブルの下に表示(バブル幅に依存しない通常の行)
+                    // リアクションはバブルの枠に重ねて表示(バッジの上半分がバブルに掛かる)
                     if !message.reactions.isEmpty, !message.deleted {
                         ReactionChipsView(reactions: message.reactions, myUid: myUid,
                                           memberFor: reactionMemberFor, onToggle: onReaction)
-                            .padding(.top, 3)
+                            .padding(.top, -10)
+                            .padding(alignRight ? .trailing : .leading, 10)
+                            .zIndex(1)
                     }
                 }
                 if !alignRight {

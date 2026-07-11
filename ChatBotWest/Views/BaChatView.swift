@@ -1080,13 +1080,15 @@ struct BaMessageBubble: View {
                         store.updateBaMessageText(message, newText: newText)
                     }
                 }
-                // リアクションはバブルの下に表示(バブル幅に依存しない通常の行)
+                // リアクションはバブルの枠に重ねて表示(バッジの上半分がバブルに掛かる)
                 if !message.reactions.isEmpty, !message.deleted {
                     ReactionChipsView(reactions: message.reactions, myUid: store.myUid(),
                                       memberFor: { uid in store.member(uid) }) { emoji in
                         store.toggleBaReaction(message, emoji: emoji)
                     }
-                    .padding(.top, 3)
+                    .padding(.top, -10)
+                    .padding(isMine ? .trailing : .leading, 10)
+                    .zIndex(1)
                 }
             }
             if !isMine {
