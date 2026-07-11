@@ -178,6 +178,8 @@ struct ReactionChipsView: View {
                     // (長押しはメッセージのメニューと競合するため使わない。付け外しは長押しメニューから)
                     Text("\(emoji) \(uids.count)")
                         .font(.system(size: 12, weight: uids.contains(myUid) ? .semibold : .regular))
+                        .lineLimit(1)
+                        .fixedSize()
                         .padding(.horizontal, 7)
                         .padding(.vertical, 3)
                         .foregroundColor(uids.contains(myUid) ? Theme.tagWaitingFg : Theme.header)

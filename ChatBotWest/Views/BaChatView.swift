@@ -1023,6 +1023,7 @@ struct BaMessageBubble: View {
                                           memberFor: { uid in store.member(uid) }) { emoji in
                             store.toggleBaReaction(message, emoji: emoji)
                         }
+                        .fixedSize() // 短いバブルでも潰れて折り返さないように
                         .offset(x: isMine ? -4 : 4, y: 9)
                     }
                 }

@@ -668,6 +668,7 @@ struct MessageBubble: View {
                             if !message.reactions.isEmpty, !message.deleted {
                                 ReactionChipsView(reactions: message.reactions, myUid: myUid,
                                                   memberFor: reactionMemberFor, onToggle: onReaction)
+                                    .fixedSize() // 短いバブルでも潰れて折り返さないように
                                     .offset(x: alignRight ? -4 : 4, y: 9)
                             }
                         }
