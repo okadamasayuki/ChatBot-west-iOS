@@ -393,8 +393,11 @@ struct ChatRoomView: View {
                     Text(handler.isEmpty ? "担当" : "担当: \(handler)")
                         .font(.system(size: 13))
                         .lineLimit(1)
+                        .frame(maxWidth: 150)
                         .foregroundColor(handler.isEmpty ? Theme.accentDark : Color(red: 0xc2 / 255.0, green: 0x6a / 255.0, blue: 0x00 / 255.0))
                 }
+                // ラベルの文字数が変わってもMenuが幅を再計算せず一瞬崩れるため、担当名が変わったら作り直す
+                .id("handler-\(handler)")
             }
             if store.isExpert, let r = room {
                 // この相談へのリンクをコピー(BAチャットに貼るとリンクカードになる)
