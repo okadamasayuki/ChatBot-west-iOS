@@ -320,6 +320,45 @@ struct Manual: Identifiable, Equatable {
     }
 }
 
+// MARK: - BAチャット(財務同士のチャット)
+
+struct BaMessage: Identifiable, Equatable {
+    var id: String
+    var text: String
+    var ts: String
+    var senderUid: String
+    var senderName: String
+    /// 相談チャットへのリンク(貼られている場合)
+    var roomId: String?
+    var roomTitle: String?
+
+    init(id: String = newUid(), text: String, ts: String = nowIso(),
+         senderUid: String, senderName: String, roomId: String? = nil, roomTitle: String? = nil) {
+        self.id = id; self.text = text; self.ts = ts
+        self.senderUid = senderUid; self.senderName = senderName
+        self.roomId = roomId; self.roomTitle = roomTitle
+    }
+
+    init?(dict: [String: Any]) {
+        guard let id = dict["id"] as? String else { return nil }
+        self.id = id
+        text = dict["text"] as? String ?? ""
+        ts = dict["ts"] as? String ?? ""
+        senderUid = dict["senderUid"] as? String ?? ""
+        senderName = dict["senderName"] as? String ?? ""
+        roomId = dict["roomId"] as? String
+        roomTitle = dict["roomTitle"] as? String
+    }
+
+    var dict: [String: Any] {
+        var d: [String: Any] = ["id": id, "text": text, "ts": ts,
+                                "senderUid": senderUid, "senderName": senderName]
+        if let roomId { d["roomId"] = roomId }
+        if let roomTitle { d["roomTitle"] = roomTitle }
+        return d
+    }
+}
+
 // MARK: - 役割
 
 enum MemberRole: String {

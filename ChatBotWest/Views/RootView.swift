@@ -34,6 +34,10 @@ struct MainTabView: View {
                 .tag(AppTab.chat)
 
             if store.isExpert {
+                BaChatView()
+                    .tabItem { Label("BAチャット", systemImage: "person.2.fill") }
+                    .tag(AppTab.baChat)
+
                 NaikiView()
                     .tabItem { Label("社内ルール", systemImage: "doc.text.fill") }
                     .tag(AppTab.naiki)

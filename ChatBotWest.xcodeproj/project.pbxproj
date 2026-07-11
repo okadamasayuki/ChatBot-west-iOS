@@ -27,10 +27,12 @@
 		D55C7C01A20E77B40C35EB21 /* ClaudeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0EF6EEED0F76C4A4FF4A316 /* ClaudeService.swift */; };
 		DABB28C988C7A389BF7A1619 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4FABF9A333379950CC10A9F /* Theme.swift */; };
 		DF2924E6DA1D73890E077965 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 3D2DE2D81AD21F46C50F66E7 /* FirebaseAuth */; };
+		EE63C99F63A1FF0069F79EB7 /* BaChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1608D4965DE3D082964935DF /* BaChatView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		0F5EDB7F58EB8E330453F694 /* SampleData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SampleData.swift; sourceTree = "<group>"; };
+		1608D4965DE3D082964935DF /* BaChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BaChatView.swift; sourceTree = "<group>"; };
 		38CA1CCC43BAEAA7161F790E /* ExpertView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExpertView.swift; sourceTree = "<group>"; };
 		597C8E0105D2CA71FFBA2ED4 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		5CE0A7C4EE659D2CF860E02C /* ChatRoomView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatRoomView.swift; sourceTree = "<group>"; };
@@ -68,6 +70,7 @@
 		855AA374268E44F0675BC06D /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				1608D4965DE3D082964935DF /* BaChatView.swift */,
 				5CE0A7C4EE659D2CF860E02C /* ChatRoomView.swift */,
 				9D205E1B7CC1238F313389C3 /* ChatTab.swift */,
 				38CA1CCC43BAEAA7161F790E /* ExpertView.swift */,
@@ -193,6 +196,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				3190AAFB4CAE4EE133DE7524 /* App.swift in Sources */,
+				EE63C99F63A1FF0069F79EB7 /* BaChatView.swift in Sources */,
 				381212752211D3590D715AE9 /* ChatRoomView.swift in Sources */,
 				32AF223B7BBE2A19E51828B8 /* ChatTab.swift in Sources */,
 				D55C7C01A20E77B40C35EB21 /* ClaudeService.swift in Sources */,

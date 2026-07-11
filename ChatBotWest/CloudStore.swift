@@ -4,7 +4,7 @@ import FirebaseAuth
 import FirebaseFirestore
 
 enum AppTab: Hashable {
-    case chat, expert, naiki, manual, settings
+    case chat, baChat, expert, naiki, manual, settings
 }
 
 /// Firebase(Auth / Firestore)との同期と、アプリの状態を一元管理する。
@@ -35,6 +35,7 @@ final class CloudStore: ObservableObject {
         let role: String
     }
     @Published var members: [MemberInfo] = []
+    @Published var baMessages: [BaMessage] = [] // BAチャット(財務同士)
 
     /// BA(財務)メンバーの表示名一覧(対応依頼の宛先に使う)
     var expertNames: [String] {
@@ -262,6 +263,13 @@ final class CloudStore: ObservableObject {
         listeners.append(wsRef().collection("qa").order(by: "answered_at").addSnapshotListener { [weak self] snap, _ in
             Task { @MainActor in
                 self?.qaLog = snap?.documents.map { QaEntry(dict: $0.data()) } ?? []
+            }
+        })
+
+        // BAチャット(財務同士のチャット)
+        listeners.append(wsRef().collection("baChat").order(by: "ts").addSnapshotListener { [weak self] snap, _ in
+            Task { @MainActor in
+                self?.baMessages = snap?.documents.compactMap { BaMessage(dict: $0.data()) } ?? []
             }
         })
 
@@ -706,6 +714,24 @@ final class CloudStore: ObservableObject {
             messages: [.init(role: "user", content: userMsg)]
         )
         return extracted.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    // MARK: - BAチャット
+
+    /// BAチャットにメッセージを送る(roomId を渡すと相談チャットへのリンク付き)
+    func sendBaMessage(_ text: String, roomId: String? = nil, roomTitle: String? = nil) {
+        let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard isExpert, !t.isEmpty || roomId != nil else { return }
+        let msg = BaMessage(text: t, senderUid: myUid(), senderName: myName(),
+                            roomId: roomId, roomTitle: roomTitle)
+        wsRef().collection("baChat").document(msg.id).setData(msg.dict)
+    }
+
+    /// BAチャットの相談リンクから相談チャットを開く
+    func openRoomFromBaChat(_ roomId: String) {
+        guard rooms.contains(where: { $0.id == roomId }) else { return }
+        activeTab = .chat
+        openRoom(roomId)
     }
 
     // MARK: - 質問送信(トリアージ)
