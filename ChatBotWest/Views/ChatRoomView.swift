@@ -75,18 +75,26 @@ struct ChatRoomView: View {
 
     /// 自分側のメッセージの既読/未読(相手が読んだかどうか)。
     /// 相談の本人には自分の質問、財務にはBAの回答に対して表示する
-    /// 既読/未読は財務アカウントのみ表示。AIアシスタントとBAのメッセージが対象で、
-    /// 相談の本人が開いた(reads)か、後から質問者の返信があれば既読
+    /// 既読/未読。財務: AI/BAのメッセージに「相談の本人が読んだか」を表示。
+    /// 担当者(質問者): 自分の質問に「AI/BAが読んだ・返信したか」を表示
     private func readStatus(for msg: Message) -> String? {
-        guard store.isExpert, let r = room else { return nil }
-        guard msg.role == .ai || msg.role == .expert else { return nil }
-        let humanRead = r.ownerUid.isEmpty || r.ownerUid == store.myUid()
-            ? r.reads.contains { $0.key != store.myUid() && $0.value >= msg.ts }
-            : (r.reads[r.ownerUid] ?? "") >= msg.ts
-        let replied = store.roomMessages.contains { $0.role == .user && $0.ts > msg.ts }
-        // 開発モードの担当者役が入力中 = 読んでいる、として既読扱いにする
-        let devReading = store.devTypingRoomId == r.id
-        return (humanRead || replied || devReading) ? "既読" : "未読"
+        guard let r = room else { return nil }
+        if store.isExpert {
+            guard msg.role == .ai || msg.role == .expert else { return nil }
+            let humanRead = r.ownerUid.isEmpty || r.ownerUid == store.myUid()
+                ? r.reads.contains { $0.key != store.myUid() && $0.value >= msg.ts }
+                : (r.reads[r.ownerUid] ?? "") >= msg.ts
+            let replied = store.roomMessages.contains { $0.role == .user && $0.ts > msg.ts }
+            // 開発モードの担当者役が入力中 = 読んでいる、として既読扱いにする
+            let devReading = store.devTypingRoomId == r.id
+            return (humanRead || replied || devReading) ? "既読" : "未読"
+        } else if store.isMyRoom(r) {
+            guard msg.role == .user else { return nil }
+            let humanRead = r.reads.contains { $0.key != store.myUid() && $0.value >= msg.ts }
+            let replied = store.roomMessages.contains { ($0.role == .ai || $0.role == .expert) && $0.ts > msg.ts }
+            return (humanRead || replied) ? "既読" : "未読"
+        }
+        return nil
     }
 
     /// この相談の未回答案件(財務のみ、チャット内にBAの案件カードを統合表示する)
