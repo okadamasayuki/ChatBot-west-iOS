@@ -50,13 +50,6 @@ struct MainTabView: View {
                     .tag(AppTab.baChat)
             }
 
-            // ユーザ一覧はBAチャットタブの「ユーザ」切替から開く(質問者のみタブで表示)
-            if !store.isExpert {
-                MembersView()
-                    .tabItem { Label("ユーザ", systemImage: "person.3.fill") }
-                    .tag(AppTab.membersList)
-            }
-
             if store.isExpert {
                 ManualView()
                     .tabItem { Label("マニュアル", systemImage: "books.vertical.fill") }
