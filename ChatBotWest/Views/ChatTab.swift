@@ -23,12 +23,14 @@ struct ChatTab: View {
 struct RoomListView: View {
     @EnvironmentObject var store: CloudStore
     @State private var filter: RoomFilter = .mine
+    @State private var expertFilter: ExpertFilter = .all // 財務: すべて / 自分が対応中
     @AppStorage("roomSort") private var sort: String = "new" // "new"=新しい順 / "status"=ステータス順
     @State private var deleteTarget: Room?
     @State private var selectedRooms: Set<String> = [] // 財務: まとめて社内ルール更新する相談の選択
     @State private var showBatchNaiki = false
 
     enum RoomFilter { case mine, all }
+    enum ExpertFilter { case all, handling }
 
     /// 相談ごとの未回答案件の対応者(nil=案件なし / ""=対応者未決定 / 名前=対応中)。
     /// 複数の案件がある場合は「対応者未決定」を優先して表示する
@@ -45,7 +47,15 @@ struct RoomListView: View {
         // メッセージのない相談(空の下書きの残骸)は一覧に出さない
         let base = store.rooms.filter { !$0.lastText.trimmingCharacters(in: .whitespaces).isEmpty }
         let effective: RoomFilter = store.isExpert ? .all : filter
-        let list = effective == .mine ? base.filter { store.isMyRoom($0) } : base
+        var list = effective == .mine ? base.filter { store.isMyRoom($0) } : base
+        // 財務: 「自分が対応中」= 未回答案件の対応者が自分の相談だけに絞る
+        if store.isExpert, expertFilter == .handling {
+            let me = store.myName()
+            let handlingRoomIds = Set(store.cases
+                .filter { $0.status != .answered && $0.handledBy == me }
+                .map { $0.roomId })
+            list = list.filter { handlingRoomIds.contains($0.id) }
+        }
         let handlers = openCaseHandlers
         let byNew: (Room, Room) -> Bool = { $0.lastTs > $1.lastTs }
         if sort == "status" {
@@ -68,7 +78,9 @@ struct RoomListView: View {
                     .listRowInsets(EdgeInsets(top: 4, leading: 12, bottom: 4, trailing: 12))
 
                 if visibleRooms.isEmpty {
-                    Text(filter == .mine && !store.isExpert
+                    Text(store.isExpert && expertFilter == .handling
+                         ? "自分が対応中の相談はありません。"
+                         : filter == .mine && !store.isExpert
                          ? "あなたの相談はまだありません。\n右上の「＋ 新規」から質問を始めてください。"
                          : "相談はまだありません。")
                         .font(.footnote)
@@ -106,7 +118,16 @@ struct RoomListView: View {
         .navigationTitle(store.isExpert ? "相談一覧" : "相談")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            if !store.isExpert {
+            if store.isExpert {
+                ToolbarItem(placement: .topBarLeading) {
+                    Picker("フィルタ", selection: $expertFilter) {
+                        Text("すべて").tag(ExpertFilter.all)
+                        Text("自分が対応中").tag(ExpertFilter.handling)
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(width: 210)
+                }
+            } else {
                 ToolbarItem(placement: .topBarLeading) {
                     Picker("フィルタ", selection: $filter) {
                         Text("自分の相談").tag(RoomFilter.mine)
