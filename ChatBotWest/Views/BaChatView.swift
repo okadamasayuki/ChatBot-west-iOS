@@ -1002,13 +1002,13 @@ struct BaMessageBubble: View {
                 .padding(.horizontal, 12)
                 .padding(.vertical, 9)
                 .background(LineBubbleShape(isMine: isMine).fill(isMine ? Theme.myBubble : Color(.systemBackground)))
-                // 既読・時刻はバブルの下端の真横に固定(リアクションの幅に影響されない)
+                // 既読・時刻はバブルの下端の真横に固定(リアクションの幅に影響されない)。
+                // 幅0のフレームからバブルの外側へあふれさせる
                 .overlay(alignment: isMine ? .bottomLeading : .bottomTrailing) {
-                    if isMine {
-                        sideMeta.alignmentGuide(.leading) { $0[.trailing] + 4 }
-                    } else {
-                        sideMeta.alignmentGuide(.trailing) { $0[.leading] - 4 }
-                    }
+                    sideMeta
+                        .padding(isMine ? .trailing : .leading, 4)
+                        .fixedSize()
+                        .frame(width: 0, alignment: isMine ? .trailing : .leading)
                 }
                 .contextMenu {
                     if !message.deleted {

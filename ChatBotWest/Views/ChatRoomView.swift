@@ -675,13 +675,13 @@ struct MessageBubble: View {
                             LineBubbleShape(isMine: alignRight)
                                 .stroke(borderColor ?? .clear, lineWidth: 1)
                         )
-                        // 既読・時刻はバブルの下端の真横に固定(リアクションの幅に影響されない)
+                        // 既読・時刻はバブルの下端の真横に固定(リアクションの幅に影響されない)。
+                        // 幅0のフレームからバブルの外側へあふれさせる
                         .overlay(alignment: alignRight ? .bottomLeading : .bottomTrailing) {
-                            if alignRight {
-                                sideMeta.alignmentGuide(.leading) { $0[.trailing] + 4 }
-                            } else {
-                                sideMeta.alignmentGuide(.trailing) { $0[.leading] - 4 }
-                            }
+                            sideMeta
+                                .padding(alignRight ? .trailing : .leading, 4)
+                                .fixedSize()
+                                .frame(width: 0, alignment: alignRight ? .trailing : .leading)
                         }
                     if showClarify {
                         // 聞き返しの選択肢ボタン
