@@ -163,6 +163,8 @@ enum AvatarRenderer {
 struct ReactionChipsView: View {
     let reactions: [String: [String]]
     let myUid: String
+    /// uid → 表示名(長押しで誰がリアクションしたかを出すのに使う)
+    var nameFor: (String) -> String = { _ in "" }
     let onToggle: (String) -> Void
 
     var body: some View {
@@ -188,6 +190,15 @@ struct ReactionChipsView: View {
                             .shadow(color: .black.opacity(0.12), radius: 2, y: 1)
                     }
                     .buttonStyle(.plain)
+                    // 長押しでリアクションした人の名前を表示
+                    .contextMenu {
+                        Section("\(emoji) リアクションした人") {
+                            ForEach(uids, id: \.self) { uid in
+                                let name = nameFor(uid)
+                                Text(name.isEmpty ? "不明なユーザ" : name)
+                            }
+                        }
+                    }
                 }
             }
         }

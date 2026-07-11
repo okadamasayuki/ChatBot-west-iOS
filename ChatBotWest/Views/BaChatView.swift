@@ -1011,7 +1011,8 @@ struct BaMessageBubble: View {
                 // 時刻の位置が動かないよう、余白は増やさず重ねるだけにする
                 .overlay(alignment: isMine ? .bottomLeading : .bottomTrailing) {
                     if !message.reactions.isEmpty, !message.deleted {
-                        ReactionChipsView(reactions: message.reactions, myUid: store.myUid()) { emoji in
+                        ReactionChipsView(reactions: message.reactions, myUid: store.myUid(),
+                                          nameFor: { uid in store.member(uid)?.name ?? "" }) { emoji in
                             store.toggleBaReaction(message, emoji: emoji)
                         }
                         .offset(x: isMine ? -4 : 4, y: 9)

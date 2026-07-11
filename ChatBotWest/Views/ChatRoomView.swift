@@ -170,6 +170,7 @@ struct ChatRoomView: View {
                                 onAvatarTap: avatar.member.map { m in { profileMember = m } },
                                 readStatus: msg.deleted ? nil : readStatus(for: msg),
                                 myUid: store.myUid(),
+                                reactionNameFor: { uid in store.member(uid)?.name ?? "" },
                                 onReaction: { emoji in store.toggleReaction(msg, emoji: emoji) },
                                 showClarify: idx == lastIdx && msg.role == .ai && !msg.clarifyOptions.isEmpty && !viewOnly && !msg.deleted,
                                 onChoice: { choice in
@@ -624,6 +625,7 @@ struct MessageBubble: View {
     var onAvatarTap: (() -> Void)? = nil
     var readStatus: String? = nil
     var myUid: String = ""
+    var reactionNameFor: (String) -> String = { _ in "" }
     var onReaction: (String) -> Void = { _ in }
     let showClarify: Bool
     var onChoice: (String) -> Void = { _ in }
@@ -661,7 +663,8 @@ struct MessageBubble: View {
                         // 時刻の位置が動かないよう、余白は増やさず重ねるだけにする
                         .overlay(alignment: alignRight ? .bottomLeading : .bottomTrailing) {
                             if !message.reactions.isEmpty, !message.deleted {
-                                ReactionChipsView(reactions: message.reactions, myUid: myUid, onToggle: onReaction)
+                                ReactionChipsView(reactions: message.reactions, myUid: myUid,
+                                                  nameFor: reactionNameFor, onToggle: onReaction)
                                     .offset(x: alignRight ? -4 : 4, y: 9)
                             }
                         }
