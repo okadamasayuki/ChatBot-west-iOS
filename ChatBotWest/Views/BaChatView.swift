@@ -19,9 +19,9 @@ struct BaChatView: View {
                     MembersListCore()
                 }
             }
-            // 「すべて/自分が対応中」と同じく、中央の切替でトーク一覧⇄ユーザ一覧を切り替える
+            // 切替は常に左上に固定(モードによって位置が動かないように)
             .toolbar {
-                ToolbarItem(placement: .principal) {
+                ToolbarItem(placement: .topBarLeading) {
                     Picker("表示", selection: $mode) {
                         Text("トーク").tag(Mode.talks)
                         Text("ユーザ").tag(Mode.users)
