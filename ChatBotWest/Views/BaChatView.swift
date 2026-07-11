@@ -956,17 +956,17 @@ struct BaMessageBubble: View {
                     .onTapGesture { if let m { onAvatarTap?(m) } }
             }
             VStack(alignment: isMine ? .trailing : .leading, spacing: 3) {
-                if !isMine {
-                    Text(message.senderName)
-                        .font(.system(size: 11))
-                        .foregroundColor(Theme.header.opacity(0.8))
-                }
-                // 既読・時刻はメッセージの上に表示
-                HStack(spacing: 4) {
+                // 名前ラベルの横に既読・時刻を表示
+                HStack(spacing: 6) {
                     if isMine, let readStatus {
                         Text(readStatus)
                             .font(.system(size: 10))
                             .foregroundColor(Theme.header.opacity(0.6))
+                    }
+                    if !isMine {
+                        Text(message.senderName)
+                            .font(.system(size: 11))
+                            .foregroundColor(Theme.header.opacity(0.8))
                     }
                     Text(fmtTime(message.ts))
                         .font(.system(size: 10))

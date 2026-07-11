@@ -641,16 +641,21 @@ struct MessageBubble: View {
                         .onTapGesture { onAvatarTap?() }
                 }
                 VStack(alignment: alignRight ? .trailing : .leading, spacing: 3) {
-                    if let senderLabel {
-                        Text(senderLabel)
-                            .font(.system(size: 11))
-                            .foregroundColor(Theme.header.opacity(0.8))
-                    }
-                    // 既読・時刻はメッセージの上に表示
-                    HStack(spacing: 4) {
-                        if alignRight { readStatusText }
-                        timeText
-                        if !alignRight { readStatusText }
+                    // 名前ラベルの横に既読・時刻を表示(バブル際に名前が来る並び)
+                    HStack(spacing: 6) {
+                        if alignRight {
+                            readStatusText
+                            timeText
+                        }
+                        if let senderLabel {
+                            Text(senderLabel)
+                                .font(.system(size: 11))
+                                .foregroundColor(Theme.header.opacity(0.8))
+                        }
+                        if !alignRight {
+                            timeText
+                            readStatusText
+                        }
                     }
                     bubbleText
                         .background(LineBubbleShape(isMine: alignRight).fill(bubbleColor))
