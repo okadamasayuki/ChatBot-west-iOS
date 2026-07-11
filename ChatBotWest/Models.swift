@@ -466,3 +466,20 @@ enum MemberRole: String {
 
     var label: String { self == .expert ? "財務" : "担当者" }
 }
+
+// MARK: - 所属部署(一般的な会社を想定した選択肢)
+
+enum Departments {
+    static let all = [
+        "営業部",
+        "経理部",
+        "人事部",
+        "総務部",
+        "経営企画部",
+        "情報システム部",
+        "マーケティング部",
+        "製造部",
+        "購買部",
+        "法務部",
+    ]
+}

@@ -10,17 +10,19 @@ struct LineBubbleShape: Shape {
         var p = Path(roundedRect: rect, cornerRadius: r)
         var tail = Path()
         if isMine {
-            tail.move(to: CGPoint(x: rect.maxX - r, y: rect.minY))
-            tail.addQuadCurve(to: CGPoint(x: rect.maxX + 7, y: rect.minY - 1),
+            // 右上に小さく跳ねるしっぽ
+            tail.move(to: CGPoint(x: rect.maxX - 8, y: rect.minY))
+            tail.addQuadCurve(to: CGPoint(x: rect.maxX + 6, y: rect.minY - 2),
                               control: CGPoint(x: rect.maxX + 1, y: rect.minY - 2))
-            tail.addQuadCurve(to: CGPoint(x: rect.maxX, y: rect.minY + r),
-                              control: CGPoint(x: rect.maxX, y: rect.minY + 3))
+            tail.addQuadCurve(to: CGPoint(x: rect.maxX - 2, y: rect.minY + 10),
+                              control: CGPoint(x: rect.maxX + 3, y: rect.minY + 6))
         } else {
-            tail.move(to: CGPoint(x: rect.minX + r, y: rect.minY))
-            tail.addQuadCurve(to: CGPoint(x: rect.minX - 7, y: rect.minY - 1),
+            // 左上に小さく跳ねるしっぽ
+            tail.move(to: CGPoint(x: rect.minX + 8, y: rect.minY))
+            tail.addQuadCurve(to: CGPoint(x: rect.minX - 6, y: rect.minY - 2),
                               control: CGPoint(x: rect.minX - 1, y: rect.minY - 2))
-            tail.addQuadCurve(to: CGPoint(x: rect.minX, y: rect.minY + r),
-                              control: CGPoint(x: rect.minX, y: rect.minY + 3))
+            tail.addQuadCurve(to: CGPoint(x: rect.minX + 2, y: rect.minY + 10),
+                              control: CGPoint(x: rect.minX - 3, y: rect.minY + 6))
         }
         tail.closeSubpath()
         p.addPath(tail)

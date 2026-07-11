@@ -79,6 +79,11 @@ struct MemberRow: View {
                             .cornerRadius(6)
                     }
                 }
+                if !member.department.isEmpty {
+                    Text(member.department)
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                }
             }
             Spacer()
             if let onTalk {

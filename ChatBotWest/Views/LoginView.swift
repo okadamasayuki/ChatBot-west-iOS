@@ -12,6 +12,7 @@ struct LoginView: View {
     @State private var password = ""
     @State private var nicknameInput = ""
     @State private var role: MemberRole = .questioner
+    @State private var department = Departments.all[0]
     @State private var errorMessage: String?
     @State private var busy = false
 
@@ -75,6 +76,15 @@ struct LoginView: View {
                             }
                             .pickerStyle(.inline)
                             .labelsHidden()
+                        }
+
+                        Section("所属部署") {
+                            Picker("所属部署", selection: $department) {
+                                ForEach(Departments.all, id: \.self) { dept in
+                                    Text(dept).tag(dept)
+                                }
+                            }
+                            .pickerStyle(.menu)
                         }
                     }
 
@@ -145,7 +155,8 @@ struct LoginView: View {
         Task {
             do {
                 if mode == .signup {
-                    try await store.signup(email: email, password: password, role: role, nickname: nickname)
+                    try await store.signup(email: email, password: password, role: role,
+                                           nickname: nickname, department: department)
                 } else {
                     try await store.login(email: email, password: password)
                 }

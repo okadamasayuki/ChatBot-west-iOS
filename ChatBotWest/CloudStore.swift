@@ -23,6 +23,7 @@ final class CloudStore: ObservableObject {
     @Published var authReady = false
     var pendingRole: MemberRole = .questioner   // 新規登録時に使う
     var pendingNickname: String = ""
+    var pendingDepartment: String = ""
 
     // MARK: - 共有データ
     @Published var naiki: String = Prompts.defaultNaiki
@@ -37,9 +38,11 @@ final class CloudStore: ObservableObject {
         let role: String
         var icon: String = ""      // アイコン(絵文字)
         var iconData: String = ""  // アイコン画像(base64 JPEG。こちらを優先表示)
+        var department: String = "" // 所属部署
 
-        init(id: String, name: String, role: String, icon: String = "", iconData: String = "") {
+        init(id: String, name: String, role: String, icon: String = "", iconData: String = "", department: String = "") {
             self.id = id; self.name = name; self.role = role; self.icon = icon; self.iconData = iconData
+            self.department = department
         }
     }
 
@@ -159,6 +162,7 @@ final class CloudStore: ObservableObject {
                         "email": user.email ?? "",
                         "role": pendingRole.rawValue,
                         "nickname": pendingNickname,
+                        "department": pendingDepartment,
                         "createdAt": nowIso(),
                     ])
                 }
@@ -199,9 +203,10 @@ final class CloudStore: ObservableObject {
         try await Auth.auth().signIn(withEmail: email, password: password)
     }
 
-    func signup(email: String, password: String, role: MemberRole, nickname: String) async throws {
+    func signup(email: String, password: String, role: MemberRole, nickname: String, department: String) async throws {
         pendingRole = role
         pendingNickname = nickname
+        pendingDepartment = department
         try await Auth.auth().createUser(withEmail: email, password: password)
     }
 
@@ -341,7 +346,8 @@ final class CloudStore: ObservableObject {
                                       name: nickname.isEmpty ? email : nickname,
                                       role: data["role"] as? String ?? "",
                                       icon: data["icon"] as? String ?? "",
-                                      iconData: data["iconData"] as? String ?? "")
+                                      iconData: data["iconData"] as? String ?? "",
+                                      department: data["department"] as? String ?? "")
                 } ?? []
             }
         })
