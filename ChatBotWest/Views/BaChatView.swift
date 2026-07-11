@@ -1002,14 +1002,6 @@ struct BaMessageBubble: View {
                 .padding(.horizontal, 12)
                 .padding(.vertical, 9)
                 .background(LineBubbleShape(isMine: isMine).fill(isMine ? Theme.myBubble : Color(.systemBackground)))
-                // 既読・時刻はバブルの下端の真横に固定(リアクションの幅に影響されない)。
-                // 幅0のフレームからバブルの外側へあふれさせる
-                .overlay(alignment: isMine ? .bottomLeading : .bottomTrailing) {
-                    sideMeta
-                        .padding(isMine ? .trailing : .leading, 4)
-                        .fixedSize()
-                        .frame(width: 0, alignment: isMine ? .trailing : .leading)
-                }
                 .contextMenu {
                     if !message.deleted {
                         // 1列目: リアクション絵文字を1行に横並び
@@ -1062,27 +1054,21 @@ struct BaMessageBubble: View {
                             }
                         }
                     }
-                } preview: {
-                    // 長押しプレビューは元のバブルと同じ形・色で本文だけを表示
-                    let previewText = message.text.isEmpty ? "(添付ファイル)" : message.text
-                    Text(previewText)
-                        .font(.system(size: 14))
-                        .lineSpacing(4)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 9)
-                        // 長文は幅を固定して確実に折り返す(横に伸ばさない)
-                        .frame(width: previewText.count > 15 ? 300 : nil, alignment: .leading)
-                        .background(LineBubbleShape(isMine: isMine).fill(isMine ? Theme.myBubble : Color(.systemBackground)))
-                        .padding(.top, 8)      // しっぽが切れないよう余白
-                        .padding(.horizontal, 10)
-                        .padding(.bottom, 8)
-                        .background(Theme.chatBg)
                 }
                 .sheet(isPresented: $showEdit) {
                     EditMessageSheet(initialText: message.text) { newText in
                         store.updateBaMessageText(message, newText: newText)
                     }
+                }
+                // 既読・時刻はバブルの下端の真横に固定(リアクションの幅に影響されない)。
+                // contextMenuの後に重ねるので、長押しプレビューは画面のバブルそのまま。
+                // リアクションがある時は少し持ち上げて重ならないようにする
+                .overlay(alignment: isMine ? .bottomLeading : .bottomTrailing) {
+                    sideMeta
+                        .padding(isMine ? .trailing : .leading, 4)
+                        .padding(.bottom, (!message.reactions.isEmpty && !message.deleted) ? 10 : 0)
+                        .fixedSize()
+                        .frame(width: 0, alignment: isMine ? .trailing : .leading)
                 }
                 // リアクションはバブルの枠に重ねて表示(バッジの上半分がバブルに掛かる)
                 if !message.reactions.isEmpty, !message.deleted {
