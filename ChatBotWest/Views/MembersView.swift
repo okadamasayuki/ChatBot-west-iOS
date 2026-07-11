@@ -24,6 +24,7 @@ struct MemberFilter: Equatable {
 struct MemberFilterBar: View {
     @Binding var filter: MemberFilter
     let pool: [CloudStore.MemberInfo]
+    var barBackground = Color(.systemGroupedBackground)
 
     private var companyOptions: [String] {
         Array(Set(pool.flatMap(\.companies).filter { !$0.isEmpty })).sorted()
@@ -76,7 +77,7 @@ struct MemberFilterBar: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
         }
-        .background(Color(.systemGroupedBackground))
+        .background(barBackground)
     }
 
     /// 絞り込みはメニューが完全に閉じてから、アニメーションなしで反映する

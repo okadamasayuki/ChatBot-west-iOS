@@ -711,14 +711,20 @@ struct AddBaMembersSheet: View {
 
                 // 検索・絞り込みはメンバー選択の真上に置く
                 Section {
-                    HStack(spacing: 6) {
-                        Image(systemName: "magnifyingglass")
-                            .foregroundColor(.secondary)
-                        TextField("ユーザー名で検索", text: $searchText)
-                            .autocorrectionDisabled()
+                    VStack(spacing: 0) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "magnifyingglass")
+                                .foregroundColor(.secondary)
+                            TextField("ユーザー名で検索", text: $searchText)
+                                .autocorrectionDisabled()
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 11)
+                        Divider().padding(.leading, 16)
+                        MemberFilterBar(filter: $filter, pool: pool,
+                                        barBackground: Color(.secondarySystemGroupedBackground))
                     }
-                    MemberFilterBar(filter: $filter, pool: pool)
-                        .listRowInsets(EdgeInsets())
+                    .listRowInsets(EdgeInsets())
                 }
 
                 Section("メンバー選択") {
@@ -787,8 +793,6 @@ struct AddBaMembersSheet: View {
                     .disabled(selected.isEmpty)
 
                     Button("キャンセル") { dismiss() }
-                        .font(.system(size: 13))
-                        .buttonStyle(.bordered)
                 }
             }
         }
