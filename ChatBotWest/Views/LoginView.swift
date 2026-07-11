@@ -171,6 +171,8 @@ struct LoginView: View {
     private func switchMode(_ m: Mode) {
         mode = m
         errorMessage = nil
+        // ログインはデモ用の共通パスワードを初期入力、新規登録は空にする
+        password = (m == .login) ? "00000000" : ""
     }
 
     private func submit() {
