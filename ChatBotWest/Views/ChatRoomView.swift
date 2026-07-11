@@ -652,23 +652,23 @@ struct MessageBubble: View {
                             LineBubbleShape(isMine: alignRight)
                                 .stroke(borderColor ?? .clear, lineWidth: 1)
                         )
+                        // Teams風: リアクションはバブルの下角に重ねて表示
+                        .overlay(alignment: alignRight ? .bottomLeading : .bottomTrailing) {
+                            if !message.reactions.isEmpty, !message.deleted {
+                                ReactionChipsView(reactions: message.reactions, myUid: myUid, onToggle: onReaction)
+                                    .offset(x: alignRight ? -4 : 4, y: 11)
+                            }
+                        }
+                        .padding(.bottom, (!message.reactions.isEmpty && !message.deleted) ? 10 : 0)
                     if showClarify {
                         // 聞き返しの選択肢ボタン
                         FlowChoices(options: message.clarifyOptions, onChoice: onChoice)
                     }
-                    // リアクションは既読・時刻と同じ行に表示する。
-                    // 既読・時刻の位置が動かないよう、チップは時刻の外側(反対側)に置く
                     HStack(spacing: 4) {
-                        if alignRight, !message.reactions.isEmpty {
-                            ReactionChipsView(reactions: message.reactions, myUid: myUid, onToggle: onReaction)
-                        }
                         // LINEと同じく、自分側は「既読 → 時刻」の順
                         if alignRight { readStatusText }
                         timeText
                         if !alignRight { readStatusText }
-                        if !alignRight, !message.reactions.isEmpty {
-                            ReactionChipsView(reactions: message.reactions, myUid: myUid, onToggle: onReaction)
-                        }
                     }
                 }
                 if !alignRight { Spacer(minLength: 60) }
