@@ -8,6 +8,8 @@ struct ChatTab: View {
         // 相談を開くとプッシュ遷移(右からスライド・スワイプで戻る)。LINEのトークと同じ動き
         NavigationStack(path: $store.chatPath) {
             RoomListView()
+                // 戻りアニメーション中はフィルタ(ナビバー)を出さず、一覧に戻り切ってから表示する
+                .toolbar(store.chatPath.isEmpty ? .visible : .hidden, for: .navigationBar)
                 .navigationDestination(for: String.self) { _ in
                     ChatRoomView()
                 }
