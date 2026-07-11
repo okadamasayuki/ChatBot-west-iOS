@@ -1213,7 +1213,7 @@ final class CloudStore: ObservableObject {
                             title: "対応依頼: \(r.title.isEmpty ? "相談" : r.title)",
                             body: accepted
                                 ? "\(r.handlerRequestResultBy)さんが対応承諾しました。"
-                                : "\(r.handlerRequestResultBy)さんが対応依頼を辞退しました。",
+                                : "\(r.handlerRequestResultBy)さんが対応を辞退されました。",
                             action: accepted
                                 ? "\(r.handlerRequestResultBy)さんが担当します。あなたの対応は不要です"
                                 : "別のBAに依頼し直すか、担当を決めてください")
