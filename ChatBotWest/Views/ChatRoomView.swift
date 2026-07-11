@@ -359,6 +359,7 @@ struct ChatRoomView: View {
     @ViewBuilder
     private var actionBar: some View {
         HStack(spacing: 14) {
+            Spacer()
             if store.isExpert, let r = room, store.pendingRoom?.id != r.id {
                 // 相談の担当BA(一覧と同じロジック: rooms.handler、未反映の間は案件から補完)。
                 // メニューから自分が担当する/他のBAに対応を依頼/担当を外す、ができる
@@ -392,13 +393,12 @@ struct ChatRoomView: View {
                         }
                     }
                 } label: {
-                    Text(handler.isEmpty ? "担当する" : "担当: \(handler)")
+                    Text(handler.isEmpty ? "担当" : "担当: \(handler)")
                         .font(.system(size: 13))
                         .lineLimit(1)
                         .foregroundColor(handler.isEmpty ? Theme.accentDark : Color(red: 0xc2 / 255.0, green: 0x6a / 255.0, blue: 0x00 / 255.0))
                 }
             }
-            Spacer()
             if store.isExpert, let r = room {
                 // この相談へのリンクをコピー(BAチャットに貼るとリンクカードになる)
                 Button {
