@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Web版のLINE風配色
-/// LINE風の吹き出し(角丸+上端のしっぽ)。isMine=true で右上、false で左上にしっぽ
+/// 吹き出し(角丸+下角の小さなしっぽ)。isMine=true で右下、false で左下にしっぽ
 struct LineBubbleShape: Shape {
     var isMine: Bool
 
@@ -10,19 +10,15 @@ struct LineBubbleShape: Shape {
         var p = Path(roundedRect: rect, cornerRadius: r)
         var tail = Path()
         if isMine {
-            // 右上に小さく跳ねるしっぽ
-            tail.move(to: CGPoint(x: rect.maxX - 8, y: rect.minY))
-            tail.addQuadCurve(to: CGPoint(x: rect.maxX + 6, y: rect.minY - 2),
-                              control: CGPoint(x: rect.maxX + 1, y: rect.minY - 2))
-            tail.addQuadCurve(to: CGPoint(x: rect.maxX - 2, y: rect.minY + 10),
-                              control: CGPoint(x: rect.maxX + 3, y: rect.minY + 6))
+            // 右下の角から小さな三角が出る
+            tail.move(to: CGPoint(x: rect.maxX - r - 4, y: rect.maxY - 1))
+            tail.addLine(to: CGPoint(x: rect.maxX - 3, y: rect.maxY + 6))
+            tail.addLine(to: CGPoint(x: rect.maxX - 1, y: rect.maxY - r + 2))
         } else {
-            // 左上に小さく跳ねるしっぽ
-            tail.move(to: CGPoint(x: rect.minX + 8, y: rect.minY))
-            tail.addQuadCurve(to: CGPoint(x: rect.minX - 6, y: rect.minY - 2),
-                              control: CGPoint(x: rect.minX - 1, y: rect.minY - 2))
-            tail.addQuadCurve(to: CGPoint(x: rect.minX + 2, y: rect.minY + 10),
-                              control: CGPoint(x: rect.minX - 3, y: rect.minY + 6))
+            // 左下の角から小さな三角が出る
+            tail.move(to: CGPoint(x: rect.minX + r + 4, y: rect.maxY - 1))
+            tail.addLine(to: CGPoint(x: rect.minX + 3, y: rect.maxY + 6))
+            tail.addLine(to: CGPoint(x: rect.minX + 1, y: rect.maxY - r + 2))
         }
         tail.closeSubpath()
         p.addPath(tail)
