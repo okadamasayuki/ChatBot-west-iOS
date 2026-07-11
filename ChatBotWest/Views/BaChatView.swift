@@ -1065,6 +1065,7 @@ struct BaMessageBubble: View {
                 .overlay(alignment: isMine ? .bottomLeading : .bottomTrailing) {
                     sideMeta
                         .padding(isMine ? .trailing : .leading, 4)
+                        .padding(.bottom, 5) // バブルの下枠から5pt上
                         .fixedSize()
                         .frame(width: 0, alignment: isMine ? .trailing : .leading)
                 }
