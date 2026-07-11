@@ -212,12 +212,12 @@ struct OrgSettingsView: View {
                     newCompany = ""
                 }
             } header: {
-                Text("所属会社")
+                Text("会社")
             } footer: {
                 Text("左にスワイプで削除、長押しして上下に動かすと並び替えできます。並び順は新規登録の選択肢にも反映されます。削除しても登録済みユーザーの所属は変わりません。")
             }
 
-            Section("所属部署(会社ごと)") {
+            Section("部署(会社ごと)") {
                 Picker("会社", selection: $deptCompany) {
                     ForEach(store.orgCompanies, id: \.self) { c in
                         Text(c).tag(c)
@@ -256,7 +256,7 @@ struct OrgSettingsView: View {
                 }
             }
 
-            Section("所属担当(部署ごと)") {
+            Section("担当(部署ごと)") {
                 Picker("部署", selection: $sectionDept) {
                     ForEach(store.allDepartments, id: \.self) { d in
                         Text(d).tag(d)

@@ -90,7 +90,7 @@ struct LoginView: View {
                         }
 
                         Section("所属") {
-                            Picker("所属会社", selection: $company) {
+                            Picker("会社", selection: $company) {
                                 ForEach(store.orgCompanies, id: \.self) { c in
                                     Text(c).tag(c)
                                 }
@@ -101,7 +101,7 @@ struct LoginView: View {
                                 department = store.departments(for: c).first ?? ""
                                 section = (store.orgSections[department] ?? []).first ?? ""
                             }
-                            Picker("所属部署", selection: $department) {
+                            Picker("部署", selection: $department) {
                                 ForEach(store.departments(for: company), id: \.self) { dept in
                                     Text(dept).tag(dept)
                                 }
@@ -110,7 +110,7 @@ struct LoginView: View {
                             .onChange(of: department) { dept in
                                 section = (store.orgSections[dept] ?? []).first ?? ""
                             }
-                            Picker("所属担当", selection: $section) {
+                            Picker("担当", selection: $section) {
                                 ForEach(store.orgSections[department] ?? [], id: \.self) { sec in
                                     Text(sec).tag(sec)
                                 }
