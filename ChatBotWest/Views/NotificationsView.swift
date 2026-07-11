@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// 通知タブ: 担当中の相談への返答・BAトークの新着を貯めて表示する。
-/// タップで該当の相談/トークを開く
+/// 通知タブ: 担当中の相談への返答・BAトークの新着・対応依頼のやりとりを貯めて表示する。
+/// タップで該当の相談/トークを開く。左スライドで削除(BAチャット一覧と同じモーション)
 struct NotificationsView: View {
     @EnvironmentObject var store: CloudStore
 
@@ -18,45 +18,14 @@ struct NotificationsView: View {
                         .listRowSeparator(.hidden)
                 }
                 ForEach(store.notifications) { n in
-                    Button {
-                        store.openNotification(n)
-                    } label: {
-                        HStack(alignment: .top, spacing: 10) {
-                            Image(systemName: n.kind == "room" ? "bubble.left.and.bubble.right.fill" : "person.2.fill")
-                                .font(.system(size: 16))
-                                .foregroundColor(n.read ? Color(.systemGray3) : Theme.accentDark)
-                                .frame(width: 26)
-                                .padding(.top, 2)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(n.title)
-                                    .font(.system(size: 13, weight: n.read ? .regular : .semibold))
-                                    .foregroundColor(.primary)
-                                    .lineLimit(1)
-                                Text(n.body)
-                                    .font(.system(size: 12))
-                                    .foregroundColor(.secondary)
-                                    .lineLimit(2)
-                                Text("\(fmtDate(n.ts)) \(fmtTime(n.ts))")
-                                    .font(.system(size: 10))
-                                    .foregroundColor(Color(.tertiaryLabel))
-                            }
-                            Spacer()
-                            if !n.read {
-                                Circle()
-                                    .fill(Theme.accent)
-                                    .frame(width: 8, height: 8)
-                                    .padding(.top, 6)
-                            }
-                        }
-                        .padding(.vertical, 2)
+                    SwipeDeleteRow(onDelete: { store.deleteNotification(n.id) },
+                                   contentInsets: EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16)) {
+                        notificationRow(n)
+                            .contentShape(Rectangle())
+                            .onTapGesture { store.openNotification(n) }
                     }
-                    .swipeActions(edge: .trailing) {
-                        Button(role: .destructive) {
-                            store.deleteNotification(n.id)
-                        } label: {
-                            Label("削除", systemImage: "trash.fill")
-                        }
-                    }
+                    // 区切り線を全行とも左端から表示
+                    .alignmentGuide(.listRowSeparatorLeading) { _ in 0 }
                 }
             }
             .listStyle(.plain)
@@ -72,5 +41,44 @@ struct NotificationsView: View {
                 }
             }
         }
+    }
+
+    @ViewBuilder
+    private func notificationRow(_ n: CloudStore.AppNotification) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: n.kind == "room" ? "bubble.left.and.bubble.right.fill" : "person.2.fill")
+                .font(.system(size: 16))
+                .foregroundColor(n.read ? Color(.systemGray3) : Theme.accentDark)
+                .frame(width: 26)
+                .padding(.top, 2)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(n.title)
+                    .font(.system(size: 13, weight: n.read ? .regular : .semibold))
+                    .foregroundColor(.primary)
+                    .lineLimit(1)
+                Text(n.body)
+                    .font(.system(size: 12))
+                    .foregroundColor(.secondary)
+                    .lineLimit(2)
+                // どんな対応が必要か
+                if let action = n.action, !action.isEmpty {
+                    Text("▶ \(action)")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(n.read ? Color(.secondaryLabel) : Theme.accentDark)
+                        .lineLimit(2)
+                }
+                Text("\(fmtDate(n.ts)) \(fmtTime(n.ts))")
+                    .font(.system(size: 10))
+                    .foregroundColor(Color(.tertiaryLabel))
+            }
+            Spacer()
+            if !n.read {
+                Circle()
+                    .fill(Theme.accent)
+                    .frame(width: 8, height: 8)
+                    .padding(.top, 6)
+            }
+        }
+        .padding(.vertical, 2)
     }
 }

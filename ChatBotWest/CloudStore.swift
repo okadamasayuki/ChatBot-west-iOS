@@ -130,6 +130,8 @@ final class CloudStore: ObservableObject {
         var title: String
         var body: String
         var read: Bool
+        /// どんな対応が必要か(「相談を開いて返答してください」など。旧データはnil)
+        var action: String?
     }
     @Published var notifications: [AppNotification] = []
     /// トークごとの未読メッセージ数(LINE式のバッジ表示用)
@@ -410,7 +412,8 @@ final class CloudStore: ObservableObject {
             guard !r.lastText.hasPrefix("【BA】") else { continue } // 自分(BA)の回答は通知不要
             addNotification(kind: "room", targetId: r.id,
                             title: "相談: \(r.title.isEmpty ? "相談" : r.title)",
-                            body: snippet(r.lastText, 60))
+                            body: snippet(r.lastText, 60),
+                            action: "担当中の相談に新着があります。内容を確認して返答してください")
         }
         UserDefaults.standard.set(roomNotifyTs, forKey: notifyTsKey("room"))
     }
@@ -432,7 +435,8 @@ final class CloudStore: ObservableObject {
             guard currentBaTalkId != t.id else { continue } // 開いているトークは通知不要
             addNotification(kind: "baTalk", targetId: t.id,
                             title: "BAチャット: \(baTalkName(t))",
-                            body: snippet(t.lastText, 60))
+                            body: snippet(t.lastText, 60),
+                            action: "新着メッセージがあります。トークを開いて確認してください")
         }
         UserDefaults.standard.set(talkNotifyTs, forKey: notifyTsKey("baTalk"))
     }
@@ -521,9 +525,9 @@ final class CloudStore: ObservableObject {
         }
     }
 
-    private func addNotification(kind: String, targetId: String, title: String, body: String) {
+    private func addNotification(kind: String, targetId: String, title: String, body: String, action: String? = nil) {
         let n = AppNotification(id: newUid(), ts: nowIso(), kind: kind,
-                                targetId: targetId, title: title, body: body, read: false)
+                                targetId: targetId, title: title, body: body, read: false, action: action)
         notifications.insert(n, at: 0)
         if notifications.count > 100 { notifications = Array(notifications.prefix(100)) }
         saveNotifications()
@@ -1171,7 +1175,8 @@ final class CloudStore: ObservableObject {
                 notified.insert(r.id); changed = true
                 addNotification(kind: "room", targetId: r.id,
                                 title: "対応依頼: \(r.title.isEmpty ? "相談" : r.title)",
-                                body: "\(r.pendingHandlerBy)さんから対応を依頼されています。相談を開いて承諾/辞退を選んでください。")
+                                body: "\(r.pendingHandlerBy)さんから対応を依頼されています。",
+                                action: "相談を開いて「承諾する/辞退」を選んでください")
             } else if notified.contains(r.id) {
                 notified.remove(r.id); changed = true // 依頼が片付いたら再依頼でまた通知できるようにする
             }
@@ -1198,7 +1203,10 @@ final class CloudStore: ObservableObject {
             let accepted = r.handlerRequestResult == "accepted"
             addNotification(kind: "room", targetId: r.id,
                             title: "対応依頼: \(r.title.isEmpty ? "相談" : r.title)",
-                            body: "\(r.handlerRequestResultBy)さんが対応依頼を\(accepted ? "承諾しました。" : "辞退しました。別のBAに依頼するか、担当を決め直してください。")")
+                            body: "\(r.handlerRequestResultBy)さんが対応依頼を\(accepted ? "承諾しました。" : "辞退しました。")",
+                            action: accepted
+                                ? "\(r.handlerRequestResultBy)さんが担当します。あなたの対応は不要です"
+                                : "別のBAに依頼し直すか、担当を決めてください")
         }
         if changed { UserDefaults.standard.set(seen, forKey: key) }
     }
