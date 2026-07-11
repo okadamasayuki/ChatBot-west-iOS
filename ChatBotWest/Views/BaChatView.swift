@@ -474,7 +474,7 @@ struct BaTalkView: View {
                             .foregroundColor(.primary)
                             .cornerRadius(14)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(ChipPressStyle())
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -1222,5 +1222,16 @@ struct FlowLayout: Layout {
             x += size.width + spacing
             rowHeight = max(rowHeight, size.height)
         }
+    }
+}
+
+
+/// チップを押したときに少し縮んで薄くなるモーション
+struct ChipPressStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.92 : 1)
+            .opacity(configuration.isPressed ? 0.6 : 1)
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
     }
 }
