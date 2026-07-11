@@ -237,11 +237,17 @@ struct ChatRoomView: View {
                                 Label("自分が担当になる", systemImage: "person.fill.checkmark")
                             }
                         }
-                        ForEach(store.expertNames.filter { $0 != store.myName() && $0 != handler }, id: \.self) { name in
-                            Button {
-                                store.assignRoomHandler(r.id, to: name)
+                        let others = store.expertNames.filter { $0 != store.myName() && $0 != handler }
+                        if !others.isEmpty {
+                            // 「対応を依頼する」→ 対応者を選択
+                            Menu {
+                                ForEach(others, id: \.self) { name in
+                                    Button(name) {
+                                        store.assignRoomHandler(r.id, to: name)
+                                    }
+                                }
                             } label: {
-                                Label("\(name)さんに依頼する", systemImage: "arrowshape.turn.up.right")
+                                Label("対応を依頼する", systemImage: "arrowshape.turn.up.right")
                             }
                         }
                         if !handler.isEmpty {
