@@ -174,7 +174,8 @@ struct ReactionChipsView: View {
             HStack(spacing: 6) {
                 ForEach(items, id: \.key) { emoji, uids in
                     // Teams風: 白いピル型バッジ(自分が付けたものは青系ハイライト)。
-                    // タップで付け外し、長押しで誰が押したかの詳細シート
+                    // Teamsと同じく、タップで「誰が押したか」の詳細シートを開く
+                    // (長押しはメッセージのメニューと競合するため使わない。付け外しは長押しメニューから)
                     Text("\(emoji) \(uids.count)")
                         .font(.system(size: 12, weight: uids.contains(myUid) ? .semibold : .regular))
                         .padding(.horizontal, 7)
@@ -188,8 +189,7 @@ struct ReactionChipsView: View {
                         )
                         .shadow(color: .black.opacity(0.12), radius: 2, y: 1)
                         .contentShape(Capsule())
-                        .onTapGesture { onToggle(emoji) }
-                        .onLongPressGesture { showDetail = true }
+                        .onTapGesture { showDetail = true }
                 }
             }
             .sheet(isPresented: $showDetail) {
