@@ -270,6 +270,7 @@ struct BaTalkView: View {
     @State private var attachError: String?
     @State private var showAddMembers = false
     @State private var showMembers = false
+    @State private var profileMember: CloudStore.MemberInfo?
     @State private var showSearch = false
     @FocusState private var inputFocused: Bool
 
@@ -320,7 +321,8 @@ struct BaTalkView: View {
                 ScrollView {
                     LazyVStack(spacing: 10) {
                         ForEach(visibleMessages) { msg in
-                            BaMessageBubble(message: msg,
+                            BaMessageBubble(onAvatarTap: { m in profileMember = m },
+                                            message: msg,
                                             isMine: msg.senderUid == store.myUid(),
                                             readStatus: readStatus(for: msg),
                                             mentionNames: talk?.memberNames ?? [])
@@ -466,6 +468,12 @@ struct BaTalkView: View {
                 BaTalkMembersSheet(talk: t)
             }
         }
+        .overlay {
+            // アイコンタップのプロフィール(画面中央のポップアップ)
+            if let m = profileMember {
+                MemberProfilePopup(member: m) { profileMember = nil }
+            }
+        }
         .sheet(isPresented: $showSearch) {
             BaTalkSearchSheet(scopeTalkId: store.currentBaTalkId)
         }
@@ -563,8 +571,10 @@ struct BaTalkMembersSheet: View {
                     Button("閉じる") { dismiss() }
                 }
             }
-            .sheet(item: $profileMember) { m in
-                MemberProfileSheet(member: m)
+            .overlay {
+                if let m = profileMember {
+                    MemberProfilePopup(member: m) { profileMember = nil }
+                }
             }
         }
     }
@@ -734,6 +744,7 @@ struct BaTalkSearchSheet: View {
 /// BAトークのバブル(自分=右・緑、他のBA=左・白+名前)
 struct BaMessageBubble: View {
     @EnvironmentObject var store: CloudStore
+    var onAvatarTap: ((CloudStore.MemberInfo) -> Void)? = nil
     let message: BaMessage
     let isMine: Bool
     var readStatus: String? = nil
@@ -761,11 +772,12 @@ struct BaMessageBubble: View {
         HStack(alignment: .top, spacing: 8) {
             if isMine { Spacer(minLength: 60) }
             if !isMine {
-                // 相手のアイコン(設定済みアイコン → イニシャル)
+                // 相手のアイコン(タップでプロフィール)
                 let m = store.member(message.senderUid)
                 AvatarCircleView(iconData: m?.iconData ?? "",
                                  icon: m?.icon ?? "",
                                  size: 34)
+                    .onTapGesture { if let m { onAvatarTap?(m) } }
             }
             VStack(alignment: isMine ? .trailing : .leading, spacing: 3) {
                 if !isMine {

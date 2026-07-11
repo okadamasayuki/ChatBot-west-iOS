@@ -153,50 +153,58 @@ struct MembersView: View {
     }
 }
 
-/// メンバーのプロフィール(アイコンタップで表示): 名前・役割・所属会社・部署・担当
-struct MemberProfileSheet: View {
+/// メンバーのプロフィール(アイコンタップで画面中央にポップアップ表示)
+struct MemberProfilePopup: View {
     let member: CloudStore.MemberInfo
+    let onClose: () -> Void
 
     private var roleLabel: String {
         member.role == MemberRole.expert.rawValue ? "財務(BA)" : "担当者(質問者)"
     }
 
     var body: some View {
-        VStack(spacing: 8) {
-            AvatarCircleView(iconData: member.iconData,
-                             icon: member.icon,
-                             fallbackBg: member.role == MemberRole.expert.rawValue
-                                 ? Theme.accent.opacity(0.8) : Theme.chatBg,
-                             size: 64)
-            Text(member.name.isEmpty ? "(名前未設定)" : member.name)
-                .font(.system(size: 17, weight: .semibold))
-            Text(roleLabel)
-                .font(.footnote)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 2)
-                .background(Theme.tagDoneBg)
-                .foregroundColor(Theme.tagDoneFg)
-                .cornerRadius(8)
+        ZStack {
+            // 外側タップで閉じる
+            Color.black.opacity(0.35)
+                .ignoresSafeArea()
+                .onTapGesture { onClose() }
 
-            Divider().padding(.vertical, 4)
+            VStack(spacing: 8) {
+                AvatarCircleView(iconData: member.iconData,
+                                 icon: member.icon,
+                                 fallbackBg: member.role == MemberRole.expert.rawValue
+                                     ? Theme.accent.opacity(0.8) : Theme.chatBg,
+                                 size: 64)
+                Text(member.name.isEmpty ? "(名前未設定)" : member.name)
+                    .font(.system(size: 17, weight: .semibold))
+                Text(roleLabel)
+                    .font(.footnote)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 2)
+                    .background(Theme.tagDoneBg)
+                    .foregroundColor(Theme.tagDoneFg)
+                    .cornerRadius(8)
 
-            VStack(spacing: 6) {
-                if member.companies.isEmpty && member.department.isEmpty && member.section.isEmpty {
-                    Text("所属は未設定です").font(.footnote).foregroundColor(.secondary)
+                Divider().padding(.vertical, 4)
+
+                VStack(spacing: 6) {
+                    if member.companies.isEmpty && member.department.isEmpty && member.section.isEmpty {
+                        Text("所属は未設定です").font(.footnote).foregroundColor(.secondary)
+                    }
+                    ForEach(member.companies, id: \.self) { c in
+                        profileRow("会社", c)
+                    }
+                    if !member.department.isEmpty { profileRow("部署", member.department) }
+                    if !member.section.isEmpty { profileRow("担当", member.section) }
+                    if !member.position.isEmpty { profileRow("役職", member.position) }
                 }
-                ForEach(member.companies, id: \.self) { c in
-                    profileRow("会社", c)
-                }
-                if !member.department.isEmpty { profileRow("部署", member.department) }
-                if !member.section.isEmpty { profileRow("担当", member.section) }
-                if !member.position.isEmpty { profileRow("役職", member.position) }
             }
-            Spacer(minLength: 0)
+            .padding(24)
+            .frame(maxWidth: 300)
+            .background(Color(.systemBackground))
+            .cornerRadius(20)
+            .shadow(color: .black.opacity(0.25), radius: 24)
         }
-        .padding(.horizontal, 24)
-        .padding(.top, 20)
-        .presentationDetents([.height(300)])
-        .presentationDragIndicator(.visible)
     }
 
     private func profileRow(_ label: String, _ value: String) -> some View {

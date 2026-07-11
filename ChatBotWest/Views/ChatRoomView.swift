@@ -343,8 +343,11 @@ struct ChatRoomView: View {
         .sheet(isPresented: $showSummary) {
             SummarySheet { try await store.summarizeCurrentRoom() }
         }
-        .sheet(item: $profileMember) { m in
-            MemberProfileSheet(member: m)
+        .overlay {
+            // アイコンタップのプロフィール(画面中央のポップアップ)
+            if let m = profileMember {
+                MemberProfilePopup(member: m) { profileMember = nil }
+            }
         }
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
