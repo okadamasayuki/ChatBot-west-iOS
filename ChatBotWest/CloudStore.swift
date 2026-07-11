@@ -616,7 +616,11 @@ final class CloudStore: ObservableObject {
         sending = true
         pendingTyping = true
         let roomId = currentRoomId!
-        addMessage(Message(role: .user, text: text))
+        // 送信者名: 通常は自分、開発モードの担当者役は相談の本人の名前
+        let senderName = simulated
+            ? (currentRoom().map { $0.ownerName.isEmpty ? $0.ownerEmail : $0.ownerName } ?? "")
+            : myName()
+        addMessage(Message(role: .user, text: text, senderName: senderName))
 
         defer {
             pendingTyping = false
@@ -717,7 +721,7 @@ final class CloudStore: ObservableObject {
         let text = finalText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
         let handler = c.handledBy.isEmpty ? myName() : c.handledBy
-        addMessage(Message(role: .expert, text: text), roomId: c.roomId)
+        addMessage(Message(role: .expert, text: text, senderName: handler), roomId: c.roomId)
         addQa(QaEntry(
             question: c.question,
             answeredBy: "BA",
@@ -862,7 +866,9 @@ final class CloudStore: ObservableObject {
 
     /// 担当者役がお礼を送って相談を完了にする
     private func devFinishRoom(_ roomId: String, thanks: String) {
-        addMessage(Message(role: .user, text: thanks), roomId: roomId)
+        let senderName = rooms.first { $0.id == roomId }
+            .map { $0.ownerName.isEmpty ? $0.ownerEmail : $0.ownerName } ?? ""
+        addMessage(Message(role: .user, text: thanks, senderName: senderName), roomId: roomId)
         if let r = rooms.first(where: { $0.id == roomId }), !r.isDone {
             toggleRoomDone(roomId)
         }

@@ -40,9 +40,16 @@ struct ChatRoomView: View {
     }
 
     /// メッセージの表示スタイル(LINEと同じく「自分側=右・緑」の視点で描く)。
+    /// ラベルは役割名ではなくユーザー名(ニックネーム)を表示する。
     /// 財務: AI/BAが右側(BAは緑)、質問者が左側。担当者: 自分の質問が右・緑、AI/BAが左側
     private func bubbleStyle(for msg: Message) -> (label: String?, right: Bool, color: Color, border: Color?) {
-        let questionerName = ownerName.isEmpty ? "質問者" : ownerName
+        // 質問者名: メッセージの送信者名 → 相談の本人の名前 → 「質問者」
+        let roomOwnerName = room.map { $0.ownerName.isEmpty ? $0.ownerEmail : $0.ownerName } ?? ""
+        let questionerName = !msg.senderName.isEmpty ? msg.senderName
+            : (!roomOwnerName.isEmpty ? roomOwnerName : "質問者")
+        // BA名: メッセージの送信者名 → 相談の担当BA → 「BA」
+        let baName = !msg.senderName.isEmpty ? msg.senderName
+            : (room?.handler.isEmpty == false ? room!.handler : "BA")
         if store.isExpert {
             switch msg.role {
             case .user:
@@ -50,16 +57,18 @@ struct ChatRoomView: View {
             case .ai:
                 return ("🤖 AIアシスタント", true, Color(.systemBackground), nil)
             default:
-                return ("👤 BA", true, Theme.myBubble, nil)
+                return ("👤 \(baName)", true, Theme.myBubble, nil)
             }
         } else {
             switch msg.role {
             case .user:
-                return (ownerName.isEmpty ? nil : "🙋 \(ownerName)", true, Theme.myBubble, nil)
+                // 自分の相談では自分のメッセージに名前は付けない(LINEと同じ)
+                let isMine = room.map { store.isMyRoom($0) } ?? true
+                return (isMine ? nil : "🙋 \(questionerName)", true, Theme.myBubble, nil)
             case .ai:
                 return ("🤖 AIアシスタント", false, Color(.systemBackground), nil)
             default:
-                return ("👤 BA", false, Theme.expertBubble, Theme.expertBorder)
+                return ("👤 \(baName)", false, Theme.expertBubble, Theme.expertBorder)
             }
         }
     }

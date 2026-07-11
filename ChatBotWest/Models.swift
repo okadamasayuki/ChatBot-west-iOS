@@ -124,10 +124,14 @@ struct Message: Identifiable, Equatable {
     /// 削除済みフラグ(本文は deletedText に退避され「削除されました」表示になる。復元可能)
     var deleted: Bool
     var deletedText: String?
+    /// 送信者の表示名(ニックネーム)。空なら役割ラベルで代替表示
+    var senderName: String
 
-    init(id: String = newUid(), role: MessageRole, text: String, ts: String = nowIso(), clarifyOptions: [String] = []) {
+    init(id: String = newUid(), role: MessageRole, text: String, ts: String = nowIso(),
+         clarifyOptions: [String] = [], senderName: String = "") {
         self.id = id; self.role = role; self.text = text; self.ts = ts; self.clarifyOptions = clarifyOptions
         self.deleted = false; self.deletedText = nil
+        self.senderName = senderName
     }
 
     init?(dict: [String: Any]) {
@@ -140,11 +144,13 @@ struct Message: Identifiable, Equatable {
         clarifyOptions = dict["clarifyOptions"] as? [String] ?? []
         deleted = dict["deleted"] as? Bool ?? false
         deletedText = dict["deletedText"] as? String
+        senderName = dict["senderName"] as? String ?? ""
     }
 
     var dict: [String: Any] {
         var d: [String: Any] = ["id": id, "role": role.rawValue, "text": text, "ts": ts]
         if !clarifyOptions.isEmpty { d["clarifyOptions"] = clarifyOptions }
+        if !senderName.isEmpty { d["senderName"] = senderName }
         return d
     }
 }
