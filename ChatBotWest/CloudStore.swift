@@ -117,6 +117,8 @@ final class CloudStore: ObservableObject {
     @Published var activeTab: AppTab = .chat
     @Published var highlightCaseId: String?   // BAタブでハイライトする案件(チャットからのジャンプ)
     @Published var chatPath: [String] = []    // NavigationStack のパス(相談を開くとプッシュ遷移)
+    /// BAチャットのリンクから相談を開いた場合、閉じたときにBAチャットへ戻すフラグ
+    var returnToBaChatOnClose = false
     @Published var currentRoomId: String?
     @Published var roomMessages: [Message] = []
     @Published var pendingTyping = false
@@ -579,6 +581,11 @@ final class CloudStore: ObservableObject {
         stopRoomMessages()
         roomMessages = []
         if !chatPath.isEmpty { chatPath = [] }
+        // BAチャットのリンク経由で開いていた場合は、閉じたら元のトークに戻る
+        if returnToBaChatOnClose {
+            returnToBaChatOnClose = false
+            activeTab = .baChat
+        }
     }
 
     private func subscribeRoomMessages(_ id: String) {
@@ -1302,8 +1309,10 @@ final class CloudStore: ObservableObject {
     }
 
     /// トークの相談リンクから相談チャットを開く
+    /// BAチャットのリンクから相談を開く。閉じたら元のBAトークに戻る
     func openRoomFromBaChat(_ roomId: String) {
         guard rooms.contains(where: { $0.id == roomId }) else { return }
+        returnToBaChatOnClose = true
         activeTab = .chat
         openRoom(roomId)
     }

@@ -28,6 +28,8 @@ struct MainTabView: View {
         TabView(selection: Binding(
             get: { store.activeTab },
             set: { newTab in
+                // 手動でタブを切り替えたら「閉じたらBAチャットに戻る」予約は解除
+                store.returnToBaChatOnClose = false
                 if newTab == store.activeTab {
                     if newTab == .chat { store.backToRooms() }
                     if newTab == .baChat { store.backToBaTalks() }
