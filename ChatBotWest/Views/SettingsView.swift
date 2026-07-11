@@ -29,9 +29,9 @@ struct IconSettingView: View {
                 .listRowBackground(Color.clear)
             }
 
-            Section("ニックネーム") {
+            Section("氏名") {
                 HStack {
-                    TextField("ニックネーム", text: $nicknameText)
+                    TextField("氏名", text: $nicknameText)
                         .focused($nicknameFocused)
                         .submitLabel(.done)
                         .onSubmit { saveNickname() }
