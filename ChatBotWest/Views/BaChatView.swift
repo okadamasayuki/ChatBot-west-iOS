@@ -109,15 +109,15 @@ struct BaTalkListView: View {
                 if !talk.isGroup, talk.memberUids.count == 2,
                    let partnerUid = talk.memberUids.first(where: { $0 != store.myUid() }),
                    let partner = store.member(partnerUid) {
-                    AvatarCircleView(iconData: partner.iconData, icon: partner.icon, size: 38)
+                    AvatarCircleView(iconData: partner.iconData, icon: partner.icon, size: 48)
                 } else {
                     ZStack {
                         Circle().fill(Theme.chatBg)
                         Image(systemName: talk.memberUids.count <= 1 ? "note.text" : (talk.isGroup ? "person.3.fill" : "person.fill"))
-                            .font(.system(size: talk.isGroup ? 12 : 15))
+                            .font(.system(size: talk.isGroup ? 15 : 19))
                             .foregroundColor(.white)
                     }
-                    .frame(width: 38, height: 38)
+                    .frame(width: 48, height: 48)
                 }
 
                 VStack(alignment: .leading, spacing: 2) {
