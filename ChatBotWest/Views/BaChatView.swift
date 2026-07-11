@@ -488,6 +488,7 @@ struct BaTalkView: View {
         .navigationBarBackButtonHidden(true)
         .toolbar {
             // タイトル部分。どのトークもタップでルーム名を変更できる
+            // (メンバー名の羅列が長いときは省略して右上のボタンに重ならないようにする)
             ToolbarItem(placement: .principal) {
                 if let t = talk {
                     Button {
@@ -499,6 +500,9 @@ struct BaTalkView: View {
                                 .font(.headline)
                                 .foregroundColor(.primary)
                                 .lineLimit(1)
+                                .truncationMode(.tail)
+                                .frame(maxWidth: 160)
+                                .fixedSize(horizontal: false, vertical: true)
                             Image(systemName: "pencil")
                                 .font(.system(size: 11))
                                 .foregroundColor(.secondary)
