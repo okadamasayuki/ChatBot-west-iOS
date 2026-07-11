@@ -165,6 +165,38 @@ struct BaTalkListView: View {
     }
 }
 
+/// 選択中のメンバーを上部の枠にチップで表示(タップで解除)
+struct SelectedMembersRow: View {
+    let members: [CloudStore.MemberInfo]
+    let onRemove: (String) -> Void
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(members) { m in
+                    Button {
+                        onRemove(m.id)
+                    } label: {
+                        HStack(spacing: 4) {
+                            AvatarCircleView(iconData: m.iconData, icon: m.icon, size: 20)
+                            Text(m.name).font(.system(size: 12))
+                                .foregroundColor(.primary)
+                            Image(systemName: "xmark")
+                                .font(.system(size: 9))
+                                .foregroundColor(.secondary)
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Theme.accent.opacity(0.15))
+                        .cornerRadius(12)
+                    }
+                    .buttonStyle(.borderless)
+                }
+            }
+        }
+    }
+}
+
 // MARK: - 新規トーク(財務アカウント一覧から相手を選ぶ)
 
 struct NewBaTalkSheet: View {
@@ -201,6 +233,14 @@ struct NewBaTalkSheet: View {
             // 会社・部署・担当・役職で絞り込み、まとめて選択できる
             MemberFilterBar(filter: $filter, pool: pool)
             Form {
+                if !selected.isEmpty {
+                    Section("選択中 — \(selected.count)人") {
+                        SelectedMembersRow(members: pool.filter { selected.contains($0.id) }) { uid in
+                            selected.remove(uid)
+                        }
+                    }
+                }
+
                 Section("財務アカウント一覧 — トークする相手を選択") {
                     if candidates.isEmpty {
                         Text("該当する財務アカウントがありません。")
@@ -657,6 +697,14 @@ struct AddBaMembersSheet: View {
             // 会社・部署・担当・役職で絞り込み、まとめて選択できる
             MemberFilterBar(filter: $filter, pool: pool)
             Form {
+                if !selected.isEmpty {
+                    Section("選択中 — \(selected.count)人") {
+                        SelectedMembersRow(members: pool.filter { selected.contains($0.id) }) { uid in
+                            selected.remove(uid)
+                        }
+                    }
+                }
+
                 // ユーザー数が多くてもスクロールせずに済むよう、操作は一覧の上に置く
                 Section {
                     Toggle("過去の履歴も見せる", isOn: $showHistory)
