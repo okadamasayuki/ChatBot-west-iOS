@@ -164,6 +164,7 @@ struct MembersView: View {
                                 } label: {
                                     HStack(spacing: 8) {
                                         Image(systemName: selected.contains(member.id) ? "checkmark.circle.fill" : "circle")
+                                            .font(.system(size: 22))
                                             .foregroundColor(member.id == store.myUid() ? Color(.quaternaryLabel)
                                                              : (selected.contains(member.id) ? Theme.accent : .secondary))
                                         MemberRow(member: member, isMe: member.id == store.myUid())
