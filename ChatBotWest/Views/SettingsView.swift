@@ -313,7 +313,6 @@ struct SettingsView: View {
     @State private var deleteAllBusy = false
     @State private var errorNote: String?
     @State private var manualBusy: String?
-    @State private var manualNote: String?
     @State private var baTalkBusy = false
 
     private static let sampleManuals: [(slug: String, title: String)] = [
@@ -371,25 +370,23 @@ struct SettingsView: View {
                         }
                         .disabled(baTalkBusy)
                     }
-                    if let sampleNote {
-                        Text(sampleNote).font(.footnote).foregroundColor(.secondary)
-                    }
-                }
-
-                Section("📄 サンプルマニュアル") {
-                    ForEach(Self.sampleManuals, id: \.slug) { item in
-                        Button {
-                            addSampleManual(item.slug, item.title)
-                        } label: {
-                            HStack {
-                                if manualBusy == item.slug { ProgressView().padding(.trailing, 6) }
-                                Text("📄 \(item.title) を追加")
+                    // サンプルマニュアルはタップ→一覧から選んで追加
+                    Menu {
+                        ForEach(Self.sampleManuals, id: \.slug) { item in
+                            Button("📄 \(item.title)") {
+                                addSampleManual(item.slug, item.title)
                             }
                         }
-                        .disabled(manualBusy != nil)
+                    } label: {
+                        HStack {
+                            if manualBusy != nil { ProgressView().padding(.trailing, 6) }
+                            Text("サンプルマニュアルを追加(デモ)")
+                                .foregroundColor(Theme.accentDark)
+                        }
                     }
-                    if let manualNote {
-                        Text(manualNote).font(.footnote).foregroundColor(.secondary)
+                    .disabled(manualBusy != nil)
+                    if let sampleNote {
+                        Text(sampleNote).font(.footnote).foregroundColor(.secondary)
                     }
                 }
 
@@ -568,24 +565,14 @@ struct SettingsView: View {
 
     private func addSampleManual(_ slug: String, _ title: String) {
         manualBusy = slug
-        manualNote = nil
         Task {
             do {
                 try await SampleData.addSampleManual(slug: slug, title: title, store: store)
-                showManualNote("✓「\(title)」を追加しました。")
+                showSampleNote("✓「\(title)」を追加しました。")
             } catch {
-                showManualNote("追加に失敗しました: \(error.localizedDescription)")
+                showSampleNote("追加に失敗しました: \(error.localizedDescription)")
             }
             manualBusy = nil
-        }
-    }
-
-    /// マニュアル追加の実行結果を一度だけ表示し、数秒で自動的に消す
-    private func showManualNote(_ text: String) {
-        manualNote = text
-        Task {
-            try? await Task.sleep(nanoseconds: 4_000_000_000)
-            withAnimation { if manualNote == text { manualNote = nil } }
         }
     }
 
