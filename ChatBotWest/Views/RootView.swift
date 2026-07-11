@@ -47,6 +47,7 @@ struct MainTabView: View {
             if store.isExpert {
                 BaChatView()
                     .tabItem { Label("BAチャット", systemImage: "person.2.fill") }
+                    .badge(store.totalTalkUnread) // 全トークの未読合計
                     .tag(AppTab.baChat)
 
                 NotificationsView()

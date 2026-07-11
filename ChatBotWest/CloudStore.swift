@@ -134,7 +134,9 @@ final class CloudStore: ObservableObject {
     @Published var notifications: [AppNotification] = []
     /// トークごとの未読メッセージ数(LINE式のバッジ表示用)
     @Published var talkUnread: [String: Int] = [:]
-    /// 新着検知用: 前回見た lastTs(初回スナップショットでは通知しない)
+    /// 未読数の集計世代。古い getDocuments の結果が新しい集計を上書きしないようにする
+    private var talkUnreadGeneration = 0
+    /// 新着検知用: 前回見た lastTs(端末に保存し、アプリを閉じている間の新着も次回起動時に通知する)
     private var roomNotifyTs: [String: String] = [:]
     private var talkNotifyTs: [String: String] = [:]
     private var roomNotifyPrimed = false
@@ -142,6 +144,13 @@ final class CloudStore: ObservableObject {
 
     var unreadNotificationCount: Int {
         notifications.filter { !$0.read }.count
+    }
+
+    /// BAチャット全トークの未読合計(タブバッジ用)
+    var totalTalkUnread: Int {
+        let uid = myUid()
+        return baTalks.filter { $0.memberUids.contains(uid) }
+            .reduce(0) { $0 + (talkUnread[$1.id] ?? 0) }
     }
     @Published var currentRoomId: String?
     @Published var roomMessages: [Message] = []
@@ -254,6 +263,11 @@ final class CloudStore: ObservableObject {
             talkNotifyPrimed = false
             roomNotifyTs = [:]
             talkNotifyTs = [:]
+            // 役割の取得を待つ間にスナップショットが先に届いていると、
+            // isExpert 未確定のまま未読・通知の計算を素通りしているのでここでやり直す
+            detectRoomNotifications()
+            detectTalkNotifications()
+            refreshTalkUnreadCounts()
             // メンバー情報(役割・ニックネーム・回答の癖)を常時同期する。
             // Web版で「回答の癖」を編集した場合も、アプリを再起動せずに反映される。
             listeners.append(mref.addSnapshotListener { [weak self] snap, _ in
@@ -352,18 +366,34 @@ final class CloudStore: ObservableObject {
 
     // MARK: - 通知タブ(アプリ内通知)
 
+    /// 新着検知の基準(前回見た lastTs)は端末に保存し、アプリを閉じている間の新着も次回起動時に通知する
+    private func notifyTsKey(_ kind: String) -> String { "notifyTs-\(kind)-\(myUid())" }
+
+    /// 保存済みの基準を読み込んで検知を始める。基準が無い初回だけ、いま見えているものを基準にする(過去分は通知しない)
+    /// - Returns: false = まだデータが無く準備できていない
+    private func primeNotifyTs(_ dict: inout [String: String], kind: String, currentTs: [String: String]) -> Bool {
+        guard !currentTs.isEmpty else { return false }
+        dict = UserDefaults.standard.dictionary(forKey: notifyTsKey(kind)) as? [String: String] ?? [:]
+        if dict.isEmpty {
+            dict = currentTs
+            UserDefaults.standard.set(dict, forKey: notifyTsKey(kind))
+        }
+        return true
+    }
+
     /// 自分が担当中の相談に新しいメッセージ(質問者の返答など)が来たら通知に積む
     private func detectRoomNotifications() {
         guard isExpert else { return }
         if !roomNotifyPrimed {
-            for r in rooms { roomNotifyTs[r.id] = r.lastTs }
-            roomNotifyPrimed = !rooms.isEmpty
-            return
+            let current = Dictionary(uniqueKeysWithValues: rooms.map { ($0.id, $0.lastTs) })
+            roomNotifyPrimed = primeNotifyTs(&roomNotifyTs, kind: "room", currentTs: current)
+            guard roomNotifyPrimed else { return }
         }
         for r in rooms {
-            let prev = roomNotifyTs[r.id]
+            let prev = roomNotifyTs[r.id] ?? "" // 基準が無い相談(前回起動後に作られた)は新着扱い
             roomNotifyTs[r.id] = r.lastTs
-            guard let prev, r.lastTs > prev else { continue }
+            guard r.lastTs > prev else { continue }
+            guard r.lastTs > (r.reads[myUid()] ?? "") else { continue } // 既読済み(Web版で読んだ等)は通知不要
             guard !r.handler.isEmpty, r.handler == myName() else { continue }
             guard currentRoomId != r.id else { continue }          // 開いている相談は通知不要
             guard !r.lastText.hasPrefix("【BA】") else { continue } // 自分(BA)の回答は通知不要
@@ -371,33 +401,44 @@ final class CloudStore: ObservableObject {
                             title: "相談: \(r.title.isEmpty ? "相談" : r.title)",
                             body: snippet(r.lastText, 60))
         }
+        UserDefaults.standard.set(roomNotifyTs, forKey: notifyTsKey("room"))
     }
 
     /// BAトークに新着メッセージが来たら通知に積む
     private func detectTalkNotifications() {
         guard isExpert else { return }
         if !talkNotifyPrimed {
-            for t in baTalks { talkNotifyTs[t.id] = t.lastTs }
-            talkNotifyPrimed = !baTalks.isEmpty
-            return
+            let current = Dictionary(uniqueKeysWithValues: baTalks.map { ($0.id, $0.lastTs) })
+            talkNotifyPrimed = primeNotifyTs(&talkNotifyTs, kind: "baTalk", currentTs: current)
+            guard talkNotifyPrimed else { return }
         }
         for t in baTalks {
-            let prev = talkNotifyTs[t.id]
+            let prev = talkNotifyTs[t.id] ?? "" // 基準が無いトーク(前回起動後に作られた)は新着扱い
             talkNotifyTs[t.id] = t.lastTs
-            guard let prev, t.lastTs > prev else { continue }
+            guard t.lastTs > prev else { continue }
+            guard t.lastTs > (t.reads[myUid()] ?? "") else { continue } // 既読済み(自分が最後に送った場合も)は通知不要
             guard t.memberUids.contains(myUid()), t.memberUids.count > 1 else { continue } // メモは対象外
             guard currentBaTalkId != t.id else { continue } // 開いているトークは通知不要
             addNotification(kind: "baTalk", targetId: t.id,
                             title: "BAチャット: \(baTalkName(t))",
                             body: snippet(t.lastText, 60))
         }
+        UserDefaults.standard.set(talkNotifyTs, forKey: notifyTsKey("baTalk"))
     }
 
     /// トークごとの未読数を数える(自分の既読時刻より後の、自分・システム以外のメッセージ)
     private func refreshTalkUnreadCounts() {
         guard isExpert else { return }
+        talkUnreadGeneration += 1
+        let gen = talkUnreadGeneration
         for t in baTalks where t.memberUids.contains(myUid()) {
-            let myRead = t.reads[myUid()] ?? ""
+            // 開いているトークはその場で読んでいるので常に0
+            if t.id == currentBaTalkId {
+                if talkUnread[t.id] != 0 { talkUnread[t.id] = 0 }
+                continue
+            }
+            // 後から追加されたメンバーは、見える範囲(historyFrom以降)だけを数える
+            let myRead = max(t.reads[myUid()] ?? "", t.historyFrom[myUid()] ?? "")
             // 最終メッセージまで既読なら0(メモも対象外)
             if t.lastTs.isEmpty || t.lastTs <= myRead || t.memberUids.count <= 1 {
                 if talkUnread[t.id] != 0 { talkUnread[t.id] = 0 }
@@ -407,10 +448,11 @@ final class CloudStore: ObservableObject {
             let query: Query = myRead.isEmpty ? ref : ref.whereField("ts", isGreaterThan: myRead)
             query.getDocuments { [weak self] snap, _ in
                 Task { @MainActor in
-                    guard let self else { return }
+                    guard let self, gen == self.talkUnreadGeneration else { return }
                     let count = snap?.documents.filter { d in
                         let sender = d.data()["senderUid"] as? String ?? ""
-                        return sender != self.myUid() && sender != "system"
+                        let deleted = d.data()["deleted"] as? Bool ?? false
+                        return !deleted && sender != self.myUid() && sender != "system"
                     }.count ?? 0
                     if self.talkUnread[t.id] != count { self.talkUnread[t.id] = count }
                 }
@@ -1227,6 +1269,7 @@ final class CloudStore: ObservableObject {
 
     func openBaTalk(_ id: String) {
         currentBaTalkId = id
+        if talkUnread[id] != 0 { talkUnread[id] = 0 } // 既読の書き込みを待たずにバッジを消す
         subscribeBaTalkMessages(id)
         if baTalkPath != [id] { baTalkPath = [id] }
     }
