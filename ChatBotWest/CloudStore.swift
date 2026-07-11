@@ -132,6 +132,8 @@ final class CloudStore: ObservableObject {
         var read: Bool
     }
     @Published var notifications: [AppNotification] = []
+    /// トークごとの未読メッセージ数(LINE式のバッジ表示用)
+    @Published var talkUnread: [String: Int] = [:]
     /// 新着検知用: 前回見た lastTs(初回スナップショットでは通知しない)
     private var roomNotifyTs: [String: String] = [:]
     private var talkNotifyTs: [String: String] = [:]
@@ -391,6 +393,31 @@ final class CloudStore: ObservableObject {
         }
     }
 
+    /// トークごとの未読数を数える(自分の既読時刻より後の、自分・システム以外のメッセージ)
+    private func refreshTalkUnreadCounts() {
+        guard isExpert else { return }
+        for t in baTalks where t.memberUids.contains(myUid()) {
+            let myRead = t.reads[myUid()] ?? ""
+            // 最終メッセージまで既読なら0(メモも対象外)
+            if t.lastTs.isEmpty || t.lastTs <= myRead || t.memberUids.count <= 1 {
+                if talkUnread[t.id] != 0 { talkUnread[t.id] = 0 }
+                continue
+            }
+            let ref = wsRef().collection("baTalks").document(t.id).collection("messages")
+            let query: Query = myRead.isEmpty ? ref : ref.whereField("ts", isGreaterThan: myRead)
+            query.getDocuments { [weak self] snap, _ in
+                Task { @MainActor in
+                    guard let self else { return }
+                    let count = snap?.documents.filter { d in
+                        let sender = d.data()["senderUid"] as? String ?? ""
+                        return sender != self.myUid() && sender != "system"
+                    }.count ?? 0
+                    if self.talkUnread[t.id] != count { self.talkUnread[t.id] = count }
+                }
+            }
+        }
+    }
+
     private func addNotification(kind: String, targetId: String, title: String, body: String) {
         let n = AppNotification(id: newUid(), ts: nowIso(), kind: kind,
                                 targetId: targetId, title: title, body: body, read: false)
@@ -636,6 +663,7 @@ final class CloudStore: ObservableObject {
             Task { @MainActor in
                 self?.baTalks = snap?.documents.compactMap { BaTalk(dict: $0.data()) } ?? []
                 self?.detectTalkNotifications()
+                self?.refreshTalkUnreadCounts()
             }
         })
 

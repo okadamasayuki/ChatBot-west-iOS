@@ -172,10 +172,21 @@ struct BaTalkListView: View {
                         .lineLimit(1)
                 }
                 Spacer()
-                if !talk.lastTs.isEmpty {
-                    Text(fmtDate(talk.lastTs))
-                        .font(.system(size: 10))
-                        .foregroundColor(Color(.tertiaryLabel))
+                VStack(alignment: .trailing, spacing: 4) {
+                    if !talk.lastTs.isEmpty {
+                        Text(fmtDate(talk.lastTs))
+                            .font(.system(size: 10))
+                            .foregroundColor(Color(.tertiaryLabel))
+                    }
+                    // LINEと同じ、未読数の緑バッジ
+                    if let unread = store.talkUnread[talk.id], unread > 0 {
+                        Text("\(unread)")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 5)
+                            .frame(minWidth: 18, minHeight: 18)
+                            .background(Capsule().fill(Theme.accent))
+                    }
                 }
             }
             .padding(.vertical, 2)
