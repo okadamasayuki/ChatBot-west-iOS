@@ -956,16 +956,10 @@ struct BaMessageBubble: View {
                     .onTapGesture { if let m { onAvatarTap?(m) } }
             }
             VStack(alignment: isMine ? .trailing : .leading, spacing: 3) {
-                // 名前ラベルの横に時刻を表示
-                HStack(spacing: 6) {
-                    if !isMine {
-                        Text(message.senderName)
-                            .font(.system(size: 11))
-                            .foregroundColor(Theme.header.opacity(0.8))
-                    }
-                    Text(fmtTime(message.ts))
-                        .font(.system(size: 10))
-                        .foregroundColor(Theme.header.opacity(0.6))
+                if !isMine {
+                    Text(message.senderName)
+                        .font(.system(size: 11))
+                        .foregroundColor(Theme.header.opacity(0.8))
                 }
                 VStack(alignment: .leading, spacing: 6) {
                     if !message.text.isEmpty {
@@ -1076,9 +1070,14 @@ struct BaMessageBubble: View {
                         store.updateBaMessageText(message, newText: newText)
                     }
                 }
-                // 未読・既読はメッセージの下に表示
-                if isMine, let readStatus {
-                    Text(readStatus)
+                // 時刻・未読既読はメッセージの下に表示
+                HStack(spacing: 4) {
+                    if isMine, let readStatus {
+                        Text(readStatus)
+                            .font(.system(size: 10))
+                            .foregroundColor(Theme.header.opacity(0.6))
+                    }
+                    Text(fmtTime(message.ts))
                         .font(.system(size: 10))
                         .foregroundColor(Theme.header.opacity(0.6))
                 }
