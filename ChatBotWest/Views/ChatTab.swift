@@ -48,13 +48,26 @@ struct RoomListView: View {
         let base = store.rooms.filter { !$0.lastText.trimmingCharacters(in: .whitespaces).isEmpty }
         let effective: RoomFilter = store.isExpert ? .all : filter
         var list = effective == .mine ? base.filter { store.isMyRoom($0) } : base
-        // 財務: 「自分が対応中」= 未回答案件の対応者が自分の相談だけに絞る
+        // 財務: 「自分が対応中」=
+        //  ① 未回答案件の対応者が自分の相談
+        //  ② 最新のBA回答が自分で、いま担当者回答待ち(未回答案件なし・未完了)の相談
         if store.isExpert, expertFilter == .handling {
             let me = store.myName()
             let handlingRoomIds = Set(store.cases
                 .filter { $0.status != .answered && $0.handledBy == me }
                 .map { $0.roomId })
-            list = list.filter { handlingRoomIds.contains($0.id) }
+            // 相談ごとの最新の回答済み案件の対応者が自分か
+            var latest: [String: (ts: String, mine: Bool)] = [:]
+            for c in store.cases where c.status == .answered {
+                let ts = c.answeredAt ?? c.askedAt
+                if let cur = latest[c.roomId], cur.ts > ts { continue }
+                latest[c.roomId] = (ts, c.handledBy == me)
+            }
+            let openRoomIds = Set(store.cases.filter { $0.status != .answered }.map { $0.roomId })
+            list = list.filter { room in
+                if handlingRoomIds.contains(room.id) { return true }
+                return !room.isDone && !openRoomIds.contains(room.id) && (latest[room.id]?.mine ?? false)
+            }
         }
         let handlers = openCaseHandlers
         let byNew: (Room, Room) -> Bool = { $0.lastTs > $1.lastTs }
