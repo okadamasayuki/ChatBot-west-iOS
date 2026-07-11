@@ -78,8 +78,8 @@ struct LoginView: View {
                     if mode == .signup {
                         Section("役割") {
                             Picker("役割", selection: $role) {
-                                Text("担当者(質問のみ)").tag(MemberRole.questioner)
-                                Text("財務(BA)").tag(MemberRole.expert)
+                                Text("質問").tag(MemberRole.questioner)
+                                Text("回答").tag(MemberRole.expert)
                             }
                             .pickerStyle(.inline)
                             .labelsHidden()
