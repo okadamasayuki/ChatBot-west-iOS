@@ -823,6 +823,8 @@ final class CloudStore: ObservableObject {
             }
             let text = result.message.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !text.isEmpty, self.currentRoomId == roomId else { retryLater(); return }
+            // 返信を投稿する前に「入力中…」を消す(AIの入力中表示と重ならないように)
+            self.devTypingRoomId = nil
             if result.satisfied && isFollowup {
                 // 納得した → お礼を送って完了にする
                 self.devFinishRoom(roomId, thanks: text)
