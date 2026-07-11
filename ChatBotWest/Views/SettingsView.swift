@@ -320,25 +320,48 @@ struct OrgSettingsView: View {
 
 /// 左にスライドすると赤い四角形の削除ボタンが指に追従して滑らかに出てくる行
 /// (OS標準のスワイプ削除はボタンが丸く表示されるため自作)
+/// leadingIcon を指定すると、右スライドで左側のアクション(ピン留めなど)も出せる
 struct SwipeDeleteRow<Content: View>: View {
     let onDelete: () -> Void
+    var deleteIcon = "trash.fill"
+    var leadingIcon: String? = nil
+    var leadingColor = Color(red: 0x33 / 255.0, green: 0xa1 / 255.0, blue: 0xde / 255.0)
+    var onLeading: (() -> Void)? = nil
+    var contentInsets = EdgeInsets(top: 11, leading: 20, bottom: 11, trailing: 0)
     @ViewBuilder var content: () -> Content
-    @State private var width: CGFloat = 0   // 削除ボタンの見えている幅(ドラッグに追従)
+    @State private var width: CGFloat = 0       // 削除ボタンの見えている幅(ドラッグに追従)
+    @State private var leadWidth: CGFloat = 0   // 左側アクションの見えている幅
     @State private var opened = false
+    @State private var leadOpened = false
 
     private let full: CGFloat = 72
 
     var body: some View {
         HStack(spacing: 0) {
+            if let leadingIcon, let onLeading {
+                Button {
+                    closeAll()
+                    onLeading()
+                } label: {
+                    Rectangle()
+                        .fill(leadingColor)
+                        .frame(width: leadWidth)
+                        .frame(maxHeight: .infinity)
+                        .overlay(
+                            Image(systemName: leadingIcon)
+                                .font(.system(size: 13))
+                                .foregroundColor(.white)
+                                .opacity(leadWidth > 30 ? 1 : 0)
+                        )
+                        .clipped()
+                }
+                .buttonStyle(.borderless)
+            }
             content()
-                .padding(.leading, 20)
-                .padding(.vertical, 11)
+                .padding(contentInsets)
                 .frame(maxWidth: .infinity, alignment: .leading)
             Button {
-                withAnimation(.spring(response: 0.25, dampingFraction: 0.9)) {
-                    width = 0
-                    opened = false
-                }
+                closeAll()
                 onDelete()
             } label: {
                 Rectangle()
@@ -346,7 +369,7 @@ struct SwipeDeleteRow<Content: View>: View {
                     .frame(width: width)
                     .frame(maxHeight: .infinity)
                     .overlay(
-                        Image(systemName: "trash.fill")
+                        Image(systemName: deleteIcon)
                             .font(.system(size: 13))
                             .foregroundColor(.white)
                             .opacity(width > 30 ? 1 : 0)
@@ -361,17 +384,31 @@ struct SwipeDeleteRow<Content: View>: View {
             DragGesture(minimumDistance: 10)
                 .onChanged { v in
                     guard abs(v.translation.width) > abs(v.translation.height) else { return }
-                    let base: CGFloat = opened ? full : 0
-                    width = max(0, min(full + 12, base - v.translation.width))
+                    if leadOpened || (v.translation.width > 0 && !opened) {
+                        guard leadingIcon != nil, onLeading != nil else { return }
+                        let base: CGFloat = leadOpened ? full : 0
+                        leadWidth = max(0, min(full + 12, base + v.translation.width))
+                    } else {
+                        let base: CGFloat = opened ? full : 0
+                        width = max(0, min(full + 12, base - v.translation.width))
+                    }
                 }
                 .onEnded { _ in
-                    let shouldOpen = width > full * 0.5
                     withAnimation(.spring(response: 0.25, dampingFraction: 0.9)) {
-                        width = shouldOpen ? full : 0
-                        opened = shouldOpen
+                        opened = width > full * 0.5
+                        width = opened ? full : 0
+                        leadOpened = leadWidth > full * 0.5
+                        leadWidth = leadOpened ? full : 0
                     }
                 }
         )
+    }
+
+    private func closeAll() {
+        withAnimation(.spring(response: 0.25, dampingFraction: 0.9)) {
+            width = 0; opened = false
+            leadWidth = 0; leadOpened = false
+        }
     }
 }
 

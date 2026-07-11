@@ -95,9 +95,13 @@ struct BaTalkListView: View {
         }
     }
 
-    /// トーク一覧の1行(タップで開く。LINE風のスワイプ操作付き)
+    /// トーク一覧の1行(タップで開く。左スライド=削除 / 右スライド=ピン留め)
     @ViewBuilder
     private func talkRow(_ talk: BaTalk) -> some View {
+        SwipeDeleteRow(onDelete: { deleteTarget = talk },
+                       leadingIcon: talk.pinnedBy.contains(store.myUid()) ? "pin.slash.fill" : "pin.fill",
+                       onLeading: { store.toggleBaTalkPin(talk.id) },
+                       contentInsets: EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 10)) {
         Button {
             store.openBaTalk(talk.id)
         } label: {
@@ -143,25 +147,10 @@ struct BaTalkListView: View {
             }
             .padding(.vertical, 2)
         }
+        .buttonStyle(.plain)
+        }
         // 区切り線を全行とも左端から表示(行によって途切れて見えないように)
         .alignmentGuide(.listRowSeparatorLeading) { _ in 0 }
-        // LINE風: 左スワイプ=削除(赤・ゴミ箱) / 右スワイプ=ピン留め(青・フルスワイプ可)
-        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-            Button(role: .destructive) {
-                deleteTarget = talk
-            } label: {
-                Label("削除", systemImage: "trash.fill")
-            }
-        }
-        .swipeActions(edge: .leading, allowsFullSwipe: true) {
-            Button {
-                store.toggleBaTalkPin(talk.id)
-            } label: {
-                Label(talk.pinnedBy.contains(store.myUid()) ? "ピン解除" : "ピン留め",
-                      systemImage: talk.pinnedBy.contains(store.myUid()) ? "pin.slash.fill" : "pin.fill")
-            }
-            .tint(Color(red: 0x33 / 255.0, green: 0xa1 / 255.0, blue: 0xde / 255.0)) // LINE風の青
-        }
     }
 }
 
