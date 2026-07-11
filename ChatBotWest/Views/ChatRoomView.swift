@@ -235,6 +235,7 @@ struct SummarySheet: View {
     @State private var summary = ""
     @State private var busy = true
     @State private var errorMessage: String?
+    @State private var copied = false
 
     var body: some View {
         NavigationStack {
@@ -267,9 +268,20 @@ struct SummarySheet: View {
                     if !busy, errorMessage == nil {
                         Button {
                             UIPasteboard.general.string = summary
+                            withAnimation { copied = true }
+                            Task {
+                                try? await Task.sleep(nanoseconds: 1_500_000_000)
+                                withAnimation { copied = false }
+                            }
                         } label: {
-                            Label("コピー", systemImage: "doc.on.doc")
+                            if copied {
+                                Label("コピーしました", systemImage: "checkmark")
+                                    .foregroundColor(Theme.accentDark)
+                            } else {
+                                Label("コピー", systemImage: "doc.on.doc")
+                            }
                         }
+                        .disabled(copied)
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
