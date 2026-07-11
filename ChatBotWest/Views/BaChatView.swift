@@ -504,7 +504,7 @@ struct BaTalkView: View {
                                 .frame(maxWidth: 160)
                                 .fixedSize(horizontal: false, vertical: true)
                             Image(systemName: "pencil")
-                                .font(.system(size: 11))
+                                .font(.system(size: 15))
                                 .foregroundColor(.secondary)
                         }
                     }
