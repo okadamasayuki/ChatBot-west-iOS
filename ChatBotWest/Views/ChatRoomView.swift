@@ -648,11 +648,13 @@ struct MessageBubble: View {
             HStack(alignment: .bottom, spacing: 6) {
                 if alignRight { Spacer(minLength: 60) }
                 if alignRight {
-                    // LINEと同じく、自分側はバブルの左横に既読・時刻(下揃え・2段)
+                    // LINEと同じく、自分側はバブルの左横に既読・時刻(下揃え・2段)。
+                    // リアクションがある場合は行の高さぶん持ち上げて重ならないようにする
                     VStack(alignment: .trailing, spacing: 1) {
                         readStatusText
                         timeText
                     }
+                    .padding(.bottom, (!message.reactions.isEmpty && !message.deleted) ? 18 : 0)
                 }
                 if !alignRight {
                     // 相手側はアイコン付きで表示(タップでプロフィール)
@@ -687,11 +689,13 @@ struct MessageBubble: View {
                     }
                 }
                 if !alignRight {
-                    // 相手側はバブルの右横に時刻・未読(下揃え・2段)
+                    // 相手側はバブルの右横に時刻・未読(下揃え・2段)。
+                    // リアクションがある場合は行の高さぶん持ち上げて重ならないようにする
                     VStack(alignment: .leading, spacing: 1) {
                         readStatusText
                         timeText
                     }
+                    .padding(.bottom, (!message.reactions.isEmpty && !message.deleted) ? 18 : 0)
                 }
                 if !alignRight { Spacer(minLength: 60) }
             }

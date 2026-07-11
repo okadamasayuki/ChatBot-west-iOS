@@ -948,7 +948,8 @@ struct BaMessageBubble: View {
         HStack(alignment: .bottom, spacing: 6) {
             if isMine { Spacer(minLength: 60) }
             if isMine {
-                // LINEと同じく、自分側はバブルの左横に既読・時刻(下揃え・2段)
+                // LINEと同じく、自分側はバブルの左横に既読・時刻(下揃え・2段)。
+                // リアクションがある場合は行の高さぶん持ち上げて重ならないようにする
                 VStack(alignment: .trailing, spacing: 1) {
                     if let readStatus {
                         Text(readStatus)
@@ -959,6 +960,7 @@ struct BaMessageBubble: View {
                         .font(.system(size: 10))
                         .foregroundColor(Theme.header.opacity(0.6))
                 }
+                .padding(.bottom, (!message.reactions.isEmpty && !message.deleted) ? 18 : 0)
             }
             if !isMine {
                 // 相手のアイコン(タップでプロフィール)
@@ -1096,10 +1098,12 @@ struct BaMessageBubble: View {
                 }
             }
             if !isMine {
-                // 相手側はバブルの右横に時刻(下揃え)
+                // 相手側はバブルの右横に時刻(下揃え)。
+                // リアクションがある場合は行の高さぶん持ち上げて重ならないようにする
                 Text(fmtTime(message.ts))
                     .font(.system(size: 10))
                     .foregroundColor(Theme.header.opacity(0.6))
+                    .padding(.bottom, (!message.reactions.isEmpty && !message.deleted) ? 18 : 0)
             }
             if !isMine { Spacer(minLength: 60) }
         }
