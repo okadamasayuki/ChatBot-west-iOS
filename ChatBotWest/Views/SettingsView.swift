@@ -46,6 +46,12 @@ struct IconSettingView: View {
                 }
             }
 
+            Section("写真から選ぶ") {
+                PhotosPicker(selection: $photosItem, matching: .images) {
+                    Label("写真を選択", systemImage: "photo")
+                }
+            }
+
             Section("絵文字から選ぶ") {
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 6), spacing: 10) {
                     ForEach(Self.emojis, id: \.self) { emoji in
@@ -61,12 +67,6 @@ struct IconSettingView: View {
                         }
                         .buttonStyle(.plain)
                     }
-                }
-            }
-
-            Section("写真から選ぶ") {
-                PhotosPicker(selection: $photosItem, matching: .images) {
-                    Label("写真を選択", systemImage: "photo")
                 }
             }
 
