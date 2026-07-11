@@ -1086,6 +1086,7 @@ struct BaMessageBubble: View {
                                       memberFor: { uid in store.member(uid) }) { emoji in
                         store.toggleBaReaction(message, emoji: emoji)
                     }
+                    .padding(.top, 3)
                 }
             }
             if !isMine {

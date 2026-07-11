@@ -677,6 +677,7 @@ struct MessageBubble: View {
                     if !message.reactions.isEmpty, !message.deleted {
                         ReactionChipsView(reactions: message.reactions, myUid: myUid,
                                           memberFor: reactionMemberFor, onToggle: onReaction)
+                            .padding(.top, 3)
                     }
                 }
                 if !alignRight {
