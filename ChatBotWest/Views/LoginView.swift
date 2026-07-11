@@ -34,11 +34,6 @@ struct LoginView: View {
                 switch mode {
                 case .chooser:
                     Section {
-                        Text("ご利用にはアカウントが必要です。初めての方は「新規登録」、登録済みの方は「ログイン」を選んでください。")
-                            .font(.footnote)
-                            .foregroundColor(.secondary)
-                    }
-                    Section {
                         Button {
                             switchMode(.login)
                         } label: {
