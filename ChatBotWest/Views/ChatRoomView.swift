@@ -147,15 +147,26 @@ struct ChatRoomView: View {
                             // 長押しでリアクション・コピー(全メッセージ)・編集・削除・復元
                             bubble.contextMenu {
                                 if !msg.deleted {
-                                    // 1列目: リアクション絵文字の横並び
-                                    ControlGroup {
-                                        ForEach(CloudStore.reactionEmojis, id: \.self) { emoji in
-                                            Button(emoji) {
-                                                store.toggleReaction(msg, emoji: emoji)
+                                    // 1列目: リアクション絵文字を1行に横並び
+                                    if #available(iOS 17.0, *) {
+                                        ControlGroup {
+                                            ForEach(CloudStore.reactionEmojis, id: \.self) { emoji in
+                                                Button(emoji) {
+                                                    store.toggleReaction(msg, emoji: emoji)
+                                                }
                                             }
                                         }
+                                        .controlGroupStyle(.palette)
+                                    } else {
+                                        ControlGroup {
+                                            ForEach(CloudStore.reactionEmojis, id: \.self) { emoji in
+                                                Button(emoji) {
+                                                    store.toggleReaction(msg, emoji: emoji)
+                                                }
+                                            }
+                                        }
+                                        .controlGroupStyle(.compactMenu)
                                     }
-                                    .controlGroupStyle(.compactMenu)
                                     Button {
                                         UIPasteboard.general.string = msg.text
                                     } label: {

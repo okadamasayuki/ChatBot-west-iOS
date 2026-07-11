@@ -751,15 +751,26 @@ struct BaMessageBubble: View {
                 .background(LineBubbleShape(isMine: isMine).fill(isMine ? Theme.myBubble : Color(.systemBackground)))
                 .contextMenu {
                     if !message.deleted {
-                        // 1列目: リアクション絵文字の横並び
-                        ControlGroup {
-                            ForEach(CloudStore.reactionEmojis, id: \.self) { emoji in
-                                Button(emoji) {
-                                    store.toggleBaReaction(message, emoji: emoji)
+                        // 1列目: リアクション絵文字を1行に横並び
+                        if #available(iOS 17.0, *) {
+                            ControlGroup {
+                                ForEach(CloudStore.reactionEmojis, id: \.self) { emoji in
+                                    Button(emoji) {
+                                        store.toggleBaReaction(message, emoji: emoji)
+                                    }
                                 }
                             }
+                            .controlGroupStyle(.palette)
+                        } else {
+                            ControlGroup {
+                                ForEach(CloudStore.reactionEmojis, id: \.self) { emoji in
+                                    Button(emoji) {
+                                        store.toggleBaReaction(message, emoji: emoji)
+                                    }
+                                }
+                            }
+                            .controlGroupStyle(.compactMenu)
                         }
-                        .controlGroupStyle(.compactMenu)
                         if !message.text.isEmpty {
                             Button {
                                 UIPasteboard.general.string = message.text
