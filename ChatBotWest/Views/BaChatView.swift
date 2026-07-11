@@ -75,22 +75,22 @@ struct BaTalkListView: View {
                 }
                 .padding(.vertical, 2)
             }
-            // 左スワイプ: 削除 / 右スワイプ: 上部に固定
-            .swipeActions(edge: .trailing) {
+            // LINE風: 左スワイプ=削除(赤・ゴミ箱) / 右スワイプ=ピン留め(青・フルスワイプ可)
+            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                 Button(role: .destructive) {
                     deleteTarget = talk
                 } label: {
-                    Text("削除")
+                    Label("削除", systemImage: "trash.fill")
                 }
             }
-            .swipeActions(edge: .leading) {
+            .swipeActions(edge: .leading, allowsFullSwipe: true) {
                 Button {
                     store.toggleBaTalkPin(talk.id)
                 } label: {
-                    Label(talk.pinnedBy.contains(store.myUid()) ? "固定解除" : "固定",
-                          systemImage: talk.pinnedBy.contains(store.myUid()) ? "pin.slash" : "pin")
+                    Label(talk.pinnedBy.contains(store.myUid()) ? "ピン解除" : "ピン留め",
+                          systemImage: talk.pinnedBy.contains(store.myUid()) ? "pin.slash.fill" : "pin.fill")
                 }
-                .tint(.orange)
+                .tint(Color(red: 0x33 / 255.0, green: 0xa1 / 255.0, blue: 0xde / 255.0)) // LINE風の青
             }
             }
         }
