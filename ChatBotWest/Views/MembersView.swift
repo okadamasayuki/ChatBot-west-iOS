@@ -113,11 +113,14 @@ struct MembersView: View {
         .background(Color(.systemGroupedBackground))
     }
 
-    /// 絞り込みの変更はアニメーションなしで反映する(メニューを閉じる動きと重なって表示が崩れるため)
+    /// 絞り込みはメニューが完全に閉じてから、アニメーションなしで反映する
+    /// (メニューを閉じる動きの最中に一覧が組み変わると表示が大きく崩れるため)
     private func applyFilter(_ change: @escaping () -> Void) {
-        var t = Transaction()
-        t.disablesAnimations = true
-        withTransaction(t) { change() }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+            var t = Transaction()
+            t.disablesAnimations = true
+            withTransaction(t) { change() }
+        }
     }
 
     private func filterMenu(title: String, selection: Binding<String>,
