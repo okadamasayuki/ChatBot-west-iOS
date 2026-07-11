@@ -141,7 +141,7 @@ struct RoomListView: View {
                 ToolbarItem(placement: .topBarLeading) {
                     Picker("フィルタ", selection: $expertFilter) {
                         Text("すべて").tag(ExpertFilter.all)
-                        Text("自分が対応中").tag(ExpertFilter.handling)
+                        Text("担当中").tag(ExpertFilter.handling)
                     }
                     .pickerStyle(.segmented)
                     .controlSize(.small)
