@@ -661,6 +661,11 @@ struct AddBaMembersSheet: View {
                 Section {
                     Toggle("過去の履歴も見せる", isOn: $showHistory)
                         .tint(Theme.accent)
+                } footer: {
+                    Text("オフにすると、追加したメンバーには追加した時点より後のメッセージだけが表示されます。")
+                }
+
+                Section {
                     Button {
                         // 絞り込みを変えても選択は保持されるよう、全体から選ぶ
                         let picked = pool.filter { selected.contains($0.id) }
@@ -674,8 +679,6 @@ struct AddBaMembersSheet: View {
                         }
                     }
                     .disabled(selected.isEmpty)
-                } footer: {
-                    Text("「過去の履歴も見せる」をオフにすると、追加したメンバーには追加した時点より後のメッセージだけが表示されます。")
                 }
 
                 Section("追加するメンバーを選択") {
